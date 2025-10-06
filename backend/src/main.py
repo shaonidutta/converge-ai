@@ -1,5 +1,5 @@
 """
-Nexora Backend - Main Application Entry Point
+ConvergeAI Backend - Main Application Entry Point
 
 This file initializes and configures the FastAPI app with:
 - Secure middleware
@@ -29,13 +29,13 @@ import uvicorn
 # =============================================
 # Configuration
 # =============================================
-APP_NAME = "Nexora Backend API"
+APP_NAME = "ConvergeAI Backend API"
 VERSION = "1.0.0"
 ENV = os.getenv("APP_ENV", "development")
 ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Customer frontend
     "http://localhost:3001",  # Ops frontend
-    "https://nexora.app",
+    "https://convergeAI.app",
 ]
 
 # =============================================
@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
     logger.info("All services initialized successfully")
     yield
-    logger.info("Shutting down Nexora backend...")
+    logger.info("Shutting down ConvergeAI backend...")
     # await close_database()
     # await close_redis()
     logger.info("Shutdown complete.")

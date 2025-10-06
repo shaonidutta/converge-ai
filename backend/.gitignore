@@ -231,13 +231,16 @@ docker-volumes/
 .docker/
 
 # ============================================
-# Documentation (except README.md)
+# Development Logs (Internal Use Only)
+# ============================================
+.dev-logs/
+
+# ============================================
+# Documentation (except README.md in docs/)
 # ============================================
 *.md
 !README.md
-!TASKLIST.md
-!PHASE1_COMMIT_SUMMARY.md
-!SETUP_TEST_RESULTS.md
+!docs/*.md
 
 # ============================================
 # Examples
