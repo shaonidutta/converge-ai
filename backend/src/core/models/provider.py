@@ -33,6 +33,20 @@ class Provider(Base, TimestampMixin):
     
     # Relationships
     booking_items = relationship("BookingItem", back_populates="provider")
+
+    # New pincode relationships (optimized)
+    pincode_associations = relationship(
+        'ProviderPincode',
+        back_populates='provider',
+        cascade='all, delete-orphan'
+    )
+
+    pincodes = relationship(
+        'Pincode',
+        secondary='provider_pincodes',
+        back_populates='providers',
+        viewonly=True
+    )
     
     # Indexes
     __table_args__ = (

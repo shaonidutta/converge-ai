@@ -11,6 +11,7 @@ from backend.src.core.models.booking_item import BookingItem, ItemPaymentStatus,
 from backend.src.core.models.conversation import Conversation, MessageRole, Channel
 from backend.src.core.models.priority_queue import PriorityQueue, IntentType
 from backend.src.core.models.complaint import Complaint, ComplaintUpdate, ComplaintType, ComplaintPriority, ComplaintStatus
+from backend.src.core.models.pincode import Pincode, RateCardPincode, ProviderPincode
 
 __all__ = [
     # Base
@@ -24,6 +25,11 @@ __all__ = [
     "RateCard",
     "Address",
     "Provider",
+
+    # Pincode Models (Optimized)
+    "Pincode",
+    "RateCardPincode",
+    "ProviderPincode",
 
     # Booking Models
     "Booking",

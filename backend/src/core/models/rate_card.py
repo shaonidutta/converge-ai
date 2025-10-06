@@ -33,6 +33,20 @@ class RateCard(Base, TimestampMixin):
     category = relationship("Category", back_populates="rate_cards")
     subcategory = relationship("Subcategory", back_populates="rate_cards")
     booking_items = relationship("BookingItem", back_populates="rate_card")
+
+    # New pincode relationships (optimized)
+    pincode_associations = relationship(
+        'RateCardPincode',
+        back_populates='rate_card',
+        cascade='all, delete-orphan'
+    )
+
+    pincodes = relationship(
+        'Pincode',
+        secondary='rate_card_pincodes',
+        back_populates='rate_cards',
+        viewonly=True
+    )
     
     # Indexes
     __table_args__ = (
