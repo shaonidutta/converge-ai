@@ -92,12 +92,26 @@
 - [x] Initialize Alembic
 - [x] Configure alembic.ini for async
 - [x] Create initial migration (all tables)
-- [ ] Test migration up and down
+- [x] Test migration up and down
 - [x] Create migration script for indexes
 - [x] Document migration process
 
 ### 2.4 Database Initialization
-- [ ] Create database initialization script
+- [x] Create database initialization script
+- [x] Create seed data scripts for all tables
+- [x] Generate realistic test data (150+ records per table)
+- [x] Create categories and subcategories for service marketplace
+- [x] Create users (ops staff and customers) with Indian mobile numbers
+- [x] Create providers with service coverage
+- [x] Create addresses across Indian cities
+- [x] Create rate cards for services
+- [x] Create bookings and booking items
+- [x] Create conversations with AI metrics
+- [x] Create priority queue items
+- [x] Create complaints and updates
+- [x] Create data verification script
+- [x] Create clear data utility script
+- [x] Test all seed scripts
 - [ ] Add seed data for categories
 - [ ] Add seed data for subcategories
 - [ ] Add seed data for service attributes
