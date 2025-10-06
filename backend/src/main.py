@@ -1,205 +1,215 @@
 """
-ConvergeAI Backend - Main Application Entry Point
+Nexora Backend - Main Application Entry Point
 
-This module initializes and configures the FastAPI application with all
-necessary middleware, routers, and startup/shutdown events.
+This file initializes and configures the FastAPI app with:
+- Secure middleware
+- Rate limiting
+- Structured logging
+- Startup/shutdown hooks
+- Router inclusion
+- Central exception handling
+- Health & metrics endpoints
 """
 
+import logging
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
-# Import configuration (will be created in Phase 3)
-# from src.config.settings import get_settings
+import uvicorn
 
-# Import routers (will be created in later phases)
-# from src.api.v1.endpoints import auth, users, chat, bookings, complaints
+# =============================================
+# Configuration
+# =============================================
+APP_NAME = "Nexora Backend API"
+VERSION = "1.0.0"
+ENV = os.getenv("APP_ENV", "development")
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Customer frontend
+    "http://localhost:3001",  # Ops frontend
+    "https://nexora.app",
+]
 
-# Import middleware (will be created in later phases)
-# from src.api.middleware.logging import LoggingMiddleware
-# from src.api.middleware.rate_limit import RateLimitMiddleware
+# =============================================
+# Rate Limiting
+# =============================================
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["100/minute"],  # global default
+    storage_uri="memory://",  # change to redis://<host>:6379 for production
+)
 
-# Import monitoring (will be created in later phases)
-# from src.monitoring.metrics import setup_metrics
-# from src.monitoring.logging import setup_logging
+# =============================================
+# Logging Configuration
+# =============================================
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(APP_NAME)
 
-
+# =============================================
+# Application Lifecycle Manager
+# =============================================
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator:
     """
-    Application lifespan manager.
-    
-    Handles startup and shutdown events for the application.
+    Application lifespan: handles startup/shutdown hooks.
     """
-    # Startup
-    print("Starting ConvergeAI Backend...")
+    logger.info(f"Starting {APP_NAME} (env={ENV})")
 
-    # Initialize database connection
+    # Initialize connections
     # await init_database()
-
-    # Initialize Redis connection
     # await init_redis()
-
-    # Initialize Pinecone
     # await init_pinecone()
-
-    # Load ML models
     # await load_ml_models()
 
-    # Setup monitoring
-    # setup_logging()
-    # setup_metrics()
-
-    print("ConvergeAI Backend started successfully!")
-
+    logger.info("All services initialized successfully")
     yield
-
-    # Shutdown
-    print("Shutting down ConvergeAI Backend...")
-
-    # Close database connections
+    logger.info("Shutting down Nexora backend...")
     # await close_database()
-
-    # Close Redis connections
     # await close_redis()
+    logger.info("Shutdown complete.")
 
-    print("ConvergeAI Backend shut down successfully!")
-
-
-# Create FastAPI application
+# =============================================
+# FastAPI Application Setup
+# =============================================
 app = FastAPI(
-    title="ConvergeAI Backend API",
-    description="Multi-Agent Customer Service Platform powered by LangChain, LangGraph, and Google Gemini",
-    version="1.0.0",
+    title=APP_NAME,
+    description="Multi-Agent Marketplace Backend powered by Gemini & RAG",
+    version=VERSION,
+    lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
-    lifespan=lifespan,
 )
 
+# =============================================
+# Security Middleware (CORS, Headers, Rate Limit)
+# =============================================
 
-# ============================================
-# CORS Middleware
-# ============================================
+# --- CORS ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # Customer frontend
-        "http://localhost:3001",  # Ops frontend
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
+# --- Rate Limiting ---
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# ============================================
-# Custom Middleware (will be added in later phases)
-# ============================================
-# app.add_middleware(LoggingMiddleware)
-# app.add_middleware(RateLimitMiddleware)
+# --- Security Headers Middleware ---
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        return response
 
+app.add_middleware(SecurityHeadersMiddleware)
 
-# ============================================
-# Health Check Endpoint
-# ============================================
-@app.get("/health", tags=["Health"])
-async def health_check():
-    """
-    Health check endpoint.
-    
-    Returns the health status of the application and its dependencies.
-    """
-    return JSONResponse(
-        status_code=200,
-        content={
-            "status": "healthy",
-            "service": "ConvergeAI Backend",
-            "version": "1.0.0",
-            "components": {
-                "api": "healthy",
-                # "database": "healthy",  # Will be implemented in Phase 2
-                # "redis": "healthy",     # Will be implemented in Phase 3
-                # "pinecone": "healthy",  # Will be implemented in Phase 7
-            }
-        }
-    )
-
-
-@app.get("/", tags=["Root"])
-async def root():
-    """
-    Root endpoint.
-    
-    Returns basic information about the API.
-    """
-    return {
-        "message": "Welcome to ConvergeAI Backend API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "redoc": "/redoc",
-        "health": "/health",
-    }
-
-
-# ============================================
-# API Routers (will be added in later phases)
-# ============================================
-# API v1 routes
-# app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
+# =============================================
+# Routers (to be imported later)
+# =============================================
+# from src.api.v1 import auth, users, chat, bookings, complaints
+# app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
 # app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 # app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
 # app.include_router(bookings.router, prefix="/api/v1/bookings", tags=["Bookings"])
 # app.include_router(complaints.router, prefix="/api/v1/complaints", tags=["Complaints"])
 
+# =============================================
+# Health & Root Endpoints
+# =============================================
 
-# ============================================
-# Exception Handlers
-# ============================================
+@app.get("/health", tags=["Health"])
+@limiter.limit("5/second")
+async def health_check(request: Request):
+    """
+    Health Check Endpoint.
+    Includes service component checks when available.
+    """
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "healthy",
+            "service": APP_NAME,
+            "version": VERSION,
+            "components": {
+                "api": "ok",
+                # "database": "ok",
+                # "redis": "ok",
+                # "pinecone": "ok",
+            },
+        },
+    )
+
+@app.get("/", tags=["Root"])
+@limiter.limit("2/second")
+async def root(request: Request):
+    """Root endpoint"""
+    return {
+        "message": f"Welcome to {APP_NAME}",
+        "version": VERSION,
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+# =============================================
+# Error & Exception Handling
+# =============================================
+
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    """
-    Global exception handler.
-    
-    Catches all unhandled exceptions and returns a standardized error response.
-    """
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch-all error handler"""
+    logger.exception(f"Unhandled Exception: {exc}")
     return JSONResponse(
         status_code=500,
         content={
             "error": "Internal Server Error",
             "message": str(exc),
             "path": str(request.url),
-        }
+        },
     )
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Access log for every request"""
+    logger.info(f"Request: {request.method} {request.url.path} from {request.client.host}")
+    response = await call_next(request)
+    logger.info(f"Response: {response.status_code} {request.url.path}")
+    return response
 
-# ============================================
+# =============================================
 # Metrics Endpoint (Prometheus)
-# ============================================
+# =============================================
+# from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 # @app.get("/metrics", tags=["Monitoring"])
 # async def metrics():
-#     """
-#     Prometheus metrics endpoint.
-#     """
-#     return Response(
-#         content=generate_latest(),
-#         media_type="text/plain"
-#     )
+#     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
-
+# =============================================
+# Entry Point
+# =============================================
 if __name__ == "__main__":
-    import uvicorn
-    
     uvicorn.run(
         "src.main:app",
         host="0.0.0.0",
-        port=8000,
-        reload=True,
+        port=int(os.getenv("PORT", 8000)),
+        reload=ENV == "development",
         log_level="info",
     )
-
