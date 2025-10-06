@@ -126,8 +126,6 @@ class AddressRequest(BaseModel):
     city: str = Field(..., min_length=2, max_length=100)
     state: str = Field(..., min_length=2, max_length=100)
     pincode: str = Field(..., min_length=6, max_length=6)
-    landmark: Optional[str] = Field(None, max_length=255)
-    address_type: str = Field("home", description="home, work, other")
     is_default: bool = Field(False, description="Set as default address")
     
     class Config:
@@ -138,8 +136,6 @@ class AddressRequest(BaseModel):
                 "city": "Mumbai",
                 "state": "Maharashtra",
                 "pincode": "400001",
-                "landmark": "Near Central Park",
-                "address_type": "home",
                 "is_default": True
             }
         }
@@ -153,11 +149,8 @@ class AddressResponse(BaseModel):
     city: str
     state: str
     pincode: str
-    landmark: Optional[str]
-    address_type: str
     is_default: bool
-    is_active: bool
-    
+
     class Config:
         from_attributes = True
 
@@ -215,11 +208,27 @@ class BookingResponse(BaseModel):
 class CancelBookingRequest(BaseModel):
     """Cancel booking request schema"""
     reason: str = Field(..., min_length=10, max_length=500, description="Cancellation reason")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
                 "reason": "Change of plans, need to reschedule"
+            }
+        }
+
+
+class RescheduleBookingRequest(BaseModel):
+    """Reschedule booking request schema"""
+    preferred_date: str = Field(..., description="New preferred date (YYYY-MM-DD)")
+    preferred_time: str = Field(..., description="New preferred time (HH:MM)")
+    reason: Optional[str] = Field(None, max_length=500, description="Reason for rescheduling")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "preferred_date": "2025-10-15",
+                "preferred_time": "14:00",
+                "reason": "Need to change appointment time"
             }
         }
 

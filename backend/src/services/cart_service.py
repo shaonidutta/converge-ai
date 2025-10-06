@@ -53,17 +53,22 @@ class CartService:
     async def get_cart(self, user: User) -> CartResponse:
         """
         Get user's cart with items
-        
+
         Args:
             user: Current user
-            
+
         Returns:
             CartResponse with cart items
         """
+        logger.info(f"Getting cart for user_id: {user.id}")
+
         # Get or create cart
+        logger.debug("Getting or creating cart")
         cart = await self.get_or_create_cart(user.id)
-        
+        logger.debug(f"Cart found/created: cart_id={cart.id}")
+
         # Get cart items with rate card and subcategory details
+        logger.debug("Fetching cart items with rate card and subcategory details")
         result = await self.db.execute(
             select(CartItem, RateCard, Subcategory)
             .join(RateCard, CartItem.rate_card_id == RateCard.id)
@@ -71,9 +76,11 @@ class CartService:
             .where(CartItem.cart_id == cart.id)
         )
         items = result.all()
-        
+        logger.debug(f"Found {len(items)} cart items")
+
         # Calculate total
         total_amount = sum(item[0].total_price for item in items)
+        logger.debug(f"Total amount: {total_amount}")
         
         # Build response
         cart_items = [

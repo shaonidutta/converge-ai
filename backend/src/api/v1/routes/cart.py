@@ -32,13 +32,24 @@ async def get_cart(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Get user's cart with items"""
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
+
     try:
+        logger.info(f"Get cart request for user_id: {current_user.id}")
         cart_service = CartService(db)
-        return await cart_service.get_cart(current_user)
+        logger.debug("CartService instantiated")
+
+        result = await cart_service.get_cart(current_user)
+        logger.info(f"Cart fetched successfully for user_id: {current_user.id}")
+        return result
     except Exception as e:
+        logger.error(f"Failed to fetch cart - Exception: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch cart"
+            detail=f"Failed to fetch cart: {str(e)}"
         )
 
 
@@ -133,13 +144,21 @@ async def clear_cart(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Clear all items from cart"""
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
+
     try:
+        logger.info(f"Clear cart request for user_id: {current_user.id}")
         cart_service = CartService(db)
         await cart_service.clear_cart(current_user)
+        logger.info(f"Cart cleared successfully for user_id: {current_user.id}")
         return MessageResponse(message="Cart cleared successfully")
     except Exception as e:
+        logger.error(f"Failed to clear cart - Exception: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to clear cart"
+            detail=f"Failed to clear cart: {str(e)}"
         )
 

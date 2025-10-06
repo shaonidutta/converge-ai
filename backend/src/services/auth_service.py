@@ -179,29 +179,42 @@ class AuthService:
     async def refresh_access_token(self, request: RefreshTokenRequest) -> AuthResponse:
         """
         Refresh access token using refresh token
-        
+
         Args:
             request: Refresh token request
-            
+
         Returns:
             AuthResponse with new tokens
-            
+
         Raises:
             ValueError: If refresh token is invalid
         """
+        logger.info("Starting token refresh process")
+
         # Verify refresh token
-        payload = verify_token(request.refresh_token)
+        logger.debug("Verifying refresh token")
+        payload = await verify_token(request.refresh_token)
         if not payload:
+            logger.warning("Invalid refresh token - verification failed")
             raise ValueError("Invalid refresh token")
-        
-        user_id = int(payload.get("sub"))
+
+        logger.debug(f"Token payload: {payload}")
+        user_id = payload.get("user_id")
+        if not user_id:
+            logger.warning("Token payload missing user_id")
+            raise ValueError("Invalid token payload")
+        logger.info(f"Token refresh for user_id: {user_id}")
 
         # Get user
+        logger.debug(f"Fetching user from database: user_id={user_id}")
         user = await self.user_repo.get_user_by_id(user_id)
         if not user:
+            logger.warning(f"User not found: user_id={user_id}")
             raise ValueError("User not found")
-        
+
+        logger.debug(f"User found: email={user.email}, is_active={user.is_active}")
         if not user.is_active:
+            logger.warning(f"Account inactive: user_id={user_id}")
             raise ValueError("Account is inactive")
         
         # Generate new tokens

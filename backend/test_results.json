@@ -5,23 +5,23 @@
     "method": "POST",
     "status": "PASS",
     "details": "Register new user",
-    "timestamp": "2025-10-07T01:52:17.066531"
+    "timestamp": "2025-10-07T02:15:58.490921"
   },
   {
     "module": "AUTH",
     "endpoint": "/auth/login",
     "method": "POST",
-    "status": "FAIL",
-    "details": "Exception: ('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None))",
-    "timestamp": "2025-10-07T01:52:19.134208"
+    "status": "PASS",
+    "details": "Login with credentials",
+    "timestamp": "2025-10-07T02:16:00.856974"
   },
   {
     "module": "AUTH",
     "endpoint": "/auth/refresh",
     "method": "POST",
-    "status": "FAIL",
-    "details": "Expected 200, got 500. Error: Token refresh failed",
-    "timestamp": "2025-10-07T01:52:21.199335"
+    "status": "PASS",
+    "details": "Refresh access token",
+    "timestamp": "2025-10-07T02:16:02.975590"
   },
   {
     "module": "AUTH",
@@ -29,7 +29,7 @@
     "method": "POST",
     "status": "PASS",
     "details": "Logout user",
-    "timestamp": "2025-10-07T01:52:23.559721"
+    "timestamp": "2025-10-07T02:16:05.172333"
   },
   {
     "module": "USERS",
@@ -37,7 +37,7 @@
     "method": "GET",
     "status": "PASS",
     "details": "Get current user profile",
-    "timestamp": "2025-10-07T01:52:25.681765"
+    "timestamp": "2025-10-07T02:16:07.308705"
   },
   {
     "module": "USERS",
@@ -45,7 +45,7 @@
     "method": "PUT",
     "status": "FAIL",
     "details": "Expected 200, got 500. Error: Failed to update profile",
-    "timestamp": "2025-10-07T01:52:27.789527"
+    "timestamp": "2025-10-07T02:16:09.404801"
   },
   {
     "module": "CATEGORIES",
@@ -53,7 +53,7 @@
     "method": "GET",
     "status": "PASS",
     "details": "List all categories",
-    "timestamp": "2025-10-07T01:52:29.992738"
+    "timestamp": "2025-10-07T02:16:11.506567"
   },
   {
     "module": "CATEGORIES",
@@ -61,7 +61,7 @@
     "method": "GET",
     "status": "PASS",
     "details": "Get category 1",
-    "timestamp": "2025-10-07T01:52:32.108572"
+    "timestamp": "2025-10-07T02:16:13.617178"
   },
   {
     "module": "CATEGORIES",
@@ -69,7 +69,7 @@
     "method": "GET",
     "status": "PASS",
     "details": "List subcategories for category 1",
-    "timestamp": "2025-10-07T01:52:34.234642"
+    "timestamp": "2025-10-07T02:16:15.762912"
   },
   {
     "module": "CATEGORIES",
@@ -77,7 +77,7 @@
     "method": "GET",
     "status": "PASS",
     "details": "List rate cards for subcategory 1",
-    "timestamp": "2025-10-07T01:52:36.386712"
+    "timestamp": "2025-10-07T02:16:17.903915"
   },
   {
     "module": "CART",
@@ -85,7 +85,7 @@
     "method": "GET",
     "status": "PASS",
     "details": "Get user cart",
-    "timestamp": "2025-10-07T01:52:38.905037"
+    "timestamp": "2025-10-07T02:16:20.559584"
   },
   {
     "module": "CART",
@@ -93,7 +93,7 @@
     "method": "POST",
     "status": "FAIL",
     "details": "Expected 201, got 400. Error: Rate card not found or inactive",
-    "timestamp": "2025-10-07T01:52:41.073809"
+    "timestamp": "2025-10-07T02:16:22.715835"
   },
   {
     "module": "CART",
@@ -101,7 +101,7 @@
     "method": "PUT",
     "status": "FAIL",
     "details": "Expected 200, got 404. Error: Cart item not found",
-    "timestamp": "2025-10-07T01:52:43.216866"
+    "timestamp": "2025-10-07T02:16:24.865734"
   },
   {
     "module": "CART",
@@ -109,7 +109,7 @@
     "method": "DELETE",
     "status": "FAIL",
     "details": "Expected 200, got 404. Error: Cart item not found",
-    "timestamp": "2025-10-07T01:52:45.406439"
+    "timestamp": "2025-10-07T02:16:27.150475"
   },
   {
     "module": "CART",
@@ -117,22 +117,38 @@
     "method": "DELETE",
     "status": "PASS",
     "details": "Clear cart",
-    "timestamp": "2025-10-07T01:52:47.550413"
+    "timestamp": "2025-10-07T02:16:29.310371"
   },
   {
     "module": "ADDRESSES",
     "endpoint": "/addresses",
     "method": "GET",
-    "status": "FAIL",
-    "details": "Expected 200, got 500. Error: Failed to fetch addresses",
-    "timestamp": "2025-10-07T01:52:49.669872"
+    "status": "PASS",
+    "details": "List user addresses",
+    "timestamp": "2025-10-07T02:16:31.434669"
   },
   {
     "module": "ADDRESSES",
     "endpoint": "/addresses",
     "method": "POST",
-    "status": "FAIL",
-    "details": "Expected 201, got 500. Error: Failed to add address",
-    "timestamp": "2025-10-07T01:52:51.828684"
+    "status": "PASS",
+    "details": "Add new address",
+    "timestamp": "2025-10-07T02:16:37.527861"
+  },
+  {
+    "module": "ADDRESSES",
+    "endpoint": "/addresses/198",
+    "method": "GET",
+    "status": "PASS",
+    "details": "Get address 198",
+    "timestamp": "2025-10-07T02:16:39.678490"
+  },
+  {
+    "module": "BOOKINGS",
+    "endpoint": "/bookings",
+    "method": "GET",
+    "status": "PASS",
+    "details": "List user bookings",
+    "timestamp": "2025-10-07T02:16:41.815451"
   }
 ]

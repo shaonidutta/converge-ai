@@ -31,13 +31,24 @@ async def list_addresses(
     active_only: bool = Query(True, description="Show only active addresses")
 ):
     """List user's addresses"""
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
+
     try:
+        logger.info(f"List addresses request for user_id: {current_user.id}, active_only: {active_only}")
         address_service = AddressService(db)
-        return await address_service.list_addresses(current_user, active_only)
+        logger.debug("AddressService instantiated")
+
+        result = await address_service.list_addresses(current_user, active_only)
+        logger.info(f"Addresses fetched successfully for user_id: {current_user.id}, count: {len(result)}")
+        return result
     except Exception as e:
+        logger.error(f"Failed to fetch addresses - Exception: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch addresses"
+            detail=f"Failed to fetch addresses: {str(e)}"
         )
 
 
@@ -53,13 +64,26 @@ async def add_address(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Add a new address"""
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
+
     try:
+        logger.info(f"Add address request for user_id: {current_user.id}")
+        logger.debug(f"Address data: {request.model_dump()}")
+
         address_service = AddressService(db)
-        return await address_service.add_address(request, current_user)
+        logger.debug("AddressService instantiated")
+
+        result = await address_service.add_address(request, current_user)
+        logger.info(f"Address added successfully for user_id: {current_user.id}, address_id: {result.id}")
+        return result
     except Exception as e:
+        logger.error(f"Failed to add address - Exception: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to add address"
+            detail=f"Failed to add address: {str(e)}"
         )
 
 

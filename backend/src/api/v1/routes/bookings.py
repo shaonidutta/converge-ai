@@ -14,6 +14,7 @@ from src.schemas.customer import (
     CreateBookingRequest,
     BookingResponse,
     CancelBookingRequest,
+    RescheduleBookingRequest,
 )
 from src.schemas.auth import MessageResponse
 from src.services import BookingService
@@ -108,6 +109,43 @@ async def get_booking(
 
 
 @router.post(
+    "/{booking_id}/reschedule",
+    response_model=BookingResponse,
+    summary="Reschedule booking"
+)
+async def reschedule_booking(
+    booking_id: int,
+    request: RescheduleBookingRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Reschedule a booking to a new date and time"""
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
+
+    try:
+        logger.info(f"Reschedule booking request: booking_id={booking_id}, user_id={current_user.id}")
+        booking_service = BookingService(db)
+        result = await booking_service.reschedule_booking(booking_id, request, current_user)
+        logger.info(f"Booking rescheduled successfully: booking_id={booking_id}")
+        return result
+    except ValueError as e:
+        logger.warning(f"Reschedule failed - ValueError: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Reschedule failed - Exception: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to reschedule booking: {str(e)}"
+        )
+
+
+@router.post(
     "/{booking_id}/cancel",
     response_model=MessageResponse,
     summary="Cancel booking"
@@ -119,18 +157,27 @@ async def cancel_booking(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Cancel a booking"""
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
+
     try:
+        logger.info(f"Cancel booking request: booking_id={booking_id}, user_id={current_user.id}")
         booking_service = BookingService(db)
         await booking_service.cancel_booking(booking_id, request, current_user)
+        logger.info(f"Booking cancelled successfully: booking_id={booking_id}")
         return MessageResponse(message="Booking cancelled successfully")
     except ValueError as e:
+        logger.warning(f"Cancel failed - ValueError: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Cancel failed - Exception: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to cancel booking"
+            detail=f"Failed to cancel booking: {str(e)}"
         )
 

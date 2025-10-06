@@ -21,33 +21,34 @@ class AddressService:
         self.db = db
     
     async def list_addresses(
-        self, 
-        user: User, 
+        self,
+        user: User,
         active_only: bool = True
     ) -> List[AddressResponse]:
         """
         List user's addresses
-        
+
         Args:
             user: Current user
             active_only: Show only active addresses
-            
+
         Returns:
             List of AddressResponse
         """
+        logger.info(f"Listing addresses for user_id: {user.id}")
+
         query = select(Address).where(Address.user_id == user.id)
-        
-        if active_only:
-            query = query.where(Address.is_active == True)
-        
+
         query = query.order_by(
-            Address.is_default.desc(), 
+            Address.is_default.desc(),
             Address.created_at.desc()
         )
-        
+
+        logger.debug("Executing address query")
         result = await self.db.execute(query)
         addresses = result.scalars().all()
-        
+        logger.debug(f"Found {len(addresses)} addresses")
+
         return [
             AddressResponse(
                 id=addr.id,
@@ -56,47 +57,48 @@ class AddressService:
                 city=addr.city,
                 state=addr.state,
                 pincode=addr.pincode,
-                landmark=addr.landmark,
-                address_type=addr.address_type,
-                is_default=addr.is_default,
-                is_active=addr.is_active
+                is_default=addr.is_default
             )
             for addr in addresses
         ]
     
     async def add_address(
-        self, 
-        request: AddressRequest, 
+        self,
+        request: AddressRequest,
         user: User
     ) -> AddressResponse:
         """
         Add a new address
-        
+
         Args:
             request: Address creation request
             user: Current user
-            
+
         Returns:
             AddressResponse with created address
         """
+        logger.info(f"Adding address for user_id: {user.id}")
+        logger.debug(f"Address data: {request.model_dump()}")
+
         # Check if user has any addresses
+        logger.debug("Checking for existing addresses")
         existing_result = await self.db.execute(
-            select(Address).where(
-                Address.user_id == user.id,
-                Address.is_active == True
-            )
+            select(Address).where(Address.user_id == user.id)
         )
         existing_addresses = existing_result.scalars().all()
-        
+        logger.debug(f"Found {len(existing_addresses)} existing addresses")
+
         # If this is the first address, make it default
         is_default = (
-            request.is_default 
-            if request.is_default is not None 
+            request.is_default
+            if request.is_default is not None
             else (len(existing_addresses) == 0)
         )
-        
+        logger.debug(f"Setting is_default: {is_default}")
+
         # If setting as default, unset other defaults
         if is_default:
+            logger.debug("Unsetting other default addresses")
             await self.db.execute(
                 update(Address)
                 .where(
@@ -105,7 +107,7 @@ class AddressService:
                 )
                 .values(is_default=False)
             )
-        
+
         # Create address
         address = Address(
             user_id=user.id,
@@ -114,18 +116,15 @@ class AddressService:
             city=request.city,
             state=request.state,
             pincode=request.pincode,
-            landmark=request.landmark,
-            address_type=request.address_type,
-            is_default=is_default,
-            is_active=True
+            is_default=is_default
         )
-        
+
         self.db.add(address)
         await self.db.commit()
         await self.db.refresh(address)
-        
+
         logger.info(f"Address added: id={address.id}, user_id={user.id}")
-        
+
         return AddressResponse(
             id=address.id,
             address_line1=address.address_line1,
@@ -133,10 +132,7 @@ class AddressService:
             city=address.city,
             state=address.state,
             pincode=address.pincode,
-            landmark=address.landmark,
-            address_type=address.address_type,
-            is_default=address.is_default,
-            is_active=address.is_active
+            is_default=address.is_default
         )
     
     async def get_address(self, address_id: int, user: User) -> AddressResponse:
@@ -171,10 +167,7 @@ class AddressService:
             city=address.city,
             state=address.state,
             pincode=address.pincode,
-            landmark=address.landmark,
-            address_type=address.address_type,
-            is_default=address.is_default,
-            is_active=address.is_active
+            is_default=address.is_default
         )
     
     async def update_address(
@@ -226,16 +219,14 @@ class AddressService:
         address.city = request.city
         address.state = request.state
         address.pincode = request.pincode
-        address.landmark = request.landmark
-        address.address_type = request.address_type
         if request.is_default is not None:
             address.is_default = request.is_default
-        
+
         await self.db.commit()
         await self.db.refresh(address)
-        
+
         logger.info(f"Address updated: id={address.id}, user_id={user.id}")
-        
+
         return AddressResponse(
             id=address.id,
             address_line1=address.address_line1,
@@ -243,10 +234,7 @@ class AddressService:
             city=address.city,
             state=address.state,
             pincode=address.pincode,
-            landmark=address.landmark,
-            address_type=address.address_type,
-            is_default=address.is_default,
-            is_active=address.is_active
+            is_default=address.is_default
         )
     
     async def delete_address(self, address_id: int, user: User) -> None:

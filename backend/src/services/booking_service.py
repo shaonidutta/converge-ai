@@ -339,6 +339,110 @@ class BookingService:
         )
 
 
+    async def reschedule_booking(
+        self,
+        booking_id: int,
+        request,  # RescheduleBookingRequest
+        user: User
+    ):
+        """
+        Reschedule a booking
+
+        Args:
+            booking_id: Booking ID
+            request: Reschedule request with new date and time
+            user: Current user
+
+        Returns:
+            BookingResponse with updated booking
+
+        Raises:
+            ValueError: If booking cannot be rescheduled
+        """
+        from src.schemas.customer import BookingResponse
+
+        logger.info(f"Rescheduling booking: booking_id={booking_id}, user_id={user.id}")
+
+        # Get booking
+        result = await self.db.execute(
+            select(Booking).where(
+                Booking.id == booking_id,
+                Booking.user_id == user.id
+            )
+        )
+        booking = result.scalar_one_or_none()
+
+        if not booking:
+            logger.warning(f"Booking not found: booking_id={booking_id}")
+            raise ValueError("Booking not found")
+
+        # Check if booking can be rescheduled
+        if booking.status not in [BookingStatus.PENDING, BookingStatus.CONFIRMED]:
+            logger.warning(
+                f"Cannot reschedule booking with status: {booking.status.value}"
+            )
+            raise ValueError(
+                f"Cannot reschedule booking with status: {booking.status.value}"
+            )
+
+        # Validate new date and time
+        try:
+            from datetime import datetime as dt
+            new_date = dt.strptime(request.preferred_date, "%Y-%m-%d").date()
+            new_time = dt.strptime(request.preferred_time, "%H:%M").time()
+
+            # Check if new date is in the future
+            if new_date < dt.now().date():
+                raise ValueError("Preferred date must be in the future")
+        except ValueError as e:
+            logger.warning(f"Invalid date/time format: {str(e)}")
+            raise ValueError(f"Invalid date or time format: {str(e)}")
+
+        # Update booking
+        old_date = booking.preferred_date
+        old_time = booking.preferred_time
+
+        booking.preferred_date = request.preferred_date
+        booking.preferred_time = request.preferred_time
+
+        # Add reschedule note to special instructions
+        reschedule_note = f"\n[Rescheduled from {old_date} {old_time}"
+        if request.reason:
+            reschedule_note += f" - Reason: {request.reason}"
+        reschedule_note += "]"
+
+        if booking.special_instructions:
+            booking.special_instructions += reschedule_note
+        else:
+            booking.special_instructions = reschedule_note.strip()
+
+        await self.db.commit()
+        await self.db.refresh(booking)
+
+        logger.info(
+            f"Booking rescheduled: id={booking.id}, "
+            f"new_date={request.preferred_date}, new_time={request.preferred_time}"
+        )
+
+        # Return updated booking
+        return BookingResponse(
+            id=booking.id,
+            order_id=booking.order_id,
+            booking_number=booking.booking_number,
+            user_id=booking.user_id,
+            address_id=booking.address_id,
+            subtotal=float(booking.subtotal),
+            discount=float(booking.discount) if booking.discount else 0.0,
+            total=float(booking.total),
+            payment_method=booking.payment_method.value,
+            payment_status=booking.payment_status.value,
+            status=booking.status.value,
+            preferred_date=booking.preferred_date,
+            preferred_time=booking.preferred_time,
+            special_instructions=booking.special_instructions,
+            created_at=booking.created_at.isoformat()
+        )
+
     async def cancel_booking(
         self,
         booking_id: int,

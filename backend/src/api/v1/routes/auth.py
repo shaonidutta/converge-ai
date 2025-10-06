@@ -59,18 +59,30 @@ async def login_user(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Login with email/mobile and password"""
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
+
     try:
+        logger.info(f"Login attempt for identifier: {request.identifier}")
         auth_service = AuthService(db)
-        return await auth_service.login_user(request)
+        logger.debug("AuthService instantiated")
+
+        result = await auth_service.login_user(request)
+        logger.info(f"Login successful for identifier: {request.identifier}")
+        return result
     except ValueError as e:
+        logger.warning(f"Login failed - ValueError: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Login failed - Exception: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Login failed"
+            detail=f"Login failed: {str(e)}"
         )
 
 
@@ -84,18 +96,32 @@ async def refresh_token(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Refresh access token using refresh token"""
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
+
     try:
+        logger.info("Token refresh attempt")
+        logger.debug(f"Refresh token (first 20 chars): {request.refresh_token[:20]}...")
+
         auth_service = AuthService(db)
-        return await auth_service.refresh_access_token(request)
+        logger.debug("AuthService instantiated for refresh")
+
+        result = await auth_service.refresh_access_token(request)
+        logger.info("Token refresh successful")
+        return result
     except ValueError as e:
+        logger.warning(f"Token refresh failed - ValueError: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Token refresh failed - Exception: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Token refresh failed"
+            detail=f"Token refresh failed: {str(e)}"
         )
 
 
