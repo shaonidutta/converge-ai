@@ -19,10 +19,10 @@ class Provider(Base, TimestampMixin):
     last_name = Column(String(100), nullable=True)
     mobile = Column(String(15), unique=True, nullable=False, index=True)
     email = Column(String(255), nullable=True)
-    
-    # Service Coverage (JSON array of pincodes)
-    service_pincodes = Column(JSON, nullable=True)
-    
+
+    # Service Coverage - Now managed through provider_pincodes junction table
+    # service_pincodes = Column(JSON, nullable=True)  # REMOVED - use pincodes relationship instead
+
     # Rating
     avg_rating = Column(Numeric(3, 2), default=0.00, nullable=False)
     total_bookings = Column(Integer, default=0, nullable=False)
@@ -65,7 +65,7 @@ class Provider(Base, TimestampMixin):
             'last_name': self.last_name,
             'mobile': self.mobile,
             'email': self.email,
-            'service_pincodes': self.service_pincodes,
+            'service_pincodes': [p.pincode for p in self.pincodes] if self.pincodes else [],  # Get from relationship
             'avg_rating': float(self.avg_rating) if self.avg_rating else 0.00,
             'total_bookings': self.total_bookings,
             'is_active': self.is_active,

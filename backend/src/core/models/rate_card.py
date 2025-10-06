@@ -22,10 +22,10 @@ class RateCard(Base, TimestampMixin):
     name = Column(String(255), nullable=False)
     price = Column(Numeric(10, 2), nullable=False)
     strike_price = Column(Numeric(10, 2), nullable=True)
-    
-    # Availability (JSON array of pincodes)
-    available_pincodes = Column(JSON, nullable=True)
-    
+
+    # Availability - Now managed through rate_card_pincodes junction table
+    # available_pincodes = Column(JSON, nullable=True)  # REMOVED - use pincodes relationship instead
+
     # Status
     is_active = Column(Boolean, default=True, nullable=False)
     
@@ -65,7 +65,7 @@ class RateCard(Base, TimestampMixin):
             'name': self.name,
             'price': float(self.price) if self.price else 0.00,
             'strike_price': float(self.strike_price) if self.strike_price else None,
-            'available_pincodes': self.available_pincodes,
+            'available_pincodes': [p.pincode for p in self.pincodes] if self.pincodes else [],  # Get from relationship
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
