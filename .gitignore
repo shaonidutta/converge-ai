@@ -1,0 +1,173 @@
+# ============================================================================
+# ConvergeAI Project .gitignore
+# Strategy: Only track backend/, customer-frontend/, ops-frontend/
+# ============================================================================
+
+# ============================================================================
+# ROOT LEVEL - Ignore everything at root, then whitelist ONLY main folders
+# ============================================================================
+
+# Ignore all root-level folders and files
+/*
+
+# EXCEPT these folders (keep in git)
+!backend/
+!customer-frontend/
+!ops-frontend/
+
+# EXCEPT these essential files (keep in git)
+!.gitignore
+!README.md
+!docker-compose.yml
+
+# ============================================================================
+# BACKEND - Python/FastAPI
+# ============================================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+
+# Virtual Environment
+backend/venv/
+backend/env/
+backend/ENV/
+
+# Backend specific
+backend/data/cache/*
+backend/data/models/*
+!backend/data/**/.gitkeep
+backend/logs/*
+!backend/logs/.gitkeep
+
+# ============================================================================
+# CUSTOMER FRONTEND - React/Next.js
+# ============================================================================
+
+# Dependencies
+customer-frontend/node_modules/
+customer-frontend/.pnp
+customer-frontend/.pnp.js
+
+# Next.js
+customer-frontend/.next/
+customer-frontend/out/
+customer-frontend/build/
+customer-frontend/dist/
+
+# Misc
+customer-frontend/.DS_Store
+customer-frontend/*.log
+customer-frontend/.turbo
+
+# ============================================================================
+# OPS FRONTEND - React/Next.js
+# ============================================================================
+
+# Dependencies
+ops-frontend/node_modules/
+ops-frontend/.pnp
+ops-frontend/.pnp.js
+
+# Next.js
+ops-frontend/.next/
+ops-frontend/out/
+ops-frontend/build/
+ops-frontend/dist/
+
+# Misc
+ops-frontend/.DS_Store
+ops-frontend/*.log
+ops-frontend/.turbo
+
+# ============================================================================
+# DATABASE
+# ============================================================================
+
+database/backups/*
+!database/backups/.gitkeep
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================================================
+# ENVIRONMENT & SECRETS
+# ============================================================================
+
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
+
+# ============================================================================
+# IDE & EDITORS
+# ============================================================================
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ============================================================================
+# TESTING & COVERAGE
+# ============================================================================
+
+.pytest_cache/
+.coverage
+htmlcov/
+coverage/
+*.cover
+.hypothesis/
+.tox/
+
+# ============================================================================
+# BUILD & DIST
+# ============================================================================
+
+dist/
+build/
+*.egg-info/
+
+# ============================================================================
+# LOGS
+# ============================================================================
+
+*.log
+*.log.*
+
+# ============================================================================
+# CACHE & TEMP
+# ============================================================================
+
+.cache/
+*.cache
+*.tmp
+*.temp
+temp/
+tmp/
+
+# ============================================================================
+# OS FILES
+# ============================================================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================================================
+# Keep README files everywhere
+# ============================================================================
+
+!README.md
+!**/README.md
+
