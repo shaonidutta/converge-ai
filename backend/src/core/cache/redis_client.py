@@ -23,6 +23,10 @@ class RedisClient:
     def __init__(self):
         self.pool: Optional[ConnectionPool] = None
         self.client: Optional[redis.Redis] = None
+
+    def _is_available(self) -> bool:
+        """Check if Redis client is available"""
+        return self.client is not None
     
     async def connect(self):
         """
@@ -36,16 +40,18 @@ class RedisClient:
                 socket_connect_timeout=settings.REDIS_SOCKET_CONNECT_TIMEOUT,
                 decode_responses=False,  # We'll handle encoding/decoding
             )
-            
+
             self.client = redis.Redis(connection_pool=self.pool)
-            
+
             # Test connection
             await self.client.ping()
             logger.info(f"Redis connected: {settings.REDIS_HOST}:{settings.REDIS_PORT}")
-            
+
         except Exception as e:
-            logger.error(f"Redis connection failed: {e}")
-            raise
+            logger.warning(f"Redis connection failed: {e}. Running without Redis cache.")
+            # Set client to None to indicate Redis is not available
+            self.client = None
+            self.pool = None
     
     async def disconnect(self):
         """
@@ -60,10 +66,12 @@ class RedisClient:
     async def ping(self) -> bool:
         """
         Check if Redis is connected
-        
+
         Returns:
             bool: True if connected, False otherwise
         """
+        if not self.client:
+            return False
         try:
             return await self.client.ping()
         except Exception as e:
@@ -73,19 +81,23 @@ class RedisClient:
     async def get(self, key: str, default: Any = None) -> Optional[Any]:
         """
         Get value from Redis
-        
+
         Args:
             key: Cache key
             default: Default value if key not found
-            
+
         Returns:
             Cached value or default
         """
+        if not self.client:
+            logger.debug(f"Redis not available, returning default for key '{key}'")
+            return default
+
         try:
             value = await self.client.get(key)
             if value is None:
                 return default
-            
+
             # Try to deserialize
             try:
                 return json.loads(value)
@@ -96,7 +108,7 @@ class RedisClient:
                 except:
                     # Return as string
                     return value.decode('utf-8') if isinstance(value, bytes) else value
-        
+
         except Exception as e:
             logger.error(f"Redis GET error for key '{key}': {e}")
             return default
@@ -111,17 +123,21 @@ class RedisClient:
     ) -> bool:
         """
         Set value in Redis
-        
+
         Args:
             key: Cache key
             value: Value to cache
             ttl: Time to live in seconds
             nx: Only set if key doesn't exist
             xx: Only set if key exists
-            
+
         Returns:
             bool: True if successful
         """
+        if not self.client:
+            logger.debug(f"Redis not available, skipping SET for key '{key}'")
+            return False
+
         try:
             # Serialize value
             if isinstance(value, (dict, list, tuple)):
@@ -131,7 +147,7 @@ class RedisClient:
             else:
                 # Use pickle for complex objects
                 serialized = pickle.dumps(value)
-            
+
             # Set with options
             result = await self.client.set(
                 key,
@@ -140,9 +156,9 @@ class RedisClient:
                 nx=nx,
                 xx=xx
             )
-            
+
             return bool(result)
-        
+
         except Exception as e:
             logger.error(f"Redis SET error for key '{key}': {e}")
             return False
@@ -150,124 +166,141 @@ class RedisClient:
     async def delete(self, *keys: str) -> int:
         """
         Delete one or more keys
-        
+
         Args:
             *keys: Keys to delete
-            
+
         Returns:
             int: Number of keys deleted
         """
+        if not self._is_available():
+            return 0
         try:
             return await self.client.delete(*keys)
         except Exception as e:
             logger.error(f"Redis DELETE error: {e}")
             return 0
-    
+
     async def exists(self, *keys: str) -> int:
         """
         Check if keys exist
-        
+
         Args:
             *keys: Keys to check
-            
+
         Returns:
             int: Number of keys that exist
         """
+        if not self._is_available():
+            return 0
         try:
             return await self.client.exists(*keys)
         except Exception as e:
             logger.error(f"Redis EXISTS error: {e}")
             return 0
-    
+
     async def expire(self, key: str, seconds: int) -> bool:
         """
         Set expiration time for a key
-        
+
         Args:
             key: Cache key
             seconds: Expiration time in seconds
-            
+
         Returns:
             bool: True if successful
         """
+        if not self._is_available():
+            return False
         try:
             return await self.client.expire(key, seconds)
         except Exception as e:
             logger.error(f"Redis EXPIRE error for key '{key}': {e}")
             return False
-    
+
     async def ttl(self, key: str) -> int:
         """
         Get time to live for a key
-        
+
         Args:
             key: Cache key
-            
+
         Returns:
             int: TTL in seconds, -1 if no expiry, -2 if key doesn't exist
         """
+        if not self._is_available():
+            return -2
         try:
             return await self.client.ttl(key)
         except Exception as e:
             logger.error(f"Redis TTL error for key '{key}': {e}")
             return -2
-    
+
     async def incr(self, key: str, amount: int = 1) -> int:
         """
         Increment value
-        
+
         Args:
             key: Cache key
             amount: Amount to increment
-            
+
         Returns:
             int: New value
         """
+        if not self._is_available():
+            return 0
         try:
             return await self.client.incrby(key, amount)
         except Exception as e:
             logger.error(f"Redis INCR error for key '{key}': {e}")
             return 0
-    
+
     async def decr(self, key: str, amount: int = 1) -> int:
         """
         Decrement value
-        
+
         Args:
             key: Cache key
             amount: Amount to decrement
-            
+
         Returns:
             int: New value
         """
+        if not self._is_available():
+            return 0
         try:
             return await self.client.decrby(key, amount)
         except Exception as e:
             logger.error(f"Redis DECR error for key '{key}': {e}")
             return 0
-    
+
     async def keys(self, pattern: str = "*") -> list:
         """
         Get keys matching pattern
-        
+
         Args:
             pattern: Key pattern (e.g., "user:*")
-            
+
         Returns:
             list: List of matching keys
         """
+        if not self._is_available():
+            return []
         try:
             keys = await self.client.keys(pattern)
             return [k.decode('utf-8') if isinstance(k, bytes) else k for k in keys]
         except Exception as e:
             logger.error(f"Redis KEYS error for pattern '{pattern}': {e}")
             return []
-    
+
     async def flushdb(self):
         """
         Clear all keys in current database
         WARNING: Use with caution!
         """
+        if not self._is_available():
+            logger.warning("Redis not available, cannot flush database")
+            return
         try:
             await self.client.flushdb()
             logger.warning("Redis database flushed")
