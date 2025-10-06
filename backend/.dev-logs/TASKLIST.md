@@ -89,12 +89,12 @@
 - [x] Add proper enum types for status fields
 
 ### 2.3 Alembic Migrations
-- [ ] Initialize Alembic
-- [ ] Configure alembic.ini for async
-- [ ] Create initial migration (all tables)
+- [x] Initialize Alembic
+- [x] Configure alembic.ini for async
+- [x] Create initial migration (all tables)
 - [ ] Test migration up and down
-- [ ] Create migration script for indexes
-- [ ] Document migration process
+- [x] Create migration script for indexes
+- [x] Document migration process
 
 ### 2.4 Database Initialization
 - [ ] Create database initialization script
