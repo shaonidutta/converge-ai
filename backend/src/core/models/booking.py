@@ -34,6 +34,7 @@ class BookingStatus(str, enum.Enum):
     """Booking status enum"""
     PENDING = "pending"
     CONFIRMED = "confirmed"
+    IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
@@ -47,11 +48,13 @@ class Booking(Base, TimestampMixin):
     # Primary Key
     id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
     
-    # Foreign Key
+    # Foreign Keys
     user_id = Column(BigInteger, ForeignKey('users.id', ondelete='RESTRICT'), nullable=False)
-    
+    address_id = Column(BigInteger, ForeignKey('addresses.id', ondelete='RESTRICT'), nullable=True)
+
     # Order
     order_id = Column(String(50), unique=True, nullable=False)
+    booking_number = Column(String(50), unique=True, nullable=True)
     invoice_number = Column(String(100), nullable=True)
     
     # Payment
@@ -89,15 +92,27 @@ class Booking(Base, TimestampMixin):
     
     # Status
     status = Column(Enum(BookingStatus), default=BookingStatus.PENDING, nullable=False)
-    
+
+    # Booking Details
+    preferred_date = Column(Date, nullable=True)
+    preferred_time = Column(Time, nullable=True)
+    special_instructions = Column(String(500), nullable=True)
+
+    # Cancellation
+    cancellation_reason = Column(String(500), nullable=True)
+    cancelled_at = Column(DateTime, nullable=True)
+
     # Relationships
     user = relationship("User", back_populates="bookings")
+    address = relationship("Address")
     booking_items = relationship("BookingItem", back_populates="booking", cascade="all, delete-orphan")
     complaints = relationship("Complaint", back_populates="booking")
     
     # Indexes
     __table_args__ = (
         Index('idx_user', 'user_id'),
+        Index('idx_address', 'address_id'),
+        Index('idx_booking_number', 'booking_number', unique=True),
         Index('idx_status', 'status'),
         Index('idx_payment', 'payment_status'),
         Index('idx_settlement', 'is_settlement'),

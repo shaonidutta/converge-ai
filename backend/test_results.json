@@ -1,0 +1,138 @@
+[
+  {
+    "module": "AUTH",
+    "endpoint": "/auth/register",
+    "method": "POST",
+    "status": "PASS",
+    "details": "Register new user",
+    "timestamp": "2025-10-07T01:52:17.066531"
+  },
+  {
+    "module": "AUTH",
+    "endpoint": "/auth/login",
+    "method": "POST",
+    "status": "FAIL",
+    "details": "Exception: ('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None))",
+    "timestamp": "2025-10-07T01:52:19.134208"
+  },
+  {
+    "module": "AUTH",
+    "endpoint": "/auth/refresh",
+    "method": "POST",
+    "status": "FAIL",
+    "details": "Expected 200, got 500. Error: Token refresh failed",
+    "timestamp": "2025-10-07T01:52:21.199335"
+  },
+  {
+    "module": "AUTH",
+    "endpoint": "/auth/logout",
+    "method": "POST",
+    "status": "PASS",
+    "details": "Logout user",
+    "timestamp": "2025-10-07T01:52:23.559721"
+  },
+  {
+    "module": "USERS",
+    "endpoint": "/users/me",
+    "method": "GET",
+    "status": "PASS",
+    "details": "Get current user profile",
+    "timestamp": "2025-10-07T01:52:25.681765"
+  },
+  {
+    "module": "USERS",
+    "endpoint": "/users/me",
+    "method": "PUT",
+    "status": "FAIL",
+    "details": "Expected 200, got 500. Error: Failed to update profile",
+    "timestamp": "2025-10-07T01:52:27.789527"
+  },
+  {
+    "module": "CATEGORIES",
+    "endpoint": "/categories",
+    "method": "GET",
+    "status": "PASS",
+    "details": "List all categories",
+    "timestamp": "2025-10-07T01:52:29.992738"
+  },
+  {
+    "module": "CATEGORIES",
+    "endpoint": "/categories/1",
+    "method": "GET",
+    "status": "PASS",
+    "details": "Get category 1",
+    "timestamp": "2025-10-07T01:52:32.108572"
+  },
+  {
+    "module": "CATEGORIES",
+    "endpoint": "/categories/1/subcategories",
+    "method": "GET",
+    "status": "PASS",
+    "details": "List subcategories for category 1",
+    "timestamp": "2025-10-07T01:52:34.234642"
+  },
+  {
+    "module": "CATEGORIES",
+    "endpoint": "/categories/subcategories/1/rate-cards",
+    "method": "GET",
+    "status": "PASS",
+    "details": "List rate cards for subcategory 1",
+    "timestamp": "2025-10-07T01:52:36.386712"
+  },
+  {
+    "module": "CART",
+    "endpoint": "/cart",
+    "method": "GET",
+    "status": "PASS",
+    "details": "Get user cart",
+    "timestamp": "2025-10-07T01:52:38.905037"
+  },
+  {
+    "module": "CART",
+    "endpoint": "/cart/items",
+    "method": "POST",
+    "status": "FAIL",
+    "details": "Expected 201, got 400. Error: Rate card not found or inactive",
+    "timestamp": "2025-10-07T01:52:41.073809"
+  },
+  {
+    "module": "CART",
+    "endpoint": "/cart/items/1",
+    "method": "PUT",
+    "status": "FAIL",
+    "details": "Expected 200, got 404. Error: Cart item not found",
+    "timestamp": "2025-10-07T01:52:43.216866"
+  },
+  {
+    "module": "CART",
+    "endpoint": "/cart/items/1",
+    "method": "DELETE",
+    "status": "FAIL",
+    "details": "Expected 200, got 404. Error: Cart item not found",
+    "timestamp": "2025-10-07T01:52:45.406439"
+  },
+  {
+    "module": "CART",
+    "endpoint": "/cart",
+    "method": "DELETE",
+    "status": "PASS",
+    "details": "Clear cart",
+    "timestamp": "2025-10-07T01:52:47.550413"
+  },
+  {
+    "module": "ADDRESSES",
+    "endpoint": "/addresses",
+    "method": "GET",
+    "status": "FAIL",
+    "details": "Expected 200, got 500. Error: Failed to fetch addresses",
+    "timestamp": "2025-10-07T01:52:49.669872"
+  },
+  {
+    "module": "ADDRESSES",
+    "endpoint": "/addresses",
+    "method": "POST",
+    "status": "FAIL",
+    "details": "Expected 201, got 500. Error: Failed to add address",
+    "timestamp": "2025-10-07T01:52:51.828684"
+  }
+]

@@ -6,6 +6,7 @@ from src.core.models.category import Category, Subcategory
 from src.core.models.rate_card import RateCard
 from src.core.models.address import Address
 from src.core.models.provider import Provider
+from src.core.models.cart import Cart, CartItem
 from src.core.models.booking import Booking, PaymentStatus, PaymentMethod, SettlementStatus, BookingStatus
 from src.core.models.booking_item import BookingItem, ItemPaymentStatus, ItemStatus, CancelBy
 from src.core.models.conversation import Conversation, MessageRole, Channel
@@ -27,6 +28,8 @@ __all__ = [
     "RateCard",
     "Address",
     "Provider",
+    "Cart",
+    "CartItem",
 
     # Pincode Models (Optimized)
     "Pincode",
