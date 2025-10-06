@@ -46,8 +46,10 @@ class Complaint(Base, TimestampMixin):
     # Foreign Keys
     booking_id = Column(BigInteger, ForeignKey('bookings.id', ondelete='SET NULL'), nullable=True)
     user_id = Column(BigInteger, ForeignKey('users.id', ondelete='RESTRICT'), nullable=False)
-    assigned_to = Column(BigInteger, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
-    resolved_by = Column(BigInteger, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    assigned_to = Column(BigInteger, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)  # DEPRECATED - use assigned_to_staff_id
+    resolved_by = Column(BigInteger, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)  # DEPRECATED - use resolved_by_staff_id
+    assigned_to_staff_id = Column(BigInteger, ForeignKey('staff.id', ondelete='SET NULL'), nullable=True)
+    resolved_by_staff_id = Column(BigInteger, ForeignKey('staff.id', ondelete='SET NULL'), nullable=True)
     
     # Session
     session_id = Column(String(100), nullable=True)
@@ -75,8 +77,10 @@ class Complaint(Base, TimestampMixin):
     # Relationships
     booking = relationship("Booking", back_populates="complaints")
     user = relationship("User", foreign_keys=[user_id], back_populates="complaints")
-    assignee = relationship("User", foreign_keys=[assigned_to])
-    resolver = relationship("User", foreign_keys=[resolved_by])
+    assignee = relationship("User", foreign_keys=[assigned_to])  # DEPRECATED
+    resolver = relationship("User", foreign_keys=[resolved_by])  # DEPRECATED
+    assigned_to_staff = relationship("Staff", foreign_keys=[assigned_to_staff_id], back_populates="assigned_complaints")
+    resolved_by_staff = relationship("Staff", foreign_keys=[resolved_by_staff_id], back_populates="resolved_complaints")
     updates = relationship("ComplaintUpdate", back_populates="complaint", cascade="all, delete-orphan")
     
     # Indexes
@@ -129,6 +133,7 @@ class ComplaintUpdate(Base, TimestampMixin):
     # Foreign Keys
     complaint_id = Column(BigInteger, ForeignKey('complaints.id', ondelete='CASCADE'), nullable=False)
     user_id = Column(BigInteger, ForeignKey('users.id', ondelete='RESTRICT'), nullable=False)
+    staff_id = Column(BigInteger, ForeignKey('staff.id', ondelete='CASCADE'), nullable=True)  # If update is from staff
     
     # Update Details
     comment = Column(Text, nullable=False)
@@ -140,6 +145,7 @@ class ComplaintUpdate(Base, TimestampMixin):
     # Relationships
     complaint = relationship("Complaint", back_populates="updates")
     user = relationship("User", back_populates="complaint_updates")
+    staff = relationship("Staff", back_populates="complaint_updates")
     
     # Indexes
     __table_args__ = (

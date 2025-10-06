@@ -12,6 +12,8 @@ from backend.src.core.models.conversation import Conversation, MessageRole, Chan
 from backend.src.core.models.priority_queue import PriorityQueue, IntentType
 from backend.src.core.models.complaint import Complaint, ComplaintUpdate, ComplaintType, ComplaintPriority, ComplaintStatus
 from backend.src.core.models.pincode import Pincode, RateCardPincode, ProviderPincode
+from backend.src.core.models.role import Role, Permission, RolePermission
+from backend.src.core.models.staff import Staff, StaffSession, StaffActivityLog
 
 __all__ = [
     # Base
@@ -30,6 +32,14 @@ __all__ = [
     "Pincode",
     "RateCardPincode",
     "ProviderPincode",
+
+    # Staff & RBAC Models
+    "Staff",
+    "StaffSession",
+    "StaffActivityLog",
+    "Role",
+    "Permission",
+    "RolePermission",
 
     # Booking Models
     "Booking",

@@ -2,7 +2,7 @@
 Pincode model for optimized pincode management
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Index
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Index, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 
@@ -78,10 +78,10 @@ class RateCardPincode(Base):
     Junction table for rate_cards and pincodes (many-to-many)
     """
     __tablename__ = 'rate_card_pincodes'
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    rate_card_id = Column(Integer, nullable=False, index=True)
-    pincode_id = Column(Integer, nullable=False, index=True)
+    rate_card_id = Column(Integer, ForeignKey('rate_cards.id', ondelete='CASCADE'), nullable=False, index=True)
+    pincode_id = Column(Integer, ForeignKey('pincodes.id', ondelete='CASCADE'), nullable=False, index=True)
     created_at = Column(DateTime, default=get_current_timestamp, nullable=False)
     
     # Relationships
@@ -115,8 +115,8 @@ class ProviderPincode(Base):
     __tablename__ = 'provider_pincodes'
 
     id = Column(Integer, primary_key=True, index=True)
-    provider_id = Column(Integer, nullable=False, index=True)  # BigInteger to match providers.id
-    pincode_id = Column(Integer, nullable=False, index=True)
+    provider_id = Column(Integer, ForeignKey('providers.id', ondelete='CASCADE'), nullable=False, index=True)  # BigInteger to match providers.id
+    pincode_id = Column(Integer, ForeignKey('pincodes.id', ondelete='CASCADE'), nullable=False, index=True)
     created_at = Column(DateTime, default=get_current_timestamp, nullable=False)
     
     # Relationships

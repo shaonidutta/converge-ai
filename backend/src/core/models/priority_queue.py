@@ -25,7 +25,8 @@ class PriorityQueue(Base, TimestampMixin):
     
     # Foreign Keys
     user_id = Column(BigInteger, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    reviewed_by = Column(BigInteger, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    reviewed_by = Column(BigInteger, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)  # DEPRECATED - use reviewed_by_staff_id
+    reviewed_by_staff_id = Column(BigInteger, ForeignKey('staff.id', ondelete='SET NULL'), nullable=True)
     
     # Session
     session_id = Column(String(100), nullable=False)
@@ -46,7 +47,8 @@ class PriorityQueue(Base, TimestampMixin):
     
     # Relationships
     user = relationship("User", foreign_keys=[user_id], back_populates="priority_queue_items")
-    reviewer = relationship("User", foreign_keys=[reviewed_by])
+    reviewer = relationship("User", foreign_keys=[reviewed_by])  # DEPRECATED
+    reviewed_by_staff = relationship("Staff", foreign_keys=[reviewed_by_staff_id], back_populates="reviewed_priority_items")
     
     # Indexes
     __table_args__ = (
