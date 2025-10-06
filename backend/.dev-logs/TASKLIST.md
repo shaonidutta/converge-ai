@@ -304,40 +304,40 @@
 
 ---
 
-## Phase 5: API Endpoints - User Management
+## Phase 5: API Endpoints - User Management ✅
 
-### 5.1 User Registration (Customer)
-- [ ] Create POST /api/v1/auth/register endpoint
-- [ ] Implement request validation (Pydantic schema)
-- [ ] Check for duplicate email/phone
-- [ ] Hash password
-- [ ] Create user in database
-- [ ] Send verification email/SMS
-- [ ] Return JWT tokens
-- [ ] Add error handling
+### 5.1 User Registration (Customer) ✅
+- [x] Create POST /api/v1/auth/register endpoint
+- [x] Implement request validation (Pydantic schema)
+- [x] Check for duplicate email/phone
+- [x] Hash password
+- [x] Create user in database
+- [ ] Send verification email/SMS (deferred to later phase)
+- [x] Return JWT tokens
+- [x] Add error handling
 
-### 5.2 User Login (Customer)
-- [ ] Create POST /api/v1/auth/login endpoint
-- [ ] Validate credentials
-- [ ] Check if user is active
-- [ ] Generate JWT tokens
-- [ ] Update last_login timestamp
-- [ ] Return user data with tokens
-- [ ] Add rate limiting (prevent brute force)
+### 5.2 User Login (Customer) ✅
+- [x] Create POST /api/v1/auth/login endpoint
+- [x] Validate credentials
+- [x] Check if user is active
+- [x] Generate JWT tokens
+- [x] Update last_login timestamp
+- [x] Return user data with tokens
+- [x] Add rate limiting (prevent brute force)
 
-### 5.3 User Profile
-- [ ] Create GET /api/v1/users/me endpoint
-- [ ] Create PUT /api/v1/users/me endpoint
-- [ ] Create PATCH /api/v1/users/me/password endpoint
-- [ ] Create DELETE /api/v1/users/me endpoint (account deletion)
-- [ ] Implement profile picture upload
-- [ ] Add validation for profile updates
+### 5.3 User Profile ✅
+- [x] Create GET /api/v1/users/me endpoint
+- [x] Create PUT /api/v1/users/me endpoint
+- [x] Create PATCH /api/v1/users/me/password endpoint
+- [x] Create DELETE /api/v1/users/me endpoint (account deletion)
+- [ ] Implement profile picture upload (deferred to later phase)
+- [x] Add validation for profile updates
 
-### 5.4 Token Management
-- [ ] Create POST /api/v1/auth/refresh endpoint
-- [ ] Create POST /api/v1/auth/logout endpoint
-- [ ] Implement token blacklisting
-- [ ] Create token validation endpoint
+### 5.4 Token Management ✅
+- [x] Create POST /api/v1/auth/refresh endpoint
+- [x] Create POST /api/v1/auth/logout endpoint
+- [x] Implement token blacklisting
+- [x] Create token validation endpoint
 
 ---
 
