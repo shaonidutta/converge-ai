@@ -1,7 +1,7 @@
 # Database base configuration and session management
 
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timezone
+from typing import Generator, AsyncGenerator
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
@@ -12,12 +12,19 @@ from sqlalchemy import Column, BigInteger, DateTime
 Base = declarative_base()
 
 
+def get_current_timestamp():
+    """
+    Get current UTC timestamp
+    """
+    return datetime.now(timezone.utc)
+
+
 class TimestampMixin:
     """
     Mixin to add created_at and updated_at timestamps to models
     """
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=get_current_timestamp, nullable=False)
+    updated_at = Column(DateTime, default=get_current_timestamp, onupdate=get_current_timestamp, nullable=False)
 
 
 # Database engine and session will be initialized in config
@@ -63,10 +70,10 @@ def init_db(database_url: str, async_database_url: str = None):
         )
 
 
-def get_db() -> Session:
+def get_db() -> Generator[Session, None, None]:
     """
     Dependency for getting database session (synchronous)
-    
+
     Yields:
         Session: Database session
     """
@@ -77,10 +84,10 @@ def get_db() -> Session:
         db.close()
 
 
-async def get_async_db() -> AsyncSession:
+async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency for getting database session (asynchronous)
-    
+
     Yields:
         AsyncSession: Async database session
     """
