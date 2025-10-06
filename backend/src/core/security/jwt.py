@@ -8,8 +8,8 @@ from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 import logging
 
-from backend.src.core.config import settings
-from backend.src.core.cache import redis_client
+from src.core.config import settings
+from src.core.cache import redis_client
 
 logger = logging.getLogger(__name__)
 

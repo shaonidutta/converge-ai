@@ -10,8 +10,8 @@ from typing import Optional, List
 from datetime import datetime, timezone
 import logging
 
-from backend.src.core.models import Staff, Role
-from backend.src.core.security import hash_password
+from src.core.models import Staff, Role
+from src.core.security import hash_password
 
 logger = logging.getLogger(__name__)
 

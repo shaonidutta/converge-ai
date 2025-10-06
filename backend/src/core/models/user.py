@@ -6,7 +6,7 @@ Includes authentication fields
 from sqlalchemy import Column, BigInteger, String, Numeric, Boolean, ForeignKey, Index, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
-from backend.src.core.database.base import Base, TimestampMixin
+from src.core.database.base import Base, TimestampMixin
 
 
 def get_current_timestamp():

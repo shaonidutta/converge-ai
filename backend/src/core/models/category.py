@@ -2,7 +2,7 @@
 
 from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, Index
 from sqlalchemy.orm import relationship
-from backend.src.core.database.base import Base, TimestampMixin
+from src.core.database.base import Base, TimestampMixin
 
 
 class Category(Base, TimestampMixin):

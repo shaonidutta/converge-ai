@@ -2,7 +2,7 @@
 
 from sqlalchemy import Column, Integer, String, Numeric, Boolean, ForeignKey, Index, JSON
 from sqlalchemy.orm import relationship
-from backend.src.core.database.base import Base, TimestampMixin
+from src.core.database.base import Base, TimestampMixin
 
 
 class RateCard(Base, TimestampMixin):

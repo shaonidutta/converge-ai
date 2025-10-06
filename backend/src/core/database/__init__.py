@@ -1,6 +1,6 @@
 # Database package - exports database utilities
 
-from backend.src.core.database.base import (
+from src.core.database.base import (
     Base,
     TimestampMixin,
     init_db,

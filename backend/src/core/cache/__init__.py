@@ -2,7 +2,7 @@
 Cache package
 """
 
-from backend.src.core.cache.redis_client import (
+from src.core.cache.redis_client import (
     RedisClient,
     redis_client,
     get_redis,

@@ -2,7 +2,7 @@
 
 from sqlalchemy import Column, BigInteger, String, Boolean, ForeignKey, Index
 from sqlalchemy.orm import relationship
-from backend.src.core.database.base import Base, TimestampMixin
+from src.core.database.base import Base, TimestampMixin
 
 
 class Address(Base, TimestampMixin):

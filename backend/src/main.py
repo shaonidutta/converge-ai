@@ -64,19 +64,43 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     """
     Application lifespan: handles startup/shutdown hooks.
     """
+    from src.core.database.connection import engine
+    from src.core.cache.redis_client import redis_client
+
     logger.info(f"Starting {APP_NAME} (env={ENV})")
 
-    # Initialize connections
-    # await init_database()
-    # await init_redis()
-    # await init_pinecone()
-    # await load_ml_models()
+    # Test database connection
+    try:
+        from sqlalchemy import text
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT 1"))
+        logger.info("✅ Database connection successful")
+    except Exception as e:
+        logger.error(f"❌ Database connection failed: {e}")
+
+    # Test Redis connection
+    try:
+        await redis_client.ping()
+        logger.info("✅ Redis connection successful")
+    except Exception as e:
+        logger.warning(f"⚠️  Redis connection failed: {e}")
 
     logger.info("All services initialized successfully")
     yield
     logger.info("Shutting down ConvergeAI backend...")
-    # await close_database()
-    # await close_redis()
+
+    # Close database connections
+    await engine.dispose()
+    logger.info("✅ Database connections closed")
+
+    # Close Redis connections (if method exists)
+    try:
+        if hasattr(redis_client, 'close'):
+            await redis_client.close()
+        logger.info("✅ Redis connections closed")
+    except Exception as e:
+        logger.warning(f"Redis close warning: {e}")
+
     logger.info("Shutdown complete.")
 
 # =============================================
@@ -123,14 +147,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 # =============================================
-# Routers (to be imported later)
+# Routers
 # =============================================
-# from src.api.v1 import auth, users, chat, bookings, complaints
-# app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
-# app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
-# app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
-# app.include_router(bookings.router, prefix="/api/v1/bookings", tags=["Bookings"])
-# app.include_router(complaints.router, prefix="/api/v1/complaints", tags=["Complaints"])
+from src.api.v1.router import api_router
+
+app.include_router(api_router, prefix="/api")
 
 # =============================================
 # Health & Root Endpoints
@@ -143,6 +164,25 @@ async def health_check(request: Request):
     Health Check Endpoint.
     Includes service component checks when available.
     """
+    from src.core.database.connection import engine
+    from src.core.cache.redis_client import redis_client
+
+    # Check database
+    db_status = "ok"
+    try:
+        from sqlalchemy import text
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+
+    # Check Redis
+    redis_status = "ok"
+    try:
+        await redis_client.ping()
+    except Exception as e:
+        redis_status = f"error: {str(e)}"
+
     return JSONResponse(
         status_code=200,
         content={
@@ -151,9 +191,8 @@ async def health_check(request: Request):
             "version": VERSION,
             "components": {
                 "api": "ok",
-                # "database": "ok",
-                # "redis": "ok",
-                # "pinecone": "ok",
+                "database": db_status,
+                "redis": redis_status,
             },
         },
     )

@@ -6,7 +6,7 @@ from sqlalchemy import Column, Integer, String, Boolean, DateTime, Index, Foreig
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 
-from backend.src.core.database.base import Base
+from src.core.database.base import Base
 
 
 def get_current_timestamp():

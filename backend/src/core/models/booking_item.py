@@ -2,7 +2,7 @@
 
 from sqlalchemy import Column, BigInteger, Integer, String, Numeric, Text, ForeignKey, Index, Enum, Date, Time, DateTime
 from sqlalchemy.orm import relationship
-from backend.src.core.database.base import Base, TimestampMixin
+from src.core.database.base import Base, TimestampMixin
 import enum
 
 

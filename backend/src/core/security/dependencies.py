@@ -9,9 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 import logging
 
-from backend.src.core.database.connection import get_db
-from backend.src.core.security.jwt import verify_token, TOKEN_TYPE_ACCESS
-from backend.src.core.models import User, Staff
+from src.core.database.connection import get_db
+from src.core.security.jwt import verify_token, TOKEN_TYPE_ACCESS
+from src.core.models import User, Staff
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +51,9 @@ async def get_current_user(
     try:
         # Extract token
         token = credentials.credentials
-        
+
         # Verify token
-        payload = verify_token(token, token_type=TOKEN_TYPE_ACCESS)
+        payload = await verify_token(token, token_type=TOKEN_TYPE_ACCESS)
         if payload is None:
             raise credentials_exception
         
@@ -119,9 +119,9 @@ async def get_current_staff(
     try:
         # Extract token
         token = credentials.credentials
-        
+
         # Verify token
-        payload = verify_token(token, token_type=TOKEN_TYPE_ACCESS)
+        payload = await verify_token(token, token_type=TOKEN_TYPE_ACCESS)
         if payload is None:
             raise credentials_exception
         

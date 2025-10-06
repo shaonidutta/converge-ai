@@ -3,7 +3,7 @@ Security package
 Password hashing, JWT tokens, authentication
 """
 
-from backend.src.core.security.password import (
+from src.core.security.password import (
     hash_password,
     verify_password,
     check_password_strength,
@@ -12,7 +12,7 @@ from backend.src.core.security.password import (
     generate_reset_token,
 )
 
-from backend.src.core.security.jwt import (
+from src.core.security.jwt import (
     create_access_token,
     create_refresh_token,
     verify_token,

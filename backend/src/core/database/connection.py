@@ -9,7 +9,7 @@ from sqlalchemy import event, text
 from typing import AsyncGenerator
 import logging
 
-from backend.src.core.config import settings
+from src.core.config import settings
 
 logger = logging.getLogger(__name__)
 
