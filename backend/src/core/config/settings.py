@@ -4,7 +4,7 @@ Uses Pydantic Settings for environment variable validation
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, validator
+from pydantic import Field, field_validator, model_validator
 from typing import Optional, List
 from functools import lru_cache
 import os
@@ -139,15 +139,17 @@ class Settings(BaseSettings):
     ENABLE_STREAMING: bool = Field(default=True, description="Enable streaming responses")
     
     # Validators
-    @validator("ENVIRONMENT")
+    @field_validator("ENVIRONMENT")
+    @classmethod
     def validate_environment(cls, v):
         """Validate environment value"""
         allowed = ["development", "staging", "production"]
         if v not in allowed:
             raise ValueError(f"ENVIRONMENT must be one of {allowed}")
         return v
-    
-    @validator("LOG_LEVEL")
+
+    @field_validator("LOG_LEVEL")
+    @classmethod
     def validate_log_level(cls, v):
         """Validate log level"""
         allowed = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -155,34 +157,30 @@ class Settings(BaseSettings):
             raise ValueError(f"LOG_LEVEL must be one of {allowed}")
         return v.upper()
     
-    @validator("REDIS_URL", always=True)
-    def build_redis_url(cls, v, values):
-        """Build Redis URL if not provided"""
-        if v:
-            return v
-        
-        host = values.get("REDIS_HOST", "localhost")
-        port = values.get("REDIS_PORT", 6379)
-        db = values.get("REDIS_DB", 0)
-        password = values.get("REDIS_PASSWORD")
-        
-        if password:
-            return f"redis://:{password}@{host}:{port}/{db}"
-        return f"redis://{host}:{port}/{db}"
-    
-    @validator("CELERY_BROKER_URL", always=True)
-    def build_celery_broker_url(cls, v, values):
-        """Build Celery broker URL if not provided"""
-        if v:
-            return v
-        return values.get("REDIS_URL")
-    
-    @validator("CELERY_RESULT_BACKEND", always=True)
-    def build_celery_result_backend(cls, v, values):
-        """Build Celery result backend if not provided"""
-        if v:
-            return v
-        return values.get("REDIS_URL")
+    @model_validator(mode='after')
+    def build_urls(self):
+        """Build Redis and Celery URLs if not provided"""
+        # Build Redis URL if not provided
+        if not self.REDIS_URL:
+            host = self.REDIS_HOST
+            port = self.REDIS_PORT
+            db = self.REDIS_DB
+            password = self.REDIS_PASSWORD
+
+            if password:
+                self.REDIS_URL = f"redis://:{password}@{host}:{port}/{db}"
+            else:
+                self.REDIS_URL = f"redis://{host}:{port}/{db}"
+
+        # Build Celery broker URL if not provided
+        if not self.CELERY_BROKER_URL:
+            self.CELERY_BROKER_URL = self.REDIS_URL
+
+        # Build Celery result backend if not provided
+        if not self.CELERY_RESULT_BACKEND:
+            self.CELERY_RESULT_BACKEND = self.REDIS_URL
+
+        return self
     
     # Properties
     @property
