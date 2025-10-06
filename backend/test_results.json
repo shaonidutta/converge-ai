@@ -5,7 +5,7 @@
     "method": "POST",
     "status": "PASS",
     "details": "Register new user",
-    "timestamp": "2025-10-07T02:15:58.490921"
+    "timestamp": "2025-10-07T02:24:10.367935"
   },
   {
     "module": "AUTH",
@@ -13,7 +13,7 @@
     "method": "POST",
     "status": "PASS",
     "details": "Login with credentials",
-    "timestamp": "2025-10-07T02:16:00.856974"
+    "timestamp": "2025-10-07T02:24:12.800742"
   },
   {
     "module": "AUTH",
@@ -21,7 +21,7 @@
     "method": "POST",
     "status": "PASS",
     "details": "Refresh access token",
-    "timestamp": "2025-10-07T02:16:02.975590"
+    "timestamp": "2025-10-07T02:24:14.920605"
   },
   {
     "module": "AUTH",
@@ -29,7 +29,7 @@
     "method": "POST",
     "status": "PASS",
     "details": "Logout user",
-    "timestamp": "2025-10-07T02:16:05.172333"
+    "timestamp": "2025-10-07T02:24:17.151340"
   },
   {
     "module": "USERS",
@@ -37,7 +37,7 @@
     "method": "GET",
     "status": "PASS",
     "details": "Get current user profile",
-    "timestamp": "2025-10-07T02:16:07.308705"
+    "timestamp": "2025-10-07T02:24:19.268136"
   },
   {
     "module": "USERS",
@@ -45,7 +45,7 @@
     "method": "PUT",
     "status": "FAIL",
     "details": "Expected 200, got 500. Error: Failed to update profile",
-    "timestamp": "2025-10-07T02:16:09.404801"
+    "timestamp": "2025-10-07T02:24:21.392498"
   },
   {
     "module": "CATEGORIES",
@@ -53,7 +53,7 @@
     "method": "GET",
     "status": "PASS",
     "details": "List all categories",
-    "timestamp": "2025-10-07T02:16:11.506567"
+    "timestamp": "2025-10-07T02:24:23.554970"
   },
   {
     "module": "CATEGORIES",
@@ -61,7 +61,7 @@
     "method": "GET",
     "status": "PASS",
     "details": "Get category 1",
-    "timestamp": "2025-10-07T02:16:13.617178"
+    "timestamp": "2025-10-07T02:24:25.668577"
   },
   {
     "module": "CATEGORIES",
@@ -69,7 +69,7 @@
     "method": "GET",
     "status": "PASS",
     "details": "List subcategories for category 1",
-    "timestamp": "2025-10-07T02:16:15.762912"
+    "timestamp": "2025-10-07T02:24:27.793742"
   },
   {
     "module": "CATEGORIES",
@@ -77,7 +77,7 @@
     "method": "GET",
     "status": "PASS",
     "details": "List rate cards for subcategory 1",
-    "timestamp": "2025-10-07T02:16:17.903915"
+    "timestamp": "2025-10-07T02:24:30.084816"
   },
   {
     "module": "CART",
@@ -85,7 +85,7 @@
     "method": "GET",
     "status": "PASS",
     "details": "Get user cart",
-    "timestamp": "2025-10-07T02:16:20.559584"
+    "timestamp": "2025-10-07T02:24:32.573199"
   },
   {
     "module": "CART",
@@ -93,7 +93,7 @@
     "method": "POST",
     "status": "FAIL",
     "details": "Expected 201, got 400. Error: Rate card not found or inactive",
-    "timestamp": "2025-10-07T02:16:22.715835"
+    "timestamp": "2025-10-07T02:24:34.694002"
   },
   {
     "module": "CART",
@@ -101,7 +101,7 @@
     "method": "PUT",
     "status": "FAIL",
     "details": "Expected 200, got 404. Error: Cart item not found",
-    "timestamp": "2025-10-07T02:16:24.865734"
+    "timestamp": "2025-10-07T02:24:36.844337"
   },
   {
     "module": "CART",
@@ -109,7 +109,7 @@
     "method": "DELETE",
     "status": "FAIL",
     "details": "Expected 200, got 404. Error: Cart item not found",
-    "timestamp": "2025-10-07T02:16:27.150475"
+    "timestamp": "2025-10-07T02:24:38.991069"
   },
   {
     "module": "CART",
@@ -117,7 +117,7 @@
     "method": "DELETE",
     "status": "PASS",
     "details": "Clear cart",
-    "timestamp": "2025-10-07T02:16:29.310371"
+    "timestamp": "2025-10-07T02:24:41.145841"
   },
   {
     "module": "ADDRESSES",
@@ -125,7 +125,7 @@
     "method": "GET",
     "status": "PASS",
     "details": "List user addresses",
-    "timestamp": "2025-10-07T02:16:31.434669"
+    "timestamp": "2025-10-07T02:24:43.282535"
   },
   {
     "module": "ADDRESSES",
@@ -133,15 +133,15 @@
     "method": "POST",
     "status": "PASS",
     "details": "Add new address",
-    "timestamp": "2025-10-07T02:16:37.527861"
+    "timestamp": "2025-10-07T02:24:45.820759"
   },
   {
     "module": "ADDRESSES",
-    "endpoint": "/addresses/198",
+    "endpoint": "/addresses/201",
     "method": "GET",
     "status": "PASS",
-    "details": "Get address 198",
-    "timestamp": "2025-10-07T02:16:39.678490"
+    "details": "Get address 201",
+    "timestamp": "2025-10-07T02:24:47.941149"
   },
   {
     "module": "BOOKINGS",
@@ -149,6 +149,38 @@
     "method": "GET",
     "status": "PASS",
     "details": "List user bookings",
-    "timestamp": "2025-10-07T02:16:41.815451"
+    "timestamp": "2025-10-07T02:24:50.132534"
+  },
+  {
+    "module": "BOOKINGS-SETUP",
+    "endpoint": "/categories/subcategories/1/rate-cards",
+    "method": "GET",
+    "status": "PASS",
+    "details": "Get rate cards for booking setup",
+    "timestamp": "2025-10-07T02:24:52.387152"
+  },
+  {
+    "module": "BOOKINGS-SETUP",
+    "endpoint": "/cart/items",
+    "method": "POST",
+    "status": "PASS",
+    "details": "Add item to cart for booking",
+    "timestamp": "2025-10-07T02:24:54.670900"
+  },
+  {
+    "module": "BOOKINGS-SETUP",
+    "endpoint": "/addresses",
+    "method": "GET",
+    "status": "PASS",
+    "details": "Get addresses for booking",
+    "timestamp": "2025-10-07T02:24:56.810351"
+  },
+  {
+    "module": "BOOKINGS",
+    "endpoint": "/bookings",
+    "method": "POST",
+    "status": "FAIL",
+    "details": "Expected 201, got 500. Error: Failed to create booking: 'COD'",
+    "timestamp": "2025-10-07T02:24:59.302448"
   }
 ]

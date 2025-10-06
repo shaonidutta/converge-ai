@@ -34,18 +34,31 @@ async def create_booking(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Create a new booking from cart"""
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
+
     try:
+        logger.info(f"Create booking request: user_id={current_user.id}, address_id={request.address_id}")
+        logger.debug(f"Booking data: {request.model_dump()}")
+
         booking_service = BookingService(db)
-        return await booking_service.create_booking(request, current_user)
+        result = await booking_service.create_booking(request, current_user)
+
+        logger.info(f"Booking created successfully: booking_id={result.id}")
+        return result
     except ValueError as e:
+        logger.warning(f"Create booking failed - ValueError: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Create booking failed - Exception: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create booking"
+            detail=f"Failed to create booking: {str(e)}"
         )
 
 

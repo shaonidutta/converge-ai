@@ -463,12 +463,8 @@ def test_booking_apis():
     print("TEST SUITE 6: BOOKING APIs")
     print(f"{'='*60}{Colors.RESET}\n")
 
-    # First, we need to add an item to cart and have an address
-    # Add item to cart (using a valid rate card ID from the database)
-    # For now, skip booking tests as they require valid cart items
-
-    # 1. List Bookings
-    test_endpoint(
+    # 1. List Bookings (should work even if empty)
+    bookings_response = test_endpoint(
         "BOOKINGS",
         "/bookings",
         "GET",
@@ -477,17 +473,196 @@ def test_booking_apis():
         description="List user bookings"
     )
 
-    # 2. Create Booking (skip - requires cart items and address)
-    print(f"{Colors.YELLOW}⏭️  [BOOKINGS] POST /bookings - SKIPPED (requires cart items){Colors.RESET}")
+    # Check if user has any existing bookings
+    existing_bookings = bookings_response if bookings_response else []
 
-    # 3. Get Booking (skip - no booking exists)
-    print(f"{Colors.YELLOW}⏭️  [BOOKINGS] GET /bookings/{{id}} - SKIPPED (no booking exists){Colors.RESET}")
+    if existing_bookings and len(existing_bookings) > 0:
+        # User has bookings - test with first booking
+        booking_id = existing_bookings[0].get("id")
+        booking_status = existing_bookings[0].get("status")
 
-    # 4. Reschedule Booking (skip - no booking exists)
-    print(f"{Colors.YELLOW}⏭️  [BOOKINGS] POST /bookings/{{id}}/reschedule - SKIPPED (no booking exists){Colors.RESET}")
+        print(f"\n{Colors.BLUE}Found existing booking: ID={booking_id}, Status={booking_status}{Colors.RESET}\n")
 
-    # 5. Cancel Booking (skip - no booking exists)
-    print(f"{Colors.YELLOW}⏭️  [BOOKINGS] POST /bookings/{{id}}/cancel - SKIPPED (no booking exists){Colors.RESET}")
+        # 2. Get Booking Details
+        booking_detail = test_endpoint(
+            "BOOKINGS",
+            f"/bookings/{booking_id}",
+            "GET",
+            200,
+            headers=get_auth_header("user"),
+            description=f"Get booking {booking_id} details"
+        )
+
+        # 3. Reschedule Booking (only if status allows)
+        if booking_status in ["PENDING", "CONFIRMED"]:
+            from datetime import datetime, timedelta
+            future_date = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+
+            reschedule_data = {
+                "preferred_date": future_date,
+                "preferred_time": "15:00",
+                "reason": "Testing reschedule functionality"
+            }
+
+            test_endpoint(
+                "BOOKINGS",
+                f"/bookings/{booking_id}/reschedule",
+                "POST",
+                200,
+                headers=get_auth_header("user"),
+                json_data=reschedule_data,
+                description=f"Reschedule booking {booking_id}"
+            )
+        else:
+            print(f"{Colors.YELLOW}⏭️  [BOOKINGS] POST /bookings/{booking_id}/reschedule - SKIPPED (status: {booking_status}){Colors.RESET}")
+
+        # 4. Cancel Booking (only if status allows and not already cancelled)
+        if booking_status in ["PENDING", "CONFIRMED"]:
+            cancel_data = {
+                "reason": "Testing cancellation functionality - please ignore"
+            }
+
+            # Ask before cancelling
+            print(f"{Colors.YELLOW}⚠️  About to cancel booking {booking_id} for testing{Colors.RESET}")
+
+            test_endpoint(
+                "BOOKINGS",
+                f"/bookings/{booking_id}/cancel",
+                "POST",
+                200,
+                headers=get_auth_header("user"),
+                json_data=cancel_data,
+                description=f"Cancel booking {booking_id}"
+            )
+        else:
+            print(f"{Colors.YELLOW}⏭️  [BOOKINGS] POST /bookings/{booking_id}/cancel - SKIPPED (status: {booking_status}){Colors.RESET}")
+
+    else:
+        # No existing bookings - try to create one
+        print(f"\n{Colors.YELLOW}No existing bookings found. Attempting to create test booking...{Colors.RESET}\n")
+
+        # First, we need to get a valid rate card and add to cart
+        # Get rate cards from category 1, subcategory 1
+        rate_cards_response = test_endpoint(
+            "BOOKINGS-SETUP",
+            "/categories/subcategories/1/rate-cards",
+            "GET",
+            200,
+            headers=get_auth_header("user"),
+            description="Get rate cards for booking setup"
+        )
+
+        if rate_cards_response and len(rate_cards_response) > 0:
+            rate_card_id = rate_cards_response[0].get("id")
+            print(f"{Colors.GREEN}Found rate card: ID={rate_card_id}{Colors.RESET}")
+
+            # Add to cart
+            add_cart_data = {
+                "rate_card_id": rate_card_id,
+                "quantity": 1
+            }
+
+            cart_item = test_endpoint(
+                "BOOKINGS-SETUP",
+                "/cart/items",
+                "POST",
+                201,
+                headers=get_auth_header("user"),
+                json_data=add_cart_data,
+                description="Add item to cart for booking"
+            )
+
+            if cart_item:
+                # Get user's addresses
+                addresses_response = test_endpoint(
+                    "BOOKINGS-SETUP",
+                    "/addresses",
+                    "GET",
+                    200,
+                    headers=get_auth_header("user"),
+                    description="Get addresses for booking"
+                )
+
+                if addresses_response and len(addresses_response) > 0:
+                    address_id = addresses_response[0].get("id")
+                    print(f"{Colors.GREEN}Found address: ID={address_id}{Colors.RESET}")
+
+                    # Create booking
+                    from datetime import datetime, timedelta
+                    future_date = (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d")
+
+                    booking_data = {
+                        "address_id": address_id,
+                        "preferred_date": future_date,
+                        "preferred_time": "10:00",
+                        "special_instructions": "Test booking - automated test",
+                        "payment_method": "cod"  # Use COD to avoid wallet balance issues
+                    }
+
+                    new_booking = test_endpoint(
+                        "BOOKINGS",
+                        "/bookings",
+                        "POST",
+                        201,
+                        headers=get_auth_header("user"),
+                        json_data=booking_data,
+                        description="Create new booking"
+                    )
+
+                    if new_booking:
+                        new_booking_id = new_booking.get("id")
+                        print(f"\n{Colors.GREEN}✅ Booking created successfully: ID={new_booking_id}{Colors.RESET}\n")
+
+                        # Test get booking
+                        test_endpoint(
+                            "BOOKINGS",
+                            f"/bookings/{new_booking_id}",
+                            "GET",
+                            200,
+                            headers=get_auth_header("user"),
+                            description=f"Get booking {new_booking_id} details"
+                        )
+
+                        # Test reschedule
+                        reschedule_date = (datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d")
+                        reschedule_data = {
+                            "preferred_date": reschedule_date,
+                            "preferred_time": "14:00",
+                            "reason": "Testing reschedule functionality"
+                        }
+
+                        test_endpoint(
+                            "BOOKINGS",
+                            f"/bookings/{new_booking_id}/reschedule",
+                            "POST",
+                            200,
+                            headers=get_auth_header("user"),
+                            json_data=reschedule_data,
+                            description=f"Reschedule booking {new_booking_id}"
+                        )
+
+                        # Test cancel
+                        cancel_data = {
+                            "reason": "Testing cancellation - automated test cleanup"
+                        }
+
+                        test_endpoint(
+                            "BOOKINGS",
+                            f"/bookings/{new_booking_id}/cancel",
+                            "POST",
+                            200,
+                            headers=get_auth_header("user"),
+                            json_data=cancel_data,
+                            description=f"Cancel booking {new_booking_id}"
+                        )
+                    else:
+                        print(f"{Colors.RED}❌ Failed to create booking{Colors.RESET}")
+                else:
+                    print(f"{Colors.YELLOW}⏭️  No addresses found - cannot create booking{Colors.RESET}")
+            else:
+                print(f"{Colors.YELLOW}⏭️  Failed to add item to cart{Colors.RESET}")
+        else:
+            print(f"{Colors.YELLOW}⏭️  No rate cards found - cannot create booking{Colors.RESET}")
 
 
 # ============================================================================

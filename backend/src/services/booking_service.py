@@ -33,46 +33,56 @@ class BookingService:
         self.db = db
     
     async def create_booking(
-        self, 
-        request: CreateBookingRequest, 
+        self,
+        request: CreateBookingRequest,
         user: User
     ) -> BookingResponse:
         """
         Create a new booking from cart
-        
+
         Args:
             request: Booking creation request
             user: Current user
-            
+
         Returns:
             BookingResponse with booking details
-            
+
         Raises:
             ValueError: If validation fails
         """
+        logger.info(f"Creating booking for user_id: {user.id}, address_id: {request.address_id}")
+
         # Verify address exists and belongs to user
+        logger.debug("Verifying address")
         address_result = await self.db.execute(
             select(Address).where(
                 Address.id == request.address_id,
-                Address.user_id == user.id,
-                Address.is_active == True
+                Address.user_id == user.id
             )
         )
         address = address_result.scalar_one_or_none()
-        
+
         if not address:
+            logger.warning(f"Address not found: address_id={request.address_id}")
             raise ValueError("Address not found")
+
+        logger.debug(f"Address verified: {address.city}, {address.state}")
         
         # Get user's cart
+        logger.debug("Fetching user cart")
         cart_result = await self.db.execute(
             select(Cart).where(Cart.user_id == user.id)
         )
         cart = cart_result.scalar_one_or_none()
-        
+
         if not cart:
+            logger.warning(f"Cart not found for user_id: {user.id}")
             raise ValueError("Cart is empty")
-        
+
+        logger.debug(f"Cart found: cart_id={cart.id}")
+
         # Get cart items
+        logger.debug("Fetching cart items")
         cart_items_result = await self.db.execute(
             select(CartItem, RateCard, Subcategory)
             .join(RateCard, CartItem.rate_card_id == RateCard.id)
@@ -80,16 +90,22 @@ class BookingService:
             .where(CartItem.cart_id == cart.id)
         )
         cart_items = cart_items_result.all()
-        
+
         if not cart_items:
+            logger.warning(f"No items in cart: cart_id={cart.id}")
             raise ValueError("Cart is empty")
-        
+
+        logger.debug(f"Found {len(cart_items)} items in cart")
+
         # Calculate total amount
         total_amount = sum(item[0].total_price for item in cart_items)
-        
+        logger.debug(f"Total amount: {total_amount}")
+
         # Check wallet balance if payment method is wallet
         if request.payment_method == "wallet":
+            logger.debug(f"Checking wallet balance: required={total_amount}, available={user.wallet_balance}")
             if user.wallet_balance < total_amount:
+                logger.warning(f"Insufficient wallet balance: user_id={user.id}")
                 raise ValueError(
                     f"Insufficient wallet balance. Required: {total_amount}, "
                     f"Available: {user.wallet_balance}"
@@ -139,19 +155,36 @@ class BookingService:
         await self.db.flush()  # Get booking ID
         
         # Create booking items from cart items
+        logger.debug(f"Creating {len(cart_items)} booking items")
         booking_items = []
+
         for cart_item, rate_card, subcategory in cart_items:
+            # Calculate scheduled time (add 2 hours to start time for end time)
+            from datetime import timedelta
+            scheduled_time_from = preferred_datetime.time()
+            scheduled_time_to = (preferred_datetime + timedelta(hours=2)).time()
+
             booking_item = BookingItem(
                 booking_id=booking.id,
                 user_id=user.id,
                 rate_card_id=cart_item.rate_card_id,
+                address_id=request.address_id,
+                service_name=rate_card.name,
                 quantity=cart_item.quantity,
-                unit_price=cart_item.unit_price,
-                total_price=cart_item.total_price,
-                status=BookingStatus.PENDING
+                price=cart_item.unit_price,
+                total_amount=cart_item.total_price,
+                discount_amount=Decimal('0.00'),
+                final_amount=cart_item.total_price,
+                scheduled_date=preferred_datetime.date(),
+                scheduled_time_from=scheduled_time_from,
+                scheduled_time_to=scheduled_time_to,
+                payment_status="unpaid",
+                status="pending"
             )
             self.db.add(booking_item)
             booking_items.append((booking_item, rate_card, subcategory))
+
+        logger.debug(f"Booking items created successfully")
         
         # Deduct from wallet if payment method is wallet
         if request.payment_method == "wallet":
@@ -178,21 +211,18 @@ class BookingService:
             city=address.city,
             state=address.state,
             pincode=address.pincode,
-            landmark=address.landmark,
-            address_type=address.address_type,
-            is_default=address.is_default,
-            is_active=address.is_active
+            is_default=address.is_default
         )
         
         item_responses = []
         for booking_item, rate_card, subcategory in booking_items:
             item_responses.append(BookingItemResponse(
                 id=booking_item.id,
-                service_name=subcategory.name,
+                service_name=booking_item.service_name,
                 rate_card_name=rate_card.name,
                 quantity=booking_item.quantity,
-                unit_price=booking_item.unit_price,
-                total_price=booking_item.total_price
+                unit_price=float(booking_item.price),
+                total_price=float(booking_item.final_amount)
             ))
         
         return BookingResponse(
@@ -293,13 +323,12 @@ class BookingService:
         
         # Get booking items
         items_result = await self.db.execute(
-            select(BookingItem, RateCard, Subcategory)
+            select(BookingItem, RateCard)
             .join(RateCard, BookingItem.rate_card_id == RateCard.id)
-            .join(Subcategory, RateCard.subcategory_id == Subcategory.id)
             .where(BookingItem.booking_id == booking.id)
         )
         items = items_result.all()
-        
+
         address_response = AddressResponse(
             id=address.id,
             address_line1=address.address_line1,
@@ -307,20 +336,17 @@ class BookingService:
             city=address.city,
             state=address.state,
             pincode=address.pincode,
-            landmark=address.landmark,
-            address_type=address.address_type,
-            is_default=address.is_default,
-            is_active=address.is_active
+            is_default=address.is_default
         )
-        
+
         item_responses = [
             BookingItemResponse(
                 id=item[0].id,
-                service_name=item[2].name,
+                service_name=item[0].service_name,
                 rate_card_name=item[1].name,
                 quantity=item[0].quantity,
-                unit_price=item[0].unit_price,
-                total_price=item[0].total_price
+                unit_price=float(item[0].price),
+                total_price=float(item[0].final_amount)
             )
             for item in items
         ]
@@ -424,21 +450,50 @@ class BookingService:
             f"new_date={request.preferred_date}, new_time={request.preferred_time}"
         )
 
-        # Return updated booking
+        # Get address and items for response
+        address_result = await self.db.execute(
+            select(Address).where(Address.id == booking.address_id)
+        )
+        address = address_result.scalar_one()
+
+        items_result = await self.db.execute(
+            select(BookingItem, RateCard)
+            .join(RateCard, BookingItem.rate_card_id == RateCard.id)
+            .where(BookingItem.booking_id == booking.id)
+        )
+        items = items_result.all()
+
+        # Build response
+        address_response = AddressResponse(
+            id=address.id,
+            address_line1=address.address_line1,
+            address_line2=address.address_line2,
+            city=address.city,
+            state=address.state,
+            pincode=address.pincode,
+            is_default=address.is_default
+        )
+
+        item_responses = []
+        for booking_item, rate_card in items:
+            item_responses.append(BookingItemResponse(
+                id=booking_item.id,
+                service_name=booking_item.service_name,
+                rate_card_name=rate_card.name,
+                quantity=booking_item.quantity,
+                unit_price=float(booking_item.price),
+                total_price=float(booking_item.final_amount)
+            ))
+
         return BookingResponse(
             id=booking.id,
-            order_id=booking.order_id,
             booking_number=booking.booking_number,
-            user_id=booking.user_id,
-            address_id=booking.address_id,
-            subtotal=float(booking.subtotal),
-            discount=float(booking.discount) if booking.discount else 0.0,
-            total=float(booking.total),
-            payment_method=booking.payment_method.value,
-            payment_status=booking.payment_status.value,
             status=booking.status.value,
-            preferred_date=booking.preferred_date,
-            preferred_time=booking.preferred_time,
+            total_amount=booking.total,
+            preferred_date=booking.preferred_date.isoformat(),
+            preferred_time=booking.preferred_time.strftime("%H:%M"),
+            address=address_response,
+            items=item_responses,
             special_instructions=booking.special_instructions,
             created_at=booking.created_at.isoformat()
         )
