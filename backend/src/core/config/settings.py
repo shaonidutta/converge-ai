@@ -59,13 +59,16 @@ class Settings(BaseSettings):
     CORS_ALLOW_METHODS: str = Field(default="*", description="Allowed HTTP methods (comma-separated)")
     CORS_ALLOW_HEADERS: str = Field(default="*", description="Allowed HTTP headers (comma-separated)")
     
-    # Pinecone Vector Database
+    # Pinecone Vector Database (Serverless)
     PINECONE_API_KEY: str = Field(..., description="Pinecone API key")
-    PINECONE_ENVIRONMENT: str = Field(default="us-east-1", description="Pinecone environment")
+    PINECONE_ENVIRONMENT: str = Field(default="us-east-1", description="Pinecone environment/region")
     PINECONE_INDEX_NAME: str = Field(default="convergeai-docs", description="Pinecone index name")
-    PINECONE_DIMENSION: int = Field(default=768, description="Embedding dimension (768 for text-embedding-004)")
+    PINECONE_DIMENSION: int = Field(default=384, description="Embedding dimension (384 for all-MiniLM-L6-v2)")
     PINECONE_METRIC: str = Field(default="cosine", description="Distance metric")
-    
+    PINECONE_CLOUD: str = Field(default="aws", description="Cloud provider (aws, gcp, azure)")
+    PINECONE_REGION: str = Field(default="us-east-1", description="Pinecone region")
+    PINECONE_CAPACITY_MODE: str = Field(default="serverless", description="Capacity mode (serverless or pod)")
+
     # Google Generative AI (Gemini)
     GOOGLE_API_KEY: str = Field(..., description="Google Generative AI API key")
     GEMINI_MODEL_FLASH: str = Field(default="gemini-2.0-flash-exp", description="Gemini Flash model")
@@ -74,10 +77,16 @@ class Settings(BaseSettings):
     GEMINI_MAX_TOKENS: int = Field(default=2048, description="Max output tokens")
     GEMINI_TOP_P: float = Field(default=0.95, description="Top-p sampling")
     GEMINI_TOP_K: int = Field(default=40, description="Top-k sampling")
-    
-    # Embedding Model
-    EMBEDDING_MODEL: str = Field(default="models/text-embedding-004", description="Google embedding model")
+
+    # Embedding Model (Sentence Transformers)
+    EMBEDDING_MODEL: str = Field(
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        description="Sentence Transformers embedding model"
+    )
+    EMBEDDING_DIMENSION: int = Field(default=384, description="Embedding dimension")
     EMBEDDING_BATCH_SIZE: int = Field(default=100, description="Batch size for embeddings")
+    EMBEDDING_DEVICE: str = Field(default="cpu", description="Device for embeddings (cpu, cuda, mps)")
+    EMBEDDING_NORMALIZE: bool = Field(default=True, description="Normalize embeddings")
     
     # Rate Limiting
     RATE_LIMIT_ENABLED: bool = Field(default=True, description="Enable rate limiting")
