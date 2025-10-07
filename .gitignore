@@ -47,11 +47,12 @@ backend/env/
 backend/ENV/
 
 # Backend specific
-backend/data/cache/*
-backend/data/models/*
-!backend/data/**/.gitkeep
+backend/data/
+backend/docs/
+backend/scripts/
 backend/logs/*
 !backend/logs/.gitkeep
+backend/.dev-logs/
 
 # ============================================================================
 # CUSTOMER FRONTEND - React/Next.js
