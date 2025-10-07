@@ -48,7 +48,6 @@ backend/ENV/
 
 # Backend specific
 backend/data/
-backend/docs/
 backend/scripts/
 backend/logs/*
 !backend/logs/.gitkeep
