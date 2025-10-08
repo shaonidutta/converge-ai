@@ -40,6 +40,13 @@ from src.schemas.customer import (
     SearchResponse,
 )
 
+from src.schemas.chat import (
+    ChatMessageRequest,
+    ChatMessageResponse,
+    ChatHistoryResponse,
+    SessionResponse,
+)
+
 __all__ = [
     # Auth schemas
     "UserRegisterRequest",
@@ -77,4 +84,10 @@ __all__ = [
     "CancelBookingRequest",
     "SearchRequest",
     "SearchResponse",
+
+    # Chat schemas
+    "ChatMessageRequest",
+    "ChatMessageResponse",
+    "ChatHistoryResponse",
+    "SessionResponse",
 ]

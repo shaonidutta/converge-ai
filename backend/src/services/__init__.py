@@ -10,6 +10,7 @@ from src.services.category_service import CategoryService
 from src.services.cart_service import CartService
 from src.services.booking_service import BookingService
 from src.services.address_service import AddressService
+from src.services.chat_service import ChatService
 
 __all__ = [
     "AuthService",
@@ -19,4 +20,5 @@ __all__ = [
     "CartService",
     "BookingService",
     "AddressService",
+    "ChatService",
 ]
