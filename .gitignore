@@ -62,6 +62,9 @@ customer-frontend/node_modules/
 customer-frontend/.pnp
 customer-frontend/.pnp.js
 
+# Vite cache
+customer-frontend/.vite/
+
 # Next.js
 customer-frontend/.next/
 customer-frontend/out/
