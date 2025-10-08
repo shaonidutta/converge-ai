@@ -11,6 +11,7 @@ from src.services.cart_service import CartService
 from src.services.booking_service import BookingService
 from src.services.address_service import AddressService
 from src.services.chat_service import ChatService
+from src.services.intent_service import IntentService
 
 __all__ = [
     "AuthService",
@@ -21,4 +22,5 @@ __all__ = [
     "BookingService",
     "AddressService",
     "ChatService",
+    "IntentService",
 ]
