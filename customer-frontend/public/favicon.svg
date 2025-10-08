@@ -1,0 +1,37 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Simplified version for favicon -->
+  <rect width="32" height="32" rx="6" fill="url(#grad)"/>
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4F46E5"/>
+      <stop offset="50%" style="stop-color:#7C3AED"/>
+      <stop offset="100%" style="stop-color:#06B6D4"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Simple headphone icon -->
+  <g transform="translate(16, 16)">
+    <!-- Headphone arc -->
+    <path d="M -6 -2 Q -6 -8, 0 -8 Q 6 -8, 6 -2" 
+          stroke="white" 
+          stroke-width="1.5" 
+          fill="none" 
+          stroke-linecap="round"/>
+    
+    <!-- Left ear -->
+    <rect x="-7" y="-2" width="3" height="5" rx="1" fill="white"/>
+    
+    <!-- Right ear -->
+    <rect x="4" y="-2" width="3" height="5" rx="1" fill="white"/>
+    
+    <!-- Mic boom -->
+    <path d="M 6 1 L 8 4" 
+          stroke="white" 
+          stroke-width="1" 
+          stroke-linecap="round"/>
+    
+    <!-- Mic head -->
+    <circle cx="8" cy="5" r="1.5" fill="white"/>
+  </g>
+</svg>
+

@@ -33,8 +33,9 @@ APP_NAME = "ConvergeAI Backend API"
 VERSION = "1.0.0"
 ENV = os.getenv("APP_ENV", "development")
 ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Customer frontend
+    "http://localhost:3000",  # Customer frontend (React)
     "http://localhost:3001",  # Ops frontend
+    "http://localhost:5173",  # Customer frontend (Vite dev server)
     "https://convergeAI.app",
 ]
 
