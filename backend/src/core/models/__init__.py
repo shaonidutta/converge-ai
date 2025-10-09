@@ -12,6 +12,7 @@ from backend.src.core.models.conversation import Conversation, MessageRole, Chan
 from backend.src.core.models.priority_queue import PriorityQueue, IntentType
 from backend.src.core.models.complaint import Complaint, ComplaintUpdate, ComplaintType, ComplaintPriority, ComplaintStatus
 from backend.src.core.models.pincode import Pincode, RateCardPincode, ProviderPincode
+from backend.src.core.models.cart import Cart, CartItem
 from backend.src.core.models.role import Role, Permission, RolePermission
 from backend.src.core.models.staff import Staff, StaffSession, StaffActivityLog
 
@@ -32,6 +33,10 @@ __all__ = [
     "Pincode",
     "RateCardPincode",
     "ProviderPincode",
+
+    # Cart Models
+    "Cart",
+    "CartItem",
 
     # Staff & RBAC Models
     "Staff",
