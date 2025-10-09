@@ -109,7 +109,7 @@ class IntentService:
                     IntentResult(
                         intent="unclear_intent",
                         confidence=0.0,
-                        entities={}
+                        entities_json={}  # Changed from entities to entities_json
                     )
                 ],
                 primary_intent="unclear_intent",

@@ -4,6 +4,7 @@ Intent Classification Schemas
 Pydantic models for intent classification request/response.
 """
 
+import json
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel, Field, field_validator
 from src.nlp.intent.config import IntentType, EntityType
@@ -12,22 +13,9 @@ from src.nlp.intent.config import IntentType, EntityType
 class IntentResult(BaseModel):
     """Single intent classification result"""
 
-    intent: str = Field(..., description="Detected intent type")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score (0.0 to 1.0)")
-    entities: Dict[str, str] = Field(default_factory=dict, description="Extracted entities")
-
-    @field_validator('entities', mode='before')
-    @classmethod
-    def validate_entities(cls, v: Any) -> Dict[str, str]:
-        """Ensure entities is always a dict, even if LLM returns empty string"""
-        if v is None or v == '' or v == 'null':
-            return {}
-        if isinstance(v, dict):
-            return v
-        return {}
-    
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "extra": "forbid",  # Forbid extra fields to avoid additionalProperties in JSON schema
+        "json_schema_extra": {
             "example": {
                 "intent": "booking_management",
                 "confidence": 0.95,
@@ -38,32 +26,47 @@ class IntentResult(BaseModel):
                 }
             }
         }
+    }
+
+    intent: str = Field(..., description="Detected intent type")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score (0.0 to 1.0)")
+    entities_json: Optional[str] = Field(default=None, description="Extracted entities as JSON string (optional)")
+
+    @field_validator('entities_json', mode='before')
+    @classmethod
+    def validate_entities_json(cls, v: Any) -> Optional[str]:
+        """Convert entities dict to JSON string"""
+        if v is None or v == '' or v == 'null':
+            return None
+        if isinstance(v, dict):
+            if not v:  # Empty dict
+                return None
+            return json.dumps(v)
+        if isinstance(v, str):
+            return v if v else None
+        return None
+
+    @property
+    def entities(self) -> Dict[str, Any]:
+        """Get entities as dict"""
+        if self.entities_json:
+            try:
+                return json.loads(self.entities_json)
+            except:
+                return {}
+        return {}
 
 
 class IntentClassificationResult(BaseModel):
     """
     Complete intent classification result with multiple intents.
-    
+
     This is the structured output schema used by the LLM.
     """
-    
-    intents: List[IntentResult] = Field(
-        ...,
-        description="List of all detected intents with confidence scores",
-        min_length=1
-    )
-    primary_intent: str = Field(..., description="Primary intent (highest confidence)")
-    requires_clarification: bool = Field(
-        default=False,
-        description="Whether the query requires clarification"
-    )
-    clarification_reason: Optional[str] = Field(
-        default=None,
-        description="Reason why clarification is needed"
-    )
-    
-    class Config:
-        json_schema_extra = {
+
+    model_config = {
+        "extra": "forbid",  # Forbid extra fields to avoid additionalProperties in JSON schema
+        "json_schema_extra": {
             "example": {
                 "intents": [
                     {
@@ -82,6 +85,30 @@ class IntentClassificationResult(BaseModel):
                 "clarification_reason": None
             }
         }
+    }
+
+    intents: List[IntentResult] = Field(
+        ...,
+        description="List of all detected intents with confidence scores",
+        min_length=1
+    )
+    primary_intent: str = Field(..., description="Primary intent (highest confidence)")
+    requires_clarification: bool = Field(
+        default=False,
+        description="Whether the query requires clarification"
+    )
+    clarification_reason: Optional[str] = Field(
+        default=None,
+        description="Reason why clarification is needed"
+    )
+    context_used: bool = Field(
+        default=False,
+        description="Whether conversation context was used for classification"
+    )
+    context_summary: Optional[str] = Field(
+        default=None,
+        description="Summary of context used (e.g., '3 previous messages, active dialog state')"
+    )
 
 
 class IntentClassificationRequest(BaseModel):
@@ -109,8 +136,10 @@ class IntentClassificationResponse(BaseModel):
     primary_intent: str = Field(..., description="Primary intent")
     requires_clarification: bool = Field(..., description="Whether clarification is needed")
     clarification_reason: Optional[str] = Field(default=None, description="Reason for clarification")
-    classification_method: str = Field(..., description="Method used (pattern_match, llm, fallback)")
+    classification_method: str = Field(..., description="Method used (pattern_match, llm, context_aware_llm, fallback)")
     processing_time_ms: int = Field(..., description="Processing time in milliseconds")
+    context_used: bool = Field(default=False, description="Whether conversation context was used")
+    context_summary: Optional[str] = Field(default=None, description="Summary of context used")
     
     class Config:
         json_schema_extra = {

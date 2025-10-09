@@ -10,6 +10,7 @@ from src.core.models.cart import Cart, CartItem
 from src.core.models.booking import Booking, PaymentStatus, PaymentMethod, SettlementStatus, BookingStatus
 from src.core.models.booking_item import BookingItem, ItemPaymentStatus, ItemStatus, CancelBy
 from src.core.models.conversation import Conversation, MessageRole, Channel
+from src.core.models.dialog_state import DialogState, DialogStateType
 from src.core.models.priority_queue import PriorityQueue, IntentType
 from src.core.models.complaint import Complaint, ComplaintUpdate, ComplaintType, ComplaintPriority, ComplaintStatus
 from src.core.models.pincode import Pincode, RateCardPincode, ProviderPincode
@@ -50,6 +51,7 @@ __all__ = [
 
     # AI/Agent Models
     "Conversation",
+    "DialogState",
     "PriorityQueue",
 
     # Complaint Models
@@ -70,6 +72,9 @@ __all__ = [
     # Enums - Conversation
     "MessageRole",
     "Channel",
+
+    # Enums - DialogState
+    "DialogStateType",
 
     # Enums - PriorityQueue
     "IntentType",
