@@ -15,9 +15,9 @@ from sqlalchemy import select
 from datetime import datetime, timedelta
 import logging
 
-from backend.src.services.booking_service import BookingService
-from backend.src.core.models import User, Address, Cart, CartItem, RateCard, Provider, ProviderPincode, Pincode, Booking
-from backend.src.schemas.customer import CreateBookingRequest
+from src.services.booking_service import BookingService
+from src.core.models import User, Address, Cart, CartItem, RateCard, Provider, ProviderPincode, Pincode, Booking
+from src.schemas.customer import CreateBookingRequest
 
 logger = logging.getLogger(__name__)
 
@@ -360,7 +360,7 @@ class BookingAgent:
                 }
 
             # Create reschedule request
-            from backend.src.schemas.customer import RescheduleBookingRequest
+            from src.schemas.customer import RescheduleBookingRequest
             reschedule_request = RescheduleBookingRequest(
                 preferred_date=new_date,
                 preferred_time=new_time,

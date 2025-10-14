@@ -14,8 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_, func
 from decimal import Decimal
 
-from backend.src.core.models import User, Category, Subcategory, RateCard, Provider
-from backend.src.services.category_service import CategoryService
+from src.core.models import User, Category, Subcategory, RateCard, Provider
+from src.services.category_service import CategoryService
 
 logger = logging.getLogger(__name__)
 

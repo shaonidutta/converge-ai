@@ -14,8 +14,8 @@ os.environ["PINECONE_API_KEY"] = "test_pinecone_key"
 os.environ["GOOGLE_API_KEY"] = "test_google_key"
 os.environ["SECRET_KEY"] = "test_secret_key_12345678901234567890"
 
-from backend.src.agents.service.service_agent import ServiceAgent
-from backend.src.core.models import User
+from src.agents.service.service_agent import ServiceAgent
+from src.core.models import User
 
 
 @pytest.mark.asyncio

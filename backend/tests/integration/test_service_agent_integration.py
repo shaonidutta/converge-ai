@@ -11,17 +11,19 @@ from sqlalchemy import select, delete
 import os
 from dotenv import load_dotenv
 
-from backend.src.agents.service.service_agent import ServiceAgent
-from backend.src.core.models import (
+from src.agents.service.service_agent import ServiceAgent
+from src.core.models import (
     User, Category, Subcategory, RateCard, Provider, Pincode
 )
-from backend.src.core.database.base import Base
+from src.core.database.base import Base
 
 # Load environment variables
 load_dotenv()
 
-# Test database URL
+# Test database URL - Replace pymysql with aiomysql for async
 TEST_DB_URL = os.getenv("DATABASE_URL")
+if TEST_DB_URL and "pymysql" in TEST_DB_URL:
+    TEST_DB_URL = TEST_DB_URL.replace("pymysql", "aiomysql")
 
 
 @pytest.fixture(scope="session")
