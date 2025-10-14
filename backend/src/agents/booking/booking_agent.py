@@ -13,10 +13,13 @@ from typing import Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timedelta
+import logging
 
 from backend.src.services.booking_service import BookingService
 from backend.src.core.models import User, Address, Cart, CartItem, RateCard, Provider, ProviderPincode, Pincode
 from backend.src.schemas.customer import CreateBookingRequest
+
+logger = logging.getLogger(__name__)
 
 
 class BookingAgent:
@@ -165,16 +168,16 @@ class BookingAgent:
             # Step 6: Return success response
             return {
                 "response": f"✅ Booking confirmed! Your booking ID is {booking_response.booking_number}. "
-                           f"Total amount: ₹{booking_response.total}. "
+                           f"Total amount: ₹{booking_response.total_amount}. "
                            f"Scheduled for {booking_response.preferred_date} at {booking_response.preferred_time}.",
                 "action_taken": "booking_created",
                 "metadata": {
                     "booking_id": booking_response.id,
                     "booking_number": booking_response.booking_number,
-                    "total_amount": float(booking_response.total),
+                    "total_amount": float(booking_response.total_amount),
                     "scheduled_date": str(booking_response.preferred_date),
                     "scheduled_time": str(booking_response.preferred_time),
-                    "payment_status": booking_response.payment_status,
+                    "payment_status": booking_response.status,
                     "status": booking_response.status
                 }
             }
@@ -188,10 +191,13 @@ class BookingAgent:
             }
         except Exception as e:
             # Handle unexpected errors
+            import traceback
+            logger.error(f"Unexpected error in _create_booking: {str(e)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return {
                 "response": f"❌ An unexpected error occurred: {str(e)}. Please try again.",
                 "action_taken": "error",
-                "metadata": {"error": str(e)}
+                "metadata": {"error": str(e), "traceback": traceback.format_exc()}
             }
     
     async def _validate_provider_availability(self, pincode: str) -> Dict[str, Any]:
@@ -290,12 +296,12 @@ class BookingAgent:
             
             return {
                 "response": f"✅ Booking {result.booking_number} has been cancelled. "
-                           f"Refund of ₹{result.total} will be processed within 5-7 business days.",
+                           f"Refund of ₹{result.total_amount} will be processed within 5-7 business days.",
                 "action_taken": "booking_cancelled",
                 "metadata": {
                     "booking_id": result.id,
                     "booking_number": result.booking_number,
-                    "refund_amount": float(result.total),
+                    "refund_amount": float(result.total_amount),
                     "status": result.status
                 }
             }

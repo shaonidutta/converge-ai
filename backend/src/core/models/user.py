@@ -33,6 +33,7 @@ class User(Base, TimestampMixin):
     # Relationships
     referrer = relationship("User", remote_side=[id], backref="referrals")
     addresses = relationship("Address", back_populates="user", cascade="all, delete-orphan")
+    carts = relationship("Cart", back_populates="user", cascade="all, delete-orphan")
     bookings = relationship("Booking", back_populates="user")
     booking_items = relationship("BookingItem", back_populates="user")
     conversations = relationship("Conversation", back_populates="user")
