@@ -1,6 +1,6 @@
 # RateCard model
 
-from sqlalchemy import Column, Integer, BigInteger, String, Numeric, Boolean, ForeignKey, Index, JSON
+from sqlalchemy import Column, Integer, BigInteger, String, Text, Numeric, Boolean, ForeignKey, Index, JSON
 from sqlalchemy.orm import relationship
 from backend.src.core.database.base import Base, TimestampMixin
 
@@ -21,6 +21,7 @@ class RateCard(Base, TimestampMixin):
     
     # Pricing
     name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)  # Detailed description to help customers differentiate
     price = Column(Numeric(10, 2), nullable=False)
     strike_price = Column(Numeric(10, 2), nullable=True)
 
@@ -67,6 +68,7 @@ class RateCard(Base, TimestampMixin):
             'subcategory_id': self.subcategory_id,
             'provider_id': self.provider_id,
             'name': self.name,
+            'description': self.description,
             'price': float(self.price) if self.price else 0.00,
             'strike_price': float(self.strike_price) if self.strike_price else None,
             'available_pincodes': [p.pincode for p in self.pincodes] if self.pincodes else [],  # Get from relationship
