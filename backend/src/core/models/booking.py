@@ -50,11 +50,11 @@ class Booking(Base, TimestampMixin):
     
     # Foreign Keys
     user_id = Column(BigInteger, ForeignKey('users.id', ondelete='RESTRICT'), nullable=False)
-    address_id = Column(BigInteger, ForeignKey('addresses.id', ondelete='RESTRICT'), nullable=True)
+    address_id = Column(BigInteger, ForeignKey('addresses.id', ondelete='RESTRICT'), nullable=False)
 
     # Order
     order_id = Column(String(50), unique=True, nullable=False)
-    booking_number = Column(String(50), unique=True, nullable=True)
+    booking_number = Column(String(50), unique=True, nullable=False)
     invoice_number = Column(String(100), nullable=True)
     
     # Payment
@@ -93,9 +93,11 @@ class Booking(Base, TimestampMixin):
     # Status
     status = Column(Enum(BookingStatus), default=BookingStatus.PENDING, nullable=False)
 
-    # Booking Details
-    preferred_date = Column(Date, nullable=True)
-    preferred_time = Column(Time, nullable=True)
+    # Scheduling
+    preferred_date = Column(Date, nullable=False)
+    preferred_time = Column(Time, nullable=False)
+
+    # Additional Info
     special_instructions = Column(String(500), nullable=True)
 
     # Cancellation

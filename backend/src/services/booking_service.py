@@ -13,7 +13,8 @@ import uuid
 
 from src.core.models import (
     User, Booking, BookingItem, Cart, CartItem, Address,
-    RateCard, Subcategory, BookingStatus, PaymentStatus, PaymentMethod
+    RateCard, Subcategory, BookingStatus, PaymentStatus, PaymentMethod,
+    Provider, Pincode, ProviderPincode
 )
 from src.schemas.customer import (
     CreateBookingRequest,
@@ -96,6 +97,10 @@ class BookingService:
             raise ValueError("Cart is empty")
 
         logger.debug(f"Found {len(cart_items)} items in cart")
+
+        # Validate provider availability in user's pincode
+        logger.debug("Validating provider availability")
+        await self._validate_provider_availability(address.pincode, cart_items)
 
         # Calculate total amount
         total_amount = sum(item[0].total_price for item in cart_items)
@@ -559,6 +564,66 @@ class BookingService:
             f"Booking cancelled: id={booking.id}, user_id={user.id}, "
             f"reason={request.reason}"
         )
+
+    async def _validate_provider_availability(
+        self,
+        pincode: str,
+        cart_items: list
+    ) -> None:
+        """
+        Validate that providers are available for all cart items in the specified pincode
+
+        This checks:
+        1. Pincode exists and is serviceable
+        2. Each rate card in cart has a provider who services this pincode
+
+        Args:
+            pincode: User's pincode
+            cart_items: List of (CartItem, RateCard, Subcategory) tuples
+
+        Raises:
+            ValueError: If validation fails
+        """
+        # Step 1: Check if pincode exists and is serviceable
+        pincode_result = await self.db.execute(
+            select(Pincode).where(Pincode.pincode == pincode)
+        )
+        pincode_obj = pincode_result.scalar_one_or_none()
+
+        if not pincode_obj:
+            logger.warning(f"Pincode not found: {pincode}")
+            raise ValueError(f"Sorry, pincode {pincode} is not in our service area yet.")
+
+        if not pincode_obj.is_serviceable:
+            logger.warning(f"Pincode not serviceable: {pincode}")
+            raise ValueError(f"Sorry, we don't service pincode {pincode} at the moment.")
+
+        # Step 2: Validate each rate card's provider services this pincode
+        for cart_item, rate_card, subcategory in cart_items:
+            # Check if rate card's provider services this pincode
+            provider_check = await self.db.execute(
+                select(ProviderPincode)
+                .join(Provider, ProviderPincode.provider_id == Provider.id)
+                .where(
+                    ProviderPincode.provider_id == rate_card.provider_id,
+                    ProviderPincode.pincode_id == pincode_obj.id,
+                    Provider.is_active == True,
+                    Provider.is_verified == True
+                )
+            )
+            provider_association = provider_check.scalar_one_or_none()
+
+            if not provider_association:
+                logger.warning(
+                    f"Provider {rate_card.provider_id} does not service pincode {pincode} "
+                    f"for rate_card {rate_card.id} ({rate_card.name})"
+                )
+                raise ValueError(
+                    f"Sorry, the service '{rate_card.name}' is not available in pincode {pincode}. "
+                    f"Please remove it from your cart or choose a different location."
+                )
+
+        logger.debug(f"Provider validation passed for pincode {pincode}")
 
 
 # Export

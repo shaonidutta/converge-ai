@@ -1,6 +1,6 @@
 # RateCard model
 
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, ForeignKey, Index, JSON
+from sqlalchemy import Column, Integer, BigInteger, String, Text, Numeric, Boolean, ForeignKey, Index, JSON
 from sqlalchemy.orm import relationship
 from src.core.database.base import Base, TimestampMixin
 
@@ -13,13 +13,15 @@ class RateCard(Base, TimestampMixin):
     
     # Primary Key
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
-    
+
     # Foreign Keys
     category_id = Column(Integer, ForeignKey('categories.id', ondelete='CASCADE'), nullable=False)
     subcategory_id = Column(Integer, ForeignKey('subcategories.id', ondelete='CASCADE'), nullable=False)
+    provider_id = Column(BigInteger, ForeignKey('providers.id', ondelete='RESTRICT'), nullable=False, index=True)
     
     # Pricing
     name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)  # Detailed description to help customers differentiate
     price = Column(Numeric(10, 2), nullable=False)
     strike_price = Column(Numeric(10, 2), nullable=True)
 
@@ -32,6 +34,7 @@ class RateCard(Base, TimestampMixin):
     # Relationships
     category = relationship("Category", back_populates="rate_cards")
     subcategory = relationship("Subcategory", back_populates="rate_cards")
+    provider = relationship("Provider", back_populates="rate_cards")
     booking_items = relationship("BookingItem", back_populates="rate_card")
 
     # New pincode relationships (optimized)
@@ -51,6 +54,7 @@ class RateCard(Base, TimestampMixin):
     # Indexes
     __table_args__ = (
         Index('idx_category_sub', 'category_id', 'subcategory_id', 'is_active'),
+        Index('idx_provider_category', 'provider_id', 'category_id', 'subcategory_id', 'is_active'),
     )
     
     def __repr__(self):
@@ -62,7 +66,9 @@ class RateCard(Base, TimestampMixin):
             'id': self.id,
             'category_id': self.category_id,
             'subcategory_id': self.subcategory_id,
+            'provider_id': self.provider_id,
             'name': self.name,
+            'description': self.description,
             'price': float(self.price) if self.price else 0.00,
             'strike_price': float(self.strike_price) if self.strike_price else None,
             'available_pincodes': [p.pincode for p in self.pincodes] if self.pincodes else [],  # Get from relationship

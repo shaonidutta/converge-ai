@@ -33,6 +33,7 @@ class Provider(Base, TimestampMixin):
     
     # Relationships
     booking_items = relationship("BookingItem", back_populates="provider")
+    rate_cards = relationship("RateCard", back_populates="provider")
 
     # New pincode relationships (optimized)
     pincode_associations = relationship(
