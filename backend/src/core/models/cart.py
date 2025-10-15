@@ -5,7 +5,7 @@ Shopping cart for users
 
 from sqlalchemy import Column, Integer, BigInteger, ForeignKey, DECIMAL, DateTime, func
 from sqlalchemy.orm import relationship
-from backend.src.core.database.base import Base, TimestampMixin
+from src.core.database.base import Base, TimestampMixin
 
 
 class Cart(Base, TimestampMixin):

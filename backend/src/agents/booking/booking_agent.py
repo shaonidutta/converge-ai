@@ -15,9 +15,9 @@ from sqlalchemy import select
 from datetime import datetime, timedelta
 import logging
 
-from backend.src.services.booking_service import BookingService
-from backend.src.core.models import User, Address, Cart, CartItem, RateCard, Provider, ProviderPincode, Pincode
-from backend.src.schemas.customer import CreateBookingRequest
+from src.services.booking_service import BookingService
+from src.core.models import User, Address, Cart, CartItem, RateCard, Provider, ProviderPincode, Pincode, Booking
+from src.schemas.customer import CreateBookingRequest
 
 logger = logging.getLogger(__name__)
 
@@ -322,38 +322,173 @@ class BookingAgent:
     async def _reschedule_booking(self, entities: Dict[str, Any], user: User) -> Dict[str, Any]:
         """
         Reschedule an existing booking to a new date/time
-        
+
         Args:
             entities: Contains booking_id, date, time
             user: Current user
-        
+
         Returns:
             Response dict with rescheduling details
         """
-        # Implementation will use BookingService.reschedule_booking
-        # For now, return placeholder
-        return {
-            "response": "Rescheduling feature is coming soon!",
-            "action_taken": "not_implemented",
-            "metadata": {}
-        }
+        try:
+            # Extract required entities
+            booking_id = entities.get("booking_id")
+            new_date = entities.get("date")
+            new_time = entities.get("time")
+            reason = entities.get("reason", "Customer requested reschedule")
+
+            # Validate required fields
+            if not booking_id:
+                return {
+                    "response": "I need the booking ID to reschedule. Could you provide it?",
+                    "action_taken": "missing_entity",
+                    "metadata": {"missing": "booking_id"}
+                }
+
+            if not new_date:
+                return {
+                    "response": "I need the new date to reschedule. What date would you prefer?",
+                    "action_taken": "missing_entity",
+                    "metadata": {"missing": "date"}
+                }
+
+            if not new_time:
+                return {
+                    "response": "I need the new time to reschedule. What time would you prefer?",
+                    "action_taken": "missing_entity",
+                    "metadata": {"missing": "time"}
+                }
+
+            # Create reschedule request
+            from src.schemas.customer import RescheduleBookingRequest
+            reschedule_request = RescheduleBookingRequest(
+                preferred_date=new_date,
+                preferred_time=new_time,
+                reason=reason
+            )
+
+            # Reschedule booking using BookingService
+            result = await self.booking_service.reschedule_booking(
+                int(booking_id),
+                reschedule_request,
+                user
+            )
+
+            return {
+                "response": f"✅ Booking {result.booking_number} has been rescheduled to {new_date} at {new_time}. "
+                           f"You will receive a confirmation shortly.",
+                "action_taken": "booking_rescheduled",
+                "metadata": {
+                    "booking_id": result.id,
+                    "booking_number": result.booking_number,
+                    "new_date": new_date,
+                    "new_time": new_time,
+                    "status": result.status
+                }
+            }
+
+        except ValueError as e:
+            return {
+                "response": f"❌ Rescheduling failed: {str(e)}",
+                "action_taken": "reschedule_failed",
+                "metadata": {"error": str(e)}
+            }
+        except Exception as e:
+            logger.error(f"Error rescheduling booking: {str(e)}")
+            return {
+                "response": f"❌ An unexpected error occurred: {str(e)}",
+                "action_taken": "error",
+                "metadata": {"error": str(e)}
+            }
     
     async def _modify_booking(self, entities: Dict[str, Any], user: User) -> Dict[str, Any]:
         """
         Modify booking details (e.g., special instructions)
-        
+
         Args:
-            entities: Contains booking_id, modifications
+            entities: Contains booking_id, special_instructions
             user: Current user
-        
+
         Returns:
             Response dict with modification details
         """
-        # Implementation for modifying booking details
-        # For now, return placeholder
-        return {
-            "response": "Booking modification feature is coming soon!",
-            "action_taken": "not_implemented",
-            "metadata": {}
-        }
+        try:
+            # Extract required entities
+            booking_id = entities.get("booking_id")
+            special_instructions = entities.get("special_instructions")
+
+            # Validate required fields
+            if not booking_id:
+                return {
+                    "response": "I need the booking ID to modify. Could you provide it?",
+                    "action_taken": "missing_entity",
+                    "metadata": {"missing": "booking_id"}
+                }
+
+            if not special_instructions:
+                return {
+                    "response": "What would you like to modify? Please provide the special instructions or changes you need.",
+                    "action_taken": "missing_entity",
+                    "metadata": {"missing": "modifications"}
+                }
+
+            # Get booking to verify it exists and belongs to user
+            booking = await self.booking_service.get_booking(int(booking_id), user)
+
+            # Check if booking can be modified
+            if booking.status not in ["PENDING", "CONFIRMED"]:
+                return {
+                    "response": f"❌ Cannot modify booking with status: {booking.status}. "
+                               f"Only pending or confirmed bookings can be modified.",
+                    "action_taken": "modification_failed",
+                    "metadata": {"error": f"Invalid status: {booking.status}"}
+                }
+
+            # Update special instructions in database
+            result = await self.db.execute(
+                select(Booking).where(
+                    Booking.id == int(booking_id),
+                    Booking.user_id == user.id
+                )
+            )
+            booking_record = result.scalar_one_or_none()
+
+            if not booking_record:
+                return {
+                    "response": "❌ Booking not found or you don't have permission to modify it.",
+                    "action_taken": "modification_failed",
+                    "metadata": {"error": "Booking not found"}
+                }
+
+            # Update special instructions
+            booking_record.special_instructions = special_instructions
+            await self.db.commit()
+            await self.db.refresh(booking_record)
+
+            return {
+                "response": f"✅ Booking {booking.booking_number} has been updated successfully. "
+                           f"Your special instructions have been noted.",
+                "action_taken": "booking_modified",
+                "metadata": {
+                    "booking_id": booking.id,
+                    "booking_number": booking.booking_number,
+                    "modifications": {
+                        "special_instructions": special_instructions
+                    }
+                }
+            }
+
+        except ValueError as e:
+            return {
+                "response": f"❌ Modification failed: {str(e)}",
+                "action_taken": "modification_failed",
+                "metadata": {"error": str(e)}
+            }
+        except Exception as e:
+            logger.error(f"Error modifying booking: {str(e)}")
+            return {
+                "response": f"❌ An unexpected error occurred: {str(e)}",
+                "action_taken": "error",
+                "metadata": {"error": str(e)}
+            }
 
