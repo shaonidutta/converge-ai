@@ -21,6 +21,7 @@ from src.schemas.intent import IntentClassificationResult, IntentResult
 from src.agents.policy.policy_agent import PolicyAgent
 from src.agents.service.service_agent import ServiceAgent
 from src.agents.booking.booking_agent import BookingAgent
+from src.agents.cancellation.cancellation_agent import CancellationAgent
 
 
 class CoordinatorAgent:
@@ -44,7 +45,7 @@ class CoordinatorAgent:
         "booking_create": "booking",
         "booking_modify": "booking",
         "booking_reschedule": "booking",
-        "booking_cancel": "booking",
+        "booking_cancel": "cancellation",  # Route to dedicated CancellationAgent
         "booking_status": "booking",
         "general_query": "policy",  # Default to policy for general questions
     }
@@ -68,6 +69,7 @@ class CoordinatorAgent:
             self.policy_agent = PolicyAgent(db=db)
             self.service_agent = ServiceAgent(db=db)
             self.booking_agent = BookingAgent(db=db)
+            self.cancellation_agent = CancellationAgent(db=db)
             
             self.logger.info("CoordinatorAgent initialized successfully")
         except Exception as e:
@@ -215,7 +217,16 @@ class CoordinatorAgent:
                     session_id=session_id
                 )
                 response["agent_used"] = "booking"
-                
+
+            elif agent_type == "cancellation":
+                response = await self.cancellation_agent.execute(
+                    message="",  # Message not needed for cancellation
+                    user=user,
+                    session_id=session_id,
+                    entities=entities
+                )
+                response["agent_used"] = "cancellation"
+
             else:
                 # Fallback to policy agent for unknown intents
                 self.logger.warning(f"Unknown agent type '{agent_type}', falling back to policy agent")
