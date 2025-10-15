@@ -236,16 +236,42 @@ docker-volumes/
 .dev-logs/
 
 # ============================================
-# Documentation (except README.md in docs/)
+# Test Results and Test Scripts
 # ============================================
-*.md
-!README.md
-!docs/*.md
+test_results.json
+test_*.json
+scripts/test_*.py
+scripts/seed_*.py
+scripts/verify_*.py
+scripts/check_*.py
+scripts/describe_*.py
+scripts/extract_*.py
+scripts/find_*.py
+scripts/fix_*.py
+scripts/list_*.py
+scripts/migrate_*.py
+scripts/setup_*.py
+scripts/clear_*.py
+scripts/migrations/
+scripts/seed_data/
+scripts/seeds/
+scripts/__pycache__/
 
 # ============================================
-# Examples
+# Documentation (Internal Development)
+# ============================================
+docs/
+!docs/README.md
+
+# ============================================
+# Examples (Development Only)
 # ============================================
 examples/
+
+# ============================================
+# Data Folders (Development/Testing)
+# ============================================
+data/
 
 # ============================================
 # Secrets & Keys

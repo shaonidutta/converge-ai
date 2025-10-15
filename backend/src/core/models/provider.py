@@ -2,7 +2,7 @@
 
 from sqlalchemy import Column, BigInteger, String, Numeric, Integer, Boolean, Index, JSON
 from sqlalchemy.orm import relationship
-from backend.src.core.database.base import Base, TimestampMixin
+from src.core.database.base import Base, TimestampMixin
 
 
 class Provider(Base, TimestampMixin):
@@ -33,6 +33,7 @@ class Provider(Base, TimestampMixin):
     
     # Relationships
     booking_items = relationship("BookingItem", back_populates="provider")
+    rate_cards = relationship("RateCard", back_populates="provider")
 
     # New pincode relationships (optimized)
     pincode_associations = relationship(
