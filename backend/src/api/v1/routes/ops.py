@@ -19,7 +19,11 @@ from src.schemas.ops import (
     OpsUpdateRequest,
 )
 from src.schemas.ops_dashboard import PriorityQueueResponse
+from src.schemas.metrics import DashboardMetricsResponse
 from src.services import OpsService, OpsDashboardService
+from src.services.metrics_service import MetricsService
+from src.services.config_service import ConfigService
+from src.services.audit_service import AuditService
 
 router = APIRouter(prefix="/ops", tags=["Ops Management"])
 
@@ -302,3 +306,95 @@ async def get_priority_queue(
         )
 
 
+@router.get(
+    "/dashboard/metrics",
+    response_model=DashboardMetricsResponse,
+    summary="Get dashboard metrics",
+    description="""
+    Get comprehensive operational metrics for the dashboard.
+
+    **Metrics Groups**:
+    - `bookings`: Bookings count by status, today/week/month counts, growth rate
+    - `complaints`: Complaints by priority/status, unresolved count, avg resolution time
+    - `sla`: SLA compliance, at-risk/breached counts, avg response/resolution time
+    - `revenue`: Total revenue, revenue by status, today/week/month revenue, AOV
+    - `realtime`: Active bookings/complaints, critical complaints, staff workload
+
+    **Period Options**:
+    - `today`: Today's data (since midnight UTC)
+    - `week`: Last 7 days
+    - `month`: Last 30 days
+    - `all`: All time data (default)
+
+    **Permissions**:
+    - `ops.read`: Access to all metrics except detailed revenue
+    - `ops.admin`: Full access including revenue details
+
+    **Performance**:
+    - Metrics are cached for 5 minutes (configurable)
+    - Use `include` parameter to request only needed metric groups
+
+    **Example Requests**:
+    - Get all metrics: `GET /api/v1/ops/dashboard/metrics`
+    - Get today's bookings and complaints: `GET /api/v1/ops/dashboard/metrics?period=today&include=bookings,complaints`
+    - Get real-time stats only: `GET /api/v1/ops/dashboard/metrics?include=realtime`
+    """
+)
+async def get_dashboard_metrics(
+    current_staff: Annotated[Staff, Depends(require_permissions(["ops.read"]))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    period: str = Query(
+        "all",
+        description="Time period for metrics",
+        enum=["today", "week", "month", "all"]
+    ),
+    include: Optional[str] = Query(
+        None,
+        description="Comma-separated list of metric groups to include (bookings,complaints,sla,revenue,realtime). If not specified, all groups are included."
+    )
+):
+    """
+    Get comprehensive dashboard metrics
+
+    Returns operational statistics including bookings, complaints, SLA, revenue, and real-time data.
+    """
+    try:
+        # Parse include groups
+        include_groups = None
+        if include:
+            include_groups = [group.strip() for group in include.split(",")]
+            # Validate groups
+            valid_groups = {"bookings", "complaints", "sla", "revenue", "realtime"}
+            invalid_groups = set(include_groups) - valid_groups
+            if invalid_groups:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid metric groups: {', '.join(invalid_groups)}. Valid groups: {', '.join(valid_groups)}"
+                )
+
+        # Initialize services
+        config_service = ConfigService(db)
+        audit_service = AuditService(db)
+        metrics_service = MetricsService(db, config_service, audit_service)
+
+        # Get metrics
+        metrics = await metrics_service.get_dashboard_metrics(
+            staff_id=current_staff.id,
+            period=period,
+            include_groups=include_groups
+        )
+
+        return metrics
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve dashboard metrics"
+        )
