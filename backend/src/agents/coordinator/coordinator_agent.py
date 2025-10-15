@@ -23,6 +23,7 @@ from src.agents.service.service_agent import ServiceAgent
 from src.agents.booking.booking_agent import BookingAgent
 from src.agents.cancellation.cancellation_agent import CancellationAgent
 from src.agents.complaint.complaint_agent import ComplaintAgent
+from src.agents.sql.sql_agent import SQLAgent
 
 
 class CoordinatorAgent:
@@ -49,6 +50,7 @@ class CoordinatorAgent:
         "booking_cancel": "cancellation",  # Route to dedicated CancellationAgent
         "booking_status": "booking",
         "complaint": "complaint",  # Route to ComplaintAgent
+        "data_query": "sql",  # Route to SQLAgent for data queries
         "general_query": "policy",  # Default to policy for general questions
     }
     
@@ -73,6 +75,7 @@ class CoordinatorAgent:
             self.booking_agent = BookingAgent(db=db)
             self.cancellation_agent = CancellationAgent(db=db)
             self.complaint_agent = ComplaintAgent(db=db)
+            self.sql_agent = SQLAgent(db=db)
             
             self.logger.info("CoordinatorAgent initialized successfully")
         except Exception as e:
@@ -238,6 +241,15 @@ class CoordinatorAgent:
                     entities=entities
                 )
                 response["agent_used"] = "complaint"
+
+            elif agent_type == "sql":
+                response = await self.sql_agent.execute(
+                    message=message,  # Full message needed for SQL generation
+                    user=user,
+                    session_id=session_id,
+                    entities=entities
+                )
+                response["agent_used"] = "sql"
 
             else:
                 # Fallback to policy agent for unknown intents
