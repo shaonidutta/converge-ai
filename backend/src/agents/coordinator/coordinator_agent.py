@@ -22,6 +22,7 @@ from src.agents.policy.policy_agent import PolicyAgent
 from src.agents.service.service_agent import ServiceAgent
 from src.agents.booking.booking_agent import BookingAgent
 from src.agents.cancellation.cancellation_agent import CancellationAgent
+from src.agents.complaint.complaint_agent import ComplaintAgent
 
 
 class CoordinatorAgent:
@@ -47,6 +48,7 @@ class CoordinatorAgent:
         "booking_reschedule": "booking",
         "booking_cancel": "cancellation",  # Route to dedicated CancellationAgent
         "booking_status": "booking",
+        "complaint": "complaint",  # Route to ComplaintAgent
         "general_query": "policy",  # Default to policy for general questions
     }
     
@@ -70,6 +72,7 @@ class CoordinatorAgent:
             self.service_agent = ServiceAgent(db=db)
             self.booking_agent = BookingAgent(db=db)
             self.cancellation_agent = CancellationAgent(db=db)
+            self.complaint_agent = ComplaintAgent(db=db)
             
             self.logger.info("CoordinatorAgent initialized successfully")
         except Exception as e:
@@ -226,6 +229,15 @@ class CoordinatorAgent:
                     entities=entities
                 )
                 response["agent_used"] = "cancellation"
+
+            elif agent_type == "complaint":
+                response = await self.complaint_agent.execute(
+                    message=message,  # Full message needed for complaint
+                    user=user,
+                    session_id=session_id,
+                    entities=entities
+                )
+                response["agent_used"] = "complaint"
 
             else:
                 # Fallback to policy agent for unknown intents
