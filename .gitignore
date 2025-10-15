@@ -51,7 +51,8 @@ backend/data/
 backend/scripts/
 backend/logs/*
 !backend/logs/.gitkeep
-backend/.dev-logs/
+# Keep .dev-logs for documentation (TASKLIST.md, plans, summaries)
+# backend/.dev-logs/
 
 # ============================================================================
 # CUSTOMER FRONTEND - React/Next.js
