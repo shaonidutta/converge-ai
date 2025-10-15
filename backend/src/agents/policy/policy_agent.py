@@ -117,15 +117,25 @@ class PolicyAgent:
             # Calculate grounding score
             grounding_score = await self._calculate_grounding_score(response_text, context)
             
-            # Check if response is well-grounded
-            if grounding_score < 0.5:
+            # Check if response is well-grounded (threshold: 0.45)
+            if grounding_score < 0.45:
+                # Extract sources safely
+                sources_info = []
+                for r in search_results[:3]:
+                    metadata = r.get("metadata", {})
+                    sources_info.append({
+                        "policy_type": metadata.get("policy_type", "Unknown"),
+                        "section": metadata.get("section", "Unknown"),
+                        "score": round(r.get("score", 0.0), 2)
+                    })
+
                 return {
                     "response": "I found some relevant information, but I'm not confident enough to provide an accurate answer. Please contact our customer support team for clarification.",
                     "action_taken": "low_grounding_score",
                     "metadata": {
                         "query": query,
                         "grounding_score": grounding_score,
-                        "sources": [{"policy_type": r["metadata"].get("policy_type"), "score": r["score"]} for r in search_results[:3]]
+                        "sources": sources_info
                     }
                 }
             
@@ -156,33 +166,126 @@ class PolicyAgent:
         namespace: str = "policies"
     ) -> List[Dict[str, Any]]:
         """
-        Search for relevant policy documents in Pinecone
-        
+        Search for relevant policy documents in Pinecone with query preprocessing and reranking
+
         Args:
             query: User query text
             top_k: Number of results to return
             namespace: Pinecone namespace (default: "policies")
-            
+
         Returns:
             List of search results with scores and metadata
         """
         try:
             self.logger.debug(f"Searching policies for query: {query[:100]}...")
-            
-            # Query Pinecone with automatic embedding
-            results = self.pinecone_service.query_by_text(
+
+            # Preprocess query - extract key terms
+            key_terms = self._extract_key_terms(query)
+            self.logger.debug(f"Extracted key terms: {key_terms}")
+
+            # Query Pinecone with automatic embedding (get more results for reranking)
+            initial_results = self.pinecone_service.query_by_text(
                 query_text=query,
-                top_k=top_k,
+                top_k=top_k * 2,  # Get 2x results for reranking
                 namespace=namespace,
                 include_metadata=True
             )
-            
-            self.logger.debug(f"Found {len(results)} policy documents")
-            return results
-            
+
+            # Rerank results based on keyword matches
+            reranked_results = self._rerank_results(initial_results, key_terms)
+
+            # Return top_k after reranking
+            final_results = reranked_results[:top_k]
+
+            self.logger.debug(f"Found {len(final_results)} policy documents after reranking")
+            return final_results
+
         except Exception as e:
             self.logger.error(f"Error searching policies: {e}")
             raise
+
+    def _extract_key_terms(self, query: str) -> List[str]:
+        """
+        Extract key terms from query for reranking
+
+        Args:
+            query: User query text
+
+        Returns:
+            List of key terms
+        """
+        # Convert to lowercase
+        query_lower = query.lower()
+
+        # Define important keywords for policy queries
+        policy_keywords = [
+            'cancel', 'cancellation', 'refund', 'booking', 'policy',
+            'hours', 'before', 'after', 'time', 'timeframe',
+            'full', 'partial', 'eligible', 'eligibility',
+            'process', 'processing', 'days', 'business days',
+            'reschedule', 'rescheduling', 'modify', 'change',
+            'service', 'provider', 'customer'
+        ]
+
+        # Extract keywords present in query
+        key_terms = [kw for kw in policy_keywords if kw in query_lower]
+
+        # Also extract numbers (like "2 hours", "4 hours")
+        import re
+        numbers = re.findall(r'\d+\s*(?:hour|day|minute)', query_lower)
+        key_terms.extend(numbers)
+
+        return key_terms
+
+    def _rerank_results(
+        self,
+        results: List[Dict[str, Any]],
+        key_terms: List[str]
+    ) -> List[Dict[str, Any]]:
+        """
+        Rerank search results based on keyword matches
+
+        Args:
+            results: Initial search results
+            key_terms: Key terms extracted from query
+
+        Returns:
+            Reranked results
+        """
+        reranked = []
+
+        for result in results:
+            metadata = result.get("metadata", {})
+            text_preview = metadata.get("text_preview", "").lower()
+            section = metadata.get("section", "").lower()
+            policy_type = metadata.get("policy_type", "").lower()
+
+            # Count keyword matches in text
+            text_matches = sum(1 for term in key_terms if term in text_preview)
+
+            # Count keyword matches in section/policy type (weighted higher)
+            meta_matches = sum(1 for term in key_terms if term in section or term in policy_type)
+
+            # Calculate boost
+            # Each text match: +0.03, each meta match: +0.05
+            boost = (text_matches * 0.03) + (meta_matches * 0.05)
+
+            # Apply boost to original score
+            original_score = result.get("score", 0.0)
+            boosted_score = min(original_score + boost, 1.0)  # Cap at 1.0
+
+            reranked.append({
+                **result,
+                "score": boosted_score,  # Update score with boosted value
+                "original_score": original_score,
+                "keyword_matches": text_matches + meta_matches
+            })
+
+        # Sort by boosted score
+        reranked.sort(key=lambda x: x["score"], reverse=True)
+
+        self.logger.debug(f"Reranked {len(reranked)} results with keyword boosting")
+        return reranked
     
     async def _retrieve_context(self, search_results: List[Dict[str, Any]]) -> str:
         """
@@ -303,10 +406,12 @@ Please provide a clear, accurate answer based ONLY on the context above. If the 
         """
         Calculate how well the response is grounded in the context
 
-        This is a simple heuristic-based approach that checks:
-        1. Keyword overlap between response and context
-        2. Length ratio (response shouldn't be much longer than context)
-        3. Presence of hedging language (indicates uncertainty)
+        Improved approach that checks:
+        1. Keyword overlap between response and context (weighted by importance)
+        2. Phrase-level matching (bigrams and trigrams)
+        3. Presence of specific facts/numbers from context
+        4. Length ratio (response shouldn't be much longer than context)
+        5. Presence of hedging language (indicates uncertainty)
 
         Args:
             response: Generated response text
@@ -321,32 +426,74 @@ Please provide a clear, accurate answer based ONLY on the context above. If the 
             context_lower = context.lower()
 
             # Extract meaningful words (exclude common stop words)
-            stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'can', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'what', 'which', 'who', 'when', 'where', 'why', 'how'}
+            stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'can', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'our', 'your', 'their'}
 
-            response_words = set(word for word in response_lower.split() if word not in stop_words and len(word) > 3)
-            context_words = set(word for word in context_lower.split() if word not in stop_words and len(word) > 3)
+            response_words = [word for word in response_lower.split() if word not in stop_words and len(word) > 2]
+            context_words = set(word for word in context_lower.split() if word not in stop_words and len(word) > 2)
 
-            # Calculate keyword overlap
+            # 1. Keyword overlap score (weighted by word importance)
             if not response_words:
                 return 0.5  # Neutral score if no meaningful words
 
-            overlap = len(response_words.intersection(context_words))
-            keyword_score = min(overlap / len(response_words), 1.0)
+            # Important policy-specific words get higher weight
+            important_words = {'refund', 'cancel', 'cancellation', 'hours', 'days', 'policy', 'eligible', 'eligibility', 'timeframe', 'processing', 'business', 'partial', 'full', 'booking'}
 
-            # Check for hedging language (indicates uncertainty)
-            hedging_phrases = ['i don\'t have', 'i\'m not sure', 'i cannot', 'i apologize', 'unclear', 'uncertain']
+            weighted_overlap = 0
+            total_weight = 0
+            for word in response_words:
+                weight = 2.0 if word in important_words else 1.0
+                total_weight += weight
+                if word in context_words:
+                    weighted_overlap += weight
+
+            keyword_score = weighted_overlap / total_weight if total_weight > 0 else 0.0
+
+            # 2. Phrase-level matching (bigrams)
+            response_bigrams = set()
+            for i in range(len(response_words) - 1):
+                bigram = f"{response_words[i]} {response_words[i+1]}"
+                response_bigrams.add(bigram)
+
+            context_text = ' '.join([w for w in context_lower.split() if w not in stop_words])
+            bigram_matches = sum(1 for bigram in response_bigrams if bigram in context_text)
+            bigram_score = min(bigram_matches / max(len(response_bigrams), 1), 1.0)
+
+            # 3. Number/fact matching (important for policy details)
+            import re
+            response_numbers = set(re.findall(r'\d+', response_lower))
+            context_numbers = set(re.findall(r'\d+', context_lower))
+
+            if response_numbers:
+                number_overlap = len(response_numbers.intersection(context_numbers)) / len(response_numbers)
+            else:
+                number_overlap = 1.0  # No penalty if no numbers in response
+
+            # 4. Check for hedging language (indicates uncertainty)
+            hedging_phrases = ['i don\'t have', 'i\'m not sure', 'i cannot', 'i apologize', 'unclear', 'uncertain', 'not mentioned', 'not specified']
             has_hedging = any(phrase in response_lower for phrase in hedging_phrases)
-            hedging_penalty = 0.3 if has_hedging else 0.0
+            hedging_penalty = 0.2 if has_hedging else 0.0
 
-            # Length ratio check (response shouldn't be much longer than context)
+            # 5. Length ratio check (response shouldn't be much longer than context)
             length_ratio = len(response) / max(len(context), 1)
-            length_score = 1.0 if length_ratio < 0.5 else max(0.5, 1.0 - (length_ratio - 0.5))
+            length_score = 1.0 if length_ratio < 0.3 else max(0.6, 1.0 - (length_ratio - 0.3) * 0.5)
 
-            # Combine scores
-            grounding_score = (keyword_score * 0.6 + length_score * 0.4) - hedging_penalty
+            # Combine scores with weights
+            # Keyword overlap: 40%, Bigram matching: 25%, Number matching: 20%, Length: 15%
+            grounding_score = (
+                keyword_score * 0.40 +
+                bigram_score * 0.25 +
+                number_overlap * 0.20 +
+                length_score * 0.15
+            ) - hedging_penalty
+
             grounding_score = max(0.0, min(1.0, grounding_score))  # Clamp to [0, 1]
 
-            self.logger.debug(f"Grounding score: {grounding_score:.2f} (keyword: {keyword_score:.2f}, length: {length_score:.2f}, hedging: {has_hedging})")
+            self.logger.debug(
+                f"Grounding score: {grounding_score:.2f} "
+                f"(keyword: {keyword_score:.2f}, bigram: {bigram_score:.2f}, "
+                f"numbers: {number_overlap:.2f}, length: {length_score:.2f}, "
+                f"hedging: {has_hedging})"
+            )
             return grounding_score
 
         except Exception as e:

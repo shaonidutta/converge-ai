@@ -117,7 +117,10 @@ async def test_policy_agent():
                 if 'sources' in metadata:
                     print(f"\n   📚 Sources:")
                     for source in metadata['sources']:
-                        print(f"   - {source['policy_type']} / {source['section']} (Score: {source['relevance_score']})")
+                        policy_type = source.get('policy_type', 'Unknown')
+                        section = source.get('section', 'Unknown')
+                        score = source.get('relevance_score') or source.get('score', 0.0)
+                        print(f"   - {policy_type} / {section} (Score: {score})")
                 
             except Exception as e:
                 print(f"   ❌ Error: {e}")

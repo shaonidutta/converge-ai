@@ -23,29 +23,31 @@ from src.rag.vector_store.pinecone_service import PineconeService
 from src.rag.embeddings.embedding_service import EmbeddingService
 
 
-def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
+def chunk_text(text: str, chunk_size: int = 800, overlap: int = 100) -> List[str]:
     """
     Chunk text into smaller pieces with overlap
-    
+
+    IMPROVED: Larger chunks (800 chars) with more overlap (100 chars) for better context
+
     Args:
         text: Input text to chunk
-        chunk_size: Target size of each chunk in characters
-        overlap: Number of characters to overlap between chunks
-        
+        chunk_size: Target size of each chunk in characters (default: 800)
+        overlap: Number of characters to overlap between chunks (default: 100)
+
     Returns:
         List of text chunks
     """
     # Split by paragraphs first
     paragraphs = text.split('\n\n')
-    
+
     chunks = []
     current_chunk = ""
-    
+
     for para in paragraphs:
         para = para.strip()
         if not para:
             continue
-        
+
         # If adding this paragraph exceeds chunk size, save current chunk
         if len(current_chunk) + len(para) > chunk_size and current_chunk:
             chunks.append(current_chunk.strip())
@@ -136,9 +138,9 @@ def process_policy_document(
     print(f"  Policy Type: {base_metadata['policy_type']}")
     print(f"  Version: {base_metadata.get('version', 'N/A')}")
     
-    # Chunk the document
-    chunks = chunk_text(content, chunk_size=500, overlap=50)
-    print(f"  Created {len(chunks)} chunks")
+    # Chunk the document (IMPROVED: larger chunks with more overlap)
+    chunks = chunk_text(content, chunk_size=800, overlap=100)
+    print(f"  Created {len(chunks)} chunks (800 chars, 100 overlap)")
     
     # Prepare documents for upload
     documents = []
