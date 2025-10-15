@@ -46,6 +46,13 @@ from src.schemas.chat import (
     ChatHistoryResponse,
     SessionResponse,
 )
+from src.schemas.intent import (
+    IntentResult,
+    IntentClassificationResult,
+    IntentClassificationRequest,
+    IntentClassificationResponse,
+    EntityExtractionResult,
+)
 
 __all__ = [
     # Auth schemas
@@ -90,4 +97,11 @@ __all__ = [
     "ChatMessageResponse",
     "ChatHistoryResponse",
     "SessionResponse",
+
+    # Intent schemas
+    "IntentResult",
+    "IntentClassificationResult",
+    "IntentClassificationRequest",
+    "IntentClassificationResponse",
+    "EntityExtractionResult",
 ]

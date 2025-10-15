@@ -11,6 +11,9 @@ from src.services.cart_service import CartService
 from src.services.booking_service import BookingService
 from src.services.address_service import AddressService
 from src.services.chat_service import ChatService
+from src.services.intent_service import IntentService
+from src.services.slot_filling_service import SlotFillingService
+from src.services.service_factory import SlotFillingServiceFactory, ServiceFactory
 
 __all__ = [
     "AuthService",
@@ -21,4 +24,8 @@ __all__ = [
     "BookingService",
     "AddressService",
     "ChatService",
+    "IntentService",
+    "SlotFillingService",
+    "SlotFillingServiceFactory",
+    "ServiceFactory",
 ]

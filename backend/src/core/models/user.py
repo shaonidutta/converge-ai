@@ -55,6 +55,7 @@ class User(Base, TimestampMixin):
     priority_queue_items = relationship("PriorityQueue", foreign_keys="[PriorityQueue.user_id]", back_populates="user")
     complaints = relationship("Complaint", foreign_keys="[Complaint.user_id]", back_populates="user")
     complaint_updates = relationship("ComplaintUpdate", back_populates="user")
+    dialog_states = relationship("DialogState", back_populates="user", cascade="all, delete-orphan")
     
     # Indexes
     __table_args__ = (

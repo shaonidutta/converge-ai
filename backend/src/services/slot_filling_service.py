@@ -1,0 +1,312 @@
+"""
+Slot-Filling Orchestrator Service
+
+High-level orchestrator that manages the slot-filling workflow using LangGraph.
+
+Responsibilities:
+- Initialize all required services
+- Create initial conversation state
+- Run the slot-filling graph
+- Return final response with metadata
+
+Design Principles:
+- Thin orchestrator (delegates to graph and services)
+- Clear separation of concerns
+- Comprehensive error handling
+- Rich metadata for debugging
+"""
+
+import logging
+from typing import Dict, Any, Optional, List
+from datetime import datetime
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.nlp.intent.classifier import IntentClassifier
+from src.services.dialog_state_manager import DialogStateManager
+from src.services.question_generator import QuestionGenerator
+from src.services.entity_extractor import EntityExtractor
+from src.services.entity_validator import EntityValidator
+from src.graphs.state import create_initial_state
+# Import run_slot_filling_graph inside function to avoid circular import
+from src.core.models import User
+
+logger = logging.getLogger(__name__)
+
+
+class SlotFillingResponse(BaseModel):
+    """Response from slot-filling workflow"""
+    final_response: str
+    response_type: str  # "question", "confirmation", "error", "ready_for_agent"
+    collected_entities: Dict[str, Any]
+    needed_entities: List[str]
+    should_trigger_agent: bool
+    metadata: Dict[str, Any]
+
+
+class SlotFillingService:
+    """
+    Slot-Filling Orchestrator Service
+    
+    Manages the complete slot-filling workflow:
+    1. Intent classification (context-aware)
+    2. Follow-up detection
+    3. Entity extraction
+    4. Entity validation
+    5. Question generation
+    6. Confirmation
+    7. Agent triggering
+    """
+    
+    def __init__(
+        self,
+        db: AsyncSession,
+        classifier: IntentClassifier,
+        dialog_manager: DialogStateManager,
+        question_generator: QuestionGenerator,
+        entity_extractor: EntityExtractor,
+        entity_validator: EntityValidator
+    ):
+        self.db = db
+        self.classifier = classifier
+        self.dialog_manager = dialog_manager
+        self.question_generator = question_generator
+        self.entity_extractor = entity_extractor
+        self.entity_validator = entity_validator
+    
+    async def process_message(
+        self,
+        message: str,
+        session_id: str,
+        user: User,
+        channel: str = "web"
+    ) -> SlotFillingResponse:
+        """
+        Process user message through slot-filling workflow
+        
+        Args:
+            message: User's message
+            session_id: Session ID
+            user: User object
+            channel: Communication channel (web, mobile, etc.)
+            
+        Returns:
+            SlotFillingResponse with final_response, response_type, metadata
+        """
+        logger.info(f"[SlotFillingService] Processing message for user {user.id}, session {session_id}")
+        logger.info(f"[SlotFillingService] Message: {message}")
+
+        try:
+            # Import here to avoid circular import
+            from src.graphs.slot_filling_graph import run_slot_filling_graph
+
+            # 1. Get conversation history
+            history = await self._get_conversation_history(session_id, limit=10)
+
+            # 2. Create initial state
+            state = create_initial_state(
+                user_id=user.id,
+                session_id=session_id,
+                current_message=message,
+                channel=channel,
+                conversation_history=history
+            )
+
+            # 3. Run slot-filling graph
+            logger.info("[SlotFillingService] Running slot-filling graph...")
+            final_state = await run_slot_filling_graph(
+                state=state,
+                db=self.db,
+                classifier=self.classifier,
+                dialog_manager=self.dialog_manager,
+                question_generator=self.question_generator,
+                entity_extractor=self.entity_extractor,
+                entity_validator=self.entity_validator
+            )
+            
+            # 4. Build response
+            response = self._build_response(final_state)
+            
+            logger.info(f"[SlotFillingService] Response type: {response.response_type}")
+            logger.info(f"[SlotFillingService] Should trigger agent: {response.should_trigger_agent}")
+            
+            return response
+        
+        except Exception as e:
+            logger.error(f"[SlotFillingService] Error processing message: {e}", exc_info=True)
+            
+            # Return error response
+            return SlotFillingResponse(
+                final_response="Sorry, I encountered an error processing your request. Please try again.",
+                response_type="error",
+                collected_entities={},
+                needed_entities=[],
+                should_trigger_agent=False,
+                metadata={
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat()
+                }
+            )
+    
+    async def _get_conversation_history(
+        self,
+        session_id: str,
+        limit: int = 10
+    ) -> List[Dict[str, str]]:
+        """
+        Get conversation history for session from Conversation table
+
+        Args:
+            session_id: Session ID
+            limit: Maximum number of messages to retrieve
+
+        Returns:
+            List of conversation messages in chronological order
+        """
+        try:
+            from src.core.models import Conversation
+            from sqlalchemy import select, asc
+
+            # Get messages in chronological order (oldest first)
+            result = await self.db.execute(
+                select(Conversation)
+                .where(Conversation.session_id == session_id)
+                .order_by(asc(Conversation.created_at))
+                .limit(limit)
+            )
+            messages = result.scalars().all()
+
+            # Convert to expected format
+            history = []
+            for msg in messages:
+                history.append({
+                    "role": msg.role.value,  # Convert enum to string: "user" or "assistant"
+                    "content": msg.message,  # Use "content" key (not "message")
+                    "timestamp": msg.created_at.isoformat()
+                })
+
+            logger.debug(f"[SlotFillingService] Retrieved {len(history)} messages for session {session_id}")
+            return history
+
+        except Exception as e:
+            logger.error(f"[SlotFillingService] Error getting conversation history: {e}", exc_info=True)
+            return []
+    
+    def _build_response(self, final_state: Dict[str, Any]) -> SlotFillingResponse:
+        """
+        Build SlotFillingResponse from final graph state
+        
+        Args:
+            final_state: Final state from slot-filling graph
+            
+        Returns:
+            SlotFillingResponse
+        """
+        # Determine response type
+        response_type = self._determine_response_type(final_state)
+        
+        # Check if should trigger agent
+        should_trigger_agent = (
+            final_state.get("next_graph") == "agent_execution" or
+            (len(final_state.get("needed_entities", [])) == 0 and 
+             final_state.get("primary_intent") is not None)
+        )
+        
+        return SlotFillingResponse(
+            final_response=final_state.get("final_response", ""),
+            response_type=response_type,
+            collected_entities=final_state.get("collected_entities", {}),
+            needed_entities=final_state.get("needed_entities", []),
+            should_trigger_agent=should_trigger_agent,
+            metadata={
+                "intent": final_state.get("primary_intent"),
+                "intent_confidence": final_state.get("intent_confidence"),
+                "is_follow_up": final_state.get("is_follow_up"),
+                "dialog_state_type": final_state.get("dialog_state_type"),
+                "retry_count": final_state.get("retry_count", 0),
+                "timestamp": datetime.now().isoformat(),
+                "provenance": final_state.get("provenance")
+            }
+        )
+    
+    def _determine_response_type(self, final_state: Dict[str, Any]) -> str:
+        """
+        Determine response type from final state
+        
+        Returns:
+            "question", "confirmation", "error", "ready_for_agent", "acknowledgment"
+        """
+        if final_state.get("error"):
+            return "error"
+        
+        if final_state.get("current_question"):
+            return "question"
+        
+        if final_state.get("confirmation_message"):
+            return "confirmation"
+        
+        if final_state.get("next_graph") == "agent_execution":
+            return "ready_for_agent"
+        
+        if len(final_state.get("needed_entities", [])) == 0:
+            return "ready_for_agent"
+        
+        return "acknowledgment"
+    
+    async def get_session_status(self, session_id: str) -> Dict[str, Any]:
+        """
+        Get current status of a session
+        
+        Args:
+            session_id: Session ID
+            
+        Returns:
+            Dict with session status information
+        """
+        try:
+            dialog_state = await self.dialog_manager.get_active_state(session_id)
+            
+            if not dialog_state:
+                return {
+                    "session_id": session_id,
+                    "status": "idle",
+                    "collected_entities": {},
+                    "needed_entities": []
+                }
+            
+            return {
+                "session_id": session_id,
+                "status": dialog_state.state.value,
+                "intent": dialog_state.intent,
+                "collected_entities": dialog_state.collected_entities,
+                "needed_entities": dialog_state.needed_entities,
+                "has_pending_action": dialog_state.has_pending_action(),
+                "is_expired": dialog_state.is_expired()
+            }
+        
+        except Exception as e:
+            logger.error(f"[SlotFillingService] Error getting session status: {e}")
+            return {
+                "session_id": session_id,
+                "status": "error",
+                "error": str(e)
+            }
+    
+    async def clear_session(self, session_id: str) -> bool:
+        """
+        Clear session state (reset conversation)
+        
+        Args:
+            session_id: Session ID
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            await self.dialog_manager.clear_state(session_id)
+            logger.info(f"[SlotFillingService] Cleared session: {session_id}")
+            return True
+        except Exception as e:
+            logger.error(f"[SlotFillingService] Error clearing session: {e}")
+            return False
+
