@@ -14,6 +14,9 @@ from src.services.chat_service import ChatService
 from src.services.intent_service import IntentService
 from src.services.slot_filling_service import SlotFillingService
 from src.services.service_factory import SlotFillingServiceFactory, ServiceFactory
+from src.services.config_service import ConfigService
+from src.services.audit_service import AuditService
+from src.services.ops_dashboard_service import OpsDashboardService
 
 __all__ = [
     "AuthService",
@@ -28,4 +31,7 @@ __all__ = [
     "SlotFillingService",
     "SlotFillingServiceFactory",
     "ServiceFactory",
+    "ConfigService",
+    "AuditService",
+    "OpsDashboardService",
 ]

@@ -73,6 +73,9 @@ class Staff(Base):
     assigned_complaints = relationship('Complaint', foreign_keys='Complaint.assigned_to_staff_id', back_populates='assigned_to_staff')
     resolved_complaints = relationship('Complaint', foreign_keys='Complaint.resolved_by_staff_id', back_populates='resolved_by_staff')
     complaint_updates = relationship('ComplaintUpdate', back_populates='staff')
+
+    # Audit logs
+    audit_logs = relationship('OpsAuditLog', back_populates='staff', cascade='all, delete-orphan')
     
     def __repr__(self):
         return f"<Staff(employee_id='{self.employee_id}', name='{self.first_name} {self.last_name}')>"

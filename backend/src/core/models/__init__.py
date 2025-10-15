@@ -16,6 +16,8 @@ from src.core.models.complaint import Complaint, ComplaintUpdate, ComplaintType,
 from src.core.models.pincode import Pincode, RateCardPincode, ProviderPincode
 from src.core.models.role import Role, Permission, RolePermission
 from src.core.models.staff import Staff, StaffSession, StaffActivityLog
+from src.core.models.ops_config import OpsConfig
+from src.core.models.ops_audit_log import OpsAuditLog
 
 __all__ = [
     # Base
@@ -61,6 +63,10 @@ __all__ = [
     # Complaint Models
     "Complaint",
     "ComplaintUpdate",
+
+    # Ops Models
+    "OpsConfig",
+    "OpsAuditLog",
 
     # Enums - Booking
     "PaymentStatus",
