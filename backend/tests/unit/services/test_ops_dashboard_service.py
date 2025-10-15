@@ -212,7 +212,7 @@ class TestOpsDashboardService:
         assert filters["status"] == "pending"
         assert filters["intent_type"] == "complaint"
         assert filters["priority_min"] == 50
-        assert filters["priority_max"] == 100"
+        assert filters["priority_max"] == 100
         assert filters["date_from"] == datetime(2025, 1, 1)
         assert filters["date_to"] == datetime(2025, 12, 31)
     
