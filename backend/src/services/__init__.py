@@ -17,6 +17,7 @@ from src.services.service_factory import SlotFillingServiceFactory, ServiceFacto
 from src.services.config_service import ConfigService
 from src.services.audit_service import AuditService
 from src.services.ops_dashboard_service import OpsDashboardService
+from src.services.metrics_service import MetricsService
 
 __all__ = [
     "AuthService",
@@ -34,4 +35,5 @@ __all__ = [
     "ConfigService",
     "AuditService",
     "OpsDashboardService",
+    "MetricsService",
 ]
