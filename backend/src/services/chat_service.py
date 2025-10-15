@@ -6,7 +6,7 @@ Business logic for chat operations
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional, List, Dict
 import uuid
 import logging
 
@@ -108,14 +108,14 @@ class ChatService:
         channel: str = "web"
     ) -> tuple[str, dict]:
         """
-        Get AI response using slot-filling workflow
+        Get AI response using CoordinatorAgent
 
-        This method now uses the intelligent slot-filling system to:
+        This method uses the CoordinatorAgent orchestration layer to:
         1. Classify user intent (context-aware)
-        2. Extract entities from message
-        3. Ask follow-up questions for missing information
-        4. Validate all inputs
-        5. Generate confirmation before executing actions
+        2. Route to appropriate specialized agent (Policy, Service, Booking)
+        3. Handle multi-intent queries
+        4. Manage conversation context
+        5. Execute agent and return response
 
         Args:
             user_message: User's message
@@ -129,69 +129,54 @@ class ChatService:
         Metadata includes:
             - intent: Detected intent
             - intent_confidence: Confidence score
-            - response_type: Type of response (question, confirmation, error, ready_for_agent)
-            - collected_entities: Entities collected so far
-            - needed_entities: Entities still needed
-            - should_trigger_agent: Whether to trigger agent execution
+            - agent_used: Agent(s) that handled the request
             - classification_method: How intent was classified (pattern/llm/fallback)
-            - nodes_executed: List of graph nodes executed
+            - all_intents: List of all detected intents
             - error: Error message if any
         """
         logger.info(f"[ChatService] Processing message for user {user.id} in session {session_id}")
         logger.debug(f"[ChatService] Message: {user_message[:100]}...")
 
         try:
-            # Import service factory
-            from src.services.service_factory import SlotFillingServiceFactory
-            from src.core.config import settings
+            # Import CoordinatorAgent
+            from src.agents.coordinator.coordinator_agent import CoordinatorAgent
 
-            # Check if slot-filling is enabled
-            if not settings.ENABLE_SLOT_FILLING:
-                logger.warning("[ChatService] Slot-filling is disabled, using fallback response")
-                return self._get_fallback_response(user, user_message), {}
+            # 1. Get conversation history for context
+            conversation_history = await self._get_conversation_history(user.id, session_id)
+            logger.debug(f"[ChatService] Retrieved {len(conversation_history)} previous messages")
 
-            # 1. Initialize slot-filling service with all dependencies
-            logger.debug("[ChatService] Initializing slot-filling service...")
-            slot_filling_service = await SlotFillingServiceFactory.create(self.db)
+            # 2. Initialize CoordinatorAgent
+            logger.debug("[ChatService] Initializing CoordinatorAgent...")
+            coordinator = CoordinatorAgent(db=self.db)
 
-            # 2. Process message through slot-filling graph
-            logger.debug("[ChatService] Running slot-filling graph...")
-            result = await slot_filling_service.process_message(
+            # 3. Execute coordinator with message and context
+            logger.debug("[ChatService] Executing CoordinatorAgent...")
+            result = await coordinator.execute(
                 message=user_message,
-                session_id=session_id,
                 user=user,
-                channel=channel
+                session_id=session_id,
+                conversation_history=conversation_history
             )
 
-            # 3. Extract metadata
+            # 4. Extract metadata
             metadata = {
-                "intent": result.metadata.get("primary_intent"),
-                "intent_confidence": result.metadata.get("intent_confidence"),
-                "response_type": result.response_type,
-                "collected_entities": result.collected_entities,
-                "needed_entities": result.needed_entities,
-                "should_trigger_agent": result.should_trigger_agent,
-                "classification_method": result.metadata.get("classification_method"),
-                "nodes_executed": result.metadata.get("nodes_executed", []),
-                "slot_filling_metadata": result.metadata  # Store full metadata
+                "intent": result.get("intent"),
+                "intent_confidence": result.get("confidence"),
+                "agent_used": result.get("agent_used"),
+                "classification_method": result.get("classification_method"),
+                "all_intents": result.get("metadata", {}).get("all_intents", []),
+                "coordinator_metadata": result.get("metadata", {})  # Store full metadata
             }
 
             logger.info(f"[ChatService] Intent: {metadata['intent']}")
             logger.info(f"[ChatService] Confidence: {metadata['intent_confidence']}")
-            logger.info(f"[ChatService] Response type: {metadata['response_type']}")
-            logger.info(f"[ChatService] Should trigger agent: {metadata['should_trigger_agent']}")
+            logger.info(f"[ChatService] Agent used: {metadata['agent_used']}")
+            logger.info(f"[ChatService] Classification method: {metadata['classification_method']}")
 
-            # 4. TODO: If should_trigger_agent=True, trigger agent execution
-            # For now, just return the confirmation and mark as ready_for_agent
-            if result.should_trigger_agent:
-                logger.info("[ChatService] Agent execution required (deferred to background worker)")
-                # TODO: Enqueue agent execution task
-                # await agent_execution_queue.enqueue(session_id, user.id, result.collected_entities)
-
-            return result.final_response, metadata
+            return result["response"], metadata
 
         except Exception as e:
-            logger.error(f"[ChatService] Slot-filling error: {e}", exc_info=True)
+            logger.error(f"[ChatService] CoordinatorAgent error: {e}", exc_info=True)
 
             # Return fallback response with error metadata
             fallback_response = (
@@ -208,9 +193,55 @@ class ChatService:
 
             return fallback_response, error_metadata
 
+    async def _get_conversation_history(
+        self,
+        user_id: int,
+        session_id: str,
+        limit: int = 10
+    ) -> List[Dict[str, str]]:
+        """
+        Get recent conversation history for context
+
+        Args:
+            user_id: User ID
+            session_id: Session ID
+            limit: Maximum number of messages to retrieve (default: 10)
+
+        Returns:
+            List of conversation messages in format [{"role": "user", "content": "..."}, ...]
+        """
+        try:
+            # Get recent messages from this session
+            query = (
+                select(Conversation)
+                .where(
+                    Conversation.user_id == user_id,
+                    Conversation.session_id == session_id
+                )
+                .order_by(Conversation.created_at.desc())
+                .limit(limit)
+            )
+            result = await self.db.execute(query)
+            messages = result.scalars().all()
+
+            # Convert to format expected by agents (reverse to chronological order)
+            history = []
+            for msg in reversed(messages):
+                history.append({
+                    "role": msg.role.value,  # "user" or "assistant"
+                    "content": msg.message
+                })
+
+            logger.debug(f"[ChatService] Retrieved {len(history)} messages for context")
+            return history
+
+        except Exception as e:
+            logger.error(f"[ChatService] Error retrieving conversation history: {e}")
+            return []  # Return empty list on error
+
     def _get_fallback_response(self, user: User, user_message: str) -> str:
         """
-        Get fallback response when slot-filling is disabled or fails
+        Get fallback response when CoordinatorAgent fails
 
         Args:
             user: User object
