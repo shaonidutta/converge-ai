@@ -3,9 +3,10 @@ Ops Routes (Thin Controllers)
 Ops user management
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated, List, Optional
+from datetime import datetime
 
 from src.core.database.connection import get_db
 from src.core.security.dependencies import get_current_staff, require_permissions
@@ -17,7 +18,8 @@ from src.schemas.ops import (
     OpsUserResponse,
     OpsUpdateRequest,
 )
-from src.services import OpsService
+from src.schemas.ops_dashboard import PriorityQueueResponse
+from src.services import OpsService, OpsDashboardService
 
 router = APIRouter(prefix="/ops", tags=["Ops Management"])
 
@@ -156,4 +158,147 @@ async def update_ops_user(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update ops user"
         )
+
+# ============================================================================
+# OPS DASHBOARD ENDPOINTS
+# ============================================================================
+
+@router.get(
+    "/dashboard/priority-queue",
+    response_model=PriorityQueueResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get priority queue items"
+)
+async def get_priority_queue(
+    request: Request,
+    current_staff: Annotated[Staff, Depends(require_permissions(["ops.read"]))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    status_filter: Optional[str] = Query(
+        None,
+        alias="status",
+        description="Filter by review status: pending, reviewed, all"
+    ),
+    intent_type: Optional[str] = Query(
+        None,
+        description="Filter by intent type: complaint, booking, refund, cancellation"
+    ),
+    priority_min: Optional[int] = Query(
+        None,
+        ge=0,
+        le=100,
+        description="Minimum priority score (0-100)"
+    ),
+    priority_max: Optional[int] = Query(
+        None,
+        ge=0,
+        le=100,
+        description="Maximum priority score (0-100)"
+    ),
+    date_from: Optional[datetime] = Query(
+        None,
+        description="Filter from date (ISO 8601 format)"
+    ),
+    date_to: Optional[datetime] = Query(
+        None,
+        description="Filter to date (ISO 8601 format)"
+    ),
+    sort_by: str = Query(
+        "priority_score",
+        description="Sort by field: priority_score, created_at, confidence_score"
+    ),
+    sort_order: str = Query(
+        "desc",
+        description="Sort order: asc, desc"
+    ),
+    skip: int = Query(
+        0,
+        ge=0,
+        description="Pagination offset"
+    ),
+    limit: int = Query(
+        20,
+        ge=1,
+        le=100,
+        description="Pagination limit (max 100)"
+    ),
+    expand: bool = Query(
+        False,
+        description="Fetch full related entity details (expensive)"
+    ),
+    fields: Optional[str] = Query(
+        None,
+        description="Specific fields to include in expansion (comma-separated)"
+    )
+):
+    """
+    Get priority queue items with filtering and pagination
+
+    **Permissions Required**: `ops.read`
+
+    **PII Access**:
+    - Users with `ops.full_access` permission see full PII (mobile, email, name)
+    - Users without full access see redacted PII
+
+    **Performance**:
+    - Default: Returns summary info (fast)
+    - With `expand=true`: Returns full details (slower, rate limited)
+
+    **Filters**:
+    - `status`: pending (default for ops), reviewed, all
+    - `intent_type`: complaint, booking, refund, cancellation
+    - `priority_min/max`: Priority score range (0-100)
+    - `date_from/to`: Date range filter
+
+    **Sorting**:
+    - `sort_by`: priority_score (default), created_at, confidence_score
+    - `sort_order`: desc (default), asc
+
+    **Pagination**:
+    - `skip`: Offset (default 0)
+    - `limit`: Items per page (default 20, max 100)
+
+    **Expansion**:
+    - `expand=false` (default): Summary info only
+    - `expand=true`: Full related entity details
+    - `fields`: Specific fields to include (e.g., "subject,description")
+    """
+    try:
+        # Extract request metadata for audit logging
+        request_metadata = {
+            "ip": request.client.host if request.client else None,
+            "user_agent": request.headers.get("user-agent")
+        }
+
+        # Call service
+        ops_dashboard_service = OpsDashboardService(db)
+        result = await ops_dashboard_service.get_priority_queue(
+            current_staff=current_staff,
+            status=status_filter,
+            intent_type=intent_type,
+            priority_min=priority_min,
+            priority_max=priority_max,
+            date_from=date_from,
+            date_to=date_to,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            skip=skip,
+            limit=limit,
+            expand=expand,
+            fields=fields,
+            request_metadata=request_metadata
+        )
+
+        return result
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve priority queue"
+        )
+
 
