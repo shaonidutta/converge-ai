@@ -71,7 +71,6 @@ class Settings(BaseSettings):
 
     # Google Generative AI (Gemini)
     GOOGLE_API_KEY: str = Field(..., description="Google Generative AI API key")
-    GEMINI_API_KEY: str = Field(..., description="Gemini API key (alias for GOOGLE_API_KEY)")
     GEMINI_MODEL: str = Field(default="gemini-2.0-flash", description="Primary Gemini model (1.5 Flash deprecated)")
     GEMINI_MODEL_FLASH: str = Field(default="gemini-2.0-flash", description="Gemini Flash model")
     GEMINI_MODEL_PRO: str = Field(default="gemini-1.5-pro", description="Gemini Pro model")
