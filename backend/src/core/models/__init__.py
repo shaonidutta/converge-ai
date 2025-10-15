@@ -18,6 +18,7 @@ from src.core.models.role import Role, Permission, RolePermission
 from src.core.models.staff import Staff, StaffSession, StaffActivityLog
 from src.core.models.ops_config import OpsConfig
 from src.core.models.ops_audit_log import OpsAuditLog
+from src.core.models.alert import Alert, AlertRule, AlertSubscription
 
 __all__ = [
     # Base
@@ -67,6 +68,11 @@ __all__ = [
     # Ops Models
     "OpsConfig",
     "OpsAuditLog",
+
+    # Alert Models
+    "Alert",
+    "AlertRule",
+    "AlertSubscription",
 
     # Enums - Booking
     "PaymentStatus",

@@ -5,7 +5,7 @@ Combines all v1 routes
 
 from fastapi import APIRouter
 
-from src.api.v1.routes import auth, users, ops, categories, cart, bookings, addresses, chat
+from src.api.v1.routes import auth, users, ops, categories, cart, bookings, addresses, chat, alerts
 
 # Create v1 router
 api_router = APIRouter(prefix="/v1")
@@ -19,6 +19,7 @@ api_router.include_router(cart.router)
 api_router.include_router(bookings.router)
 api_router.include_router(addresses.router)
 api_router.include_router(chat.router)
+api_router.include_router(alerts.router)
 
 # Export
 __all__ = ["api_router"]

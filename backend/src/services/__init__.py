@@ -18,6 +18,7 @@ from src.services.config_service import ConfigService
 from src.services.audit_service import AuditService
 from src.services.ops_dashboard_service import OpsDashboardService
 from src.services.metrics_service import MetricsService
+from src.services.alert_service import AlertService
 
 __all__ = [
     "AuthService",
@@ -36,4 +37,5 @@ __all__ = [
     "AuditService",
     "OpsDashboardService",
     "MetricsService",
+    "AlertService",
 ]

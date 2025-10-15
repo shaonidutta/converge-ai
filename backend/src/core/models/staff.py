@@ -76,7 +76,11 @@ class Staff(Base):
 
     # Audit logs
     audit_logs = relationship('OpsAuditLog', back_populates='staff', cascade='all, delete-orphan')
-    
+
+    # Alerts
+    alerts = relationship('Alert', back_populates='assigned_to_staff', cascade='all, delete-orphan')
+    alert_subscriptions = relationship('AlertSubscription', back_populates='staff', cascade='all, delete-orphan')
+
     def __repr__(self):
         return f"<Staff(employee_id='{self.employee_id}', name='{self.first_name} {self.last_name}')>"
     

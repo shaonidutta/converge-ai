@@ -69,12 +69,18 @@
   - ✅ Database migration completed
   - ✅ Branch: feature/ops-priority-queue
   - ✅ Merged to master, pushed to remote
-- ⏳ **Task 1.2: Ops Metrics Dashboard API** (NEXT)
-  - Bookings count by status
-  - Complaints count by priority
-  - SLA breach alerts
-  - Revenue metrics
-  - Real-time dashboard stats
+- ✅ **Task 1.2: Ops Metrics Dashboard API** (COMPLETE - 2025-10-15)
+  - ✅ Metrics endpoint with 5 metric groups
+  - ✅ Bookings count by status (pending, confirmed, in_progress, completed, cancelled)
+  - ✅ Complaints count by priority (low, medium, high, critical)
+  - ✅ SLA breach alerts (at-risk, breached, compliance rate)
+  - ✅ Revenue metrics (total, by status, AOV, growth rate)
+  - ✅ Real-time dashboard stats (active bookings/complaints, staff workload)
+  - ✅ Period filtering (today, week, month, all)
+  - ✅ Flexible metric group selection
+  - ✅ 10 unit tests (all passing)
+  - ✅ Branch: feature/ops-metrics-dashboard
+  - ✅ Merged to master, pushed to remote
 
 #### Phase 7: Vector Database Setup (PARTIALLY COMPLETE) ⏭️
 - ✅ **Embedding Service:** sentence-transformers/all-MiniLM-L6-v2 (384 dims)
@@ -89,7 +95,8 @@
 
 **Phase 1 (NEW): Operational Dashboard & Workflow** - IN PROGRESS
 - ✅ Task 1.1: Ops Priority Queue Dashboard API (COMPLETE)
-- ⏳ Task 1.2: Ops Metrics Dashboard API (NEXT)
+- ✅ Task 1.2: Ops Metrics Dashboard API (COMPLETE)
+- ⏳ Task 1.3: Next operational feature (TBD)
 
 **Phase 7.3: Document Ingestion** - PAUSED
 
