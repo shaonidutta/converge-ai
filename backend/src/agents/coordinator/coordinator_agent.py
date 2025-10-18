@@ -12,6 +12,7 @@ This agent serves as the central orchestrator that:
 
 import logging
 from typing import Dict, Any, List, Optional
+from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.models import User, Conversation
@@ -273,6 +274,53 @@ class CoordinatorAgent:
                 "metadata": {"error": str(e)}
             }
     
+    async def _route_to_agent_with_timing(
+        self,
+        intent_result: IntentResult,
+        user: User,
+        session_id: str
+    ) -> Dict[str, Any]:
+        """
+        Route to agent with execution time tracking
+
+        Args:
+            intent_result: Single intent result
+            user: User object
+            session_id: Session ID
+
+        Returns:
+            Agent response with execution time
+        """
+        start_time = datetime.utcnow()
+
+        try:
+            response = await self._route_to_agent(
+                intent_result=intent_result,
+                user=user,
+                session_id=session_id
+            )
+
+            end_time = datetime.utcnow()
+            execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
+
+            # Add execution time to response
+            response["execution_time_ms"] = execution_time_ms
+
+            return response
+
+        except Exception as e:
+            end_time = datetime.utcnow()
+            execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
+
+            self.logger.error(f"Error in _route_to_agent_with_timing: {e}")
+            return {
+                "response": f"Error processing {intent_result.intent}",
+                "action_taken": "error",
+                "agent_used": "error",
+                "error": str(e),
+                "execution_time_ms": execution_time_ms
+            }
+
     async def _handle_multi_intent(
         self,
         intent_result: IntentClassificationResult,
@@ -280,7 +328,90 @@ class CoordinatorAgent:
         session_id: str
     ) -> Dict[str, Any]:
         """
-        Handle requests with multiple intents
+        Handle requests with multiple intents using parallel execution
+
+        Uses the Agent Execution Graph for:
+        - Parallel execution of independent intents
+        - Sequential execution of dependent intents
+        - Response merging with provenance tracking
+
+        Args:
+            intent_result: Classification result with multiple intents
+            user: User object
+            session_id: Session ID
+
+        Returns:
+            Coordinated response from multiple agents with provenance
+        """
+        self.logger.info(f"Handling multi-intent request with {len(intent_result.intents)} intents")
+
+        try:
+            # Import here to avoid circular dependency
+            from src.graphs.agent_execution_graph import create_agent_execution_graph
+
+            # Create agent execution graph
+            graph = create_agent_execution_graph(self)
+
+            # Prepare initial state
+            initial_state = {
+                "user": user,
+                "user_id": user.id,
+                "session_id": session_id,
+                "intent_result": intent_result.model_dump(),
+                "agent_timeout": 30,  # 30 seconds timeout
+                "metadata": {
+                    "graph_name": "agent_execution",
+                    "nodes_executed": []
+                }
+            }
+
+            # Execute graph
+            result = await graph.ainvoke(initial_state)
+
+            # Check for errors
+            if result.get("error"):
+                error = result["error"]
+                self.logger.error(f"Agent execution graph error: {error}")
+                return {
+                    "response": "I encountered an error processing your request. Please try again.",
+                    "action_taken": "error",
+                    "agent_used": "coordinator",
+                    "metadata": {"error": error}
+                }
+
+            # Return merged response with provenance
+            return {
+                "response": result.get("final_response", ""),
+                "action_taken": "multi_intent_handled",
+                "agent_used": "multi_agent",
+                "provenance": result.get("provenance", []),
+                "metadata": {
+                    "intent_count": len(intent_result.intents),
+                    "intents_processed": [i.intent for i in intent_result.intents],
+                    "agents_used": result.get("agents_used", []),
+                    "execution_plan": result.get("execution_plan"),
+                    "combined_metadata": result.get("combined_metadata", {}),
+                    "graph_metadata": result.get("metadata", {})
+                }
+            }
+
+        except Exception as e:
+            self.logger.error(f"Error in _handle_multi_intent: {e}", exc_info=True)
+
+            # Fallback to sequential execution
+            self.logger.info("Falling back to sequential execution")
+            return await self._handle_multi_intent_fallback(intent_result, user, session_id)
+
+    async def _handle_multi_intent_fallback(
+        self,
+        intent_result: IntentClassificationResult,
+        user: User,
+        session_id: str
+    ) -> Dict[str, Any]:
+        """
+        Fallback method for multi-intent handling (sequential execution)
+
+        Used when the agent execution graph fails.
 
         Args:
             intent_result: Classification result with multiple intents
@@ -290,8 +421,6 @@ class CoordinatorAgent:
         Returns:
             Coordinated response from multiple agents
         """
-        self.logger.info(f"Handling multi-intent request with {len(intent_result.intents)} intents")
-
         responses = []
         agents_used = []
 
@@ -314,11 +443,12 @@ class CoordinatorAgent:
 
         return {
             "response": combined_response,
-            "action_taken": "multi_intent_handled",
+            "action_taken": "multi_intent_handled_fallback",
             "agent_used": ", ".join(agents_used),
             "metadata": {
                 "intent_count": len(intent_result.intents),
-                "intents_processed": [i.intent for i in intent_result.intents]
+                "intents_processed": [i.intent for i in intent_result.intents],
+                "fallback_used": True
             }
         }
     

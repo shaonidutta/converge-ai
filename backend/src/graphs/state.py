@@ -137,19 +137,46 @@ class ConversationState(TypedDict, total=False):
     """Whether user confirmed the collected information"""
     
     # ============================================================
-    # AGENT EXECUTION
+    # AGENT EXECUTION (Single Agent)
     # ============================================================
     agent_name: Optional[str]
     """Name of agent to execute (e.g., 'BookingAgent', 'SQLAgent')"""
-    
+
     agent_input: Optional[Dict[str, Any]]
     """Input data for agent execution"""
-    
+
     agent_result: Optional[Dict[str, Any]]
     """Result from agent execution"""
-    
+
     agent_error: Optional[str]
     """Error message if agent execution failed"""
+
+    # ============================================================
+    # MULTI-AGENT EXECUTION
+    # ============================================================
+    independent_intents: List[Dict[str, Any]]
+    """Intents that can be executed in parallel (no dependencies)"""
+
+    dependent_intents: List[Dict[str, Any]]
+    """Intents that must be executed sequentially (have dependencies)"""
+
+    execution_plan: Optional[Dict[str, Any]]
+    """
+    Execution plan for multi-agent orchestration
+    Format: {"parallel_batch": [...], "sequential_batch": [...]}
+    """
+
+    parallel_responses: List[Dict[str, Any]]
+    """Responses from parallel agent execution"""
+
+    sequential_responses: List[Dict[str, Any]]
+    """Responses from sequential agent execution"""
+
+    agent_timeout: int
+    """Timeout in seconds for agent execution (default: 30)"""
+
+    agents_used: List[str]
+    """List of agent names that were executed"""
     
     # ============================================================
     # RESPONSE GENERATION
@@ -169,10 +196,31 @@ class ConversationState(TypedDict, total=False):
     Example: {"graph_name": "slot_filling", "nodes_executed": [...], "execution_time_ms": 150}
     """
     
-    provenance: Optional[Dict[str, Any]]
+    provenance: Optional[List[Dict[str, Any]]]
     """
-    Source tracking for response
-    Example: {"sources": ["vector_db", "sql_query"], "agent_calls": ["BookingAgent"]}
+    Source tracking for response with detailed agent contributions
+    Format: [
+        {
+            "agent": "service",
+            "contribution": "AC service costs ₹500...",
+            "action_taken": "service_info_retrieved",
+            "order": 1,
+            "execution_time_ms": 150
+        },
+        {
+            "agent": "policy",
+            "contribution": "Cancellation policy allows...",
+            "action_taken": "policy_retrieved",
+            "order": 2,
+            "execution_time_ms": 200
+        }
+    ]
+    """
+
+    combined_metadata: Optional[Dict[str, Any]]
+    """
+    Combined metadata from all agent executions
+    Format: {"service": {...}, "policy": {...}}
     """
     
     # ============================================================
@@ -273,6 +321,14 @@ def create_initial_state(
         needed_entities=[],
         validation_errors=[],
         metadata={},
+
+        # Multi-agent execution
+        independent_intents=[],
+        dependent_intents=[],
+        parallel_responses=[],
+        sequential_responses=[],
+        agent_timeout=30,
+        agents_used=[],
         
         # Counters
         question_attempt_count=0,
