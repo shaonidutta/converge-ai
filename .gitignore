@@ -51,8 +51,8 @@ backend/data/
 backend/scripts/
 backend/logs/*
 !backend/logs/.gitkeep
-# Keep .dev-logs for documentation (TASKLIST.md, plans, summaries)
-# backend/.dev-logs/
+# .dev-logs should NEVER be pushed - local development logs only
+backend/.dev-logs/
 
 # ============================================================================
 # CUSTOMER FRONTEND - React/Next.js
