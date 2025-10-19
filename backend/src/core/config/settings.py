@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     PINECONE_API_KEY: str = Field(..., description="Pinecone API key")
     PINECONE_ENVIRONMENT: str = Field(default="us-east-1", description="Pinecone environment/region")
     PINECONE_INDEX_NAME: str = Field(default="convergeai-docs", description="Pinecone index name")
-    PINECONE_DIMENSION: int = Field(default=384, description="Embedding dimension (384 for all-MiniLM-L6-v2)")
+    PINECONE_DIMENSION: int = Field(default=768, description="Embedding dimension (768 for all-mpnet-base-v2)")
     PINECONE_METRIC: str = Field(default="cosine", description="Distance metric")
     PINECONE_CLOUD: str = Field(default="aws", description="Cloud provider (aws, gcp, azure)")
     PINECONE_REGION: str = Field(default="us-east-1", description="Pinecone region")
@@ -80,12 +80,13 @@ class Settings(BaseSettings):
     GEMINI_TOP_K: int = Field(default=40, description="Top-k sampling")
 
     # Embedding Model (Sentence Transformers)
+    # Using all-mpnet-base-v2 for better semantic understanding of policy documents
     EMBEDDING_MODEL: str = Field(
-        default="sentence-transformers/all-MiniLM-L6-v2",
-        description="Sentence Transformers embedding model"
+        default="sentence-transformers/all-mpnet-base-v2",
+        description="Sentence Transformers embedding model (768d for quality)"
     )
-    EMBEDDING_DIMENSION: int = Field(default=384, description="Embedding dimension")
-    EMBEDDING_BATCH_SIZE: int = Field(default=100, description="Batch size for embeddings")
+    EMBEDDING_DIMENSION: int = Field(default=768, description="Embedding dimension (768 for all-mpnet-base-v2)")
+    EMBEDDING_BATCH_SIZE: int = Field(default=32, description="Batch size for embeddings (reduced for 768d)")
     EMBEDDING_DEVICE: str = Field(default="cpu", description="Device for embeddings (cpu, cuda, mps)")
     EMBEDDING_NORMALIZE: bool = Field(default=True, description="Normalize embeddings")
     
