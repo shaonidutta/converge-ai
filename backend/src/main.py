@@ -147,6 +147,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
+# --- Prometheus Monitoring Middleware ---
+from src.middleware.prometheus_middleware import PrometheusMiddleware
+app.add_middleware(PrometheusMiddleware)
+
 # =============================================
 # Routers
 # =============================================

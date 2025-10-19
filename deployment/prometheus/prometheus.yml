@@ -1,0 +1,41 @@
+# Prometheus Configuration for ConvergeAI
+
+global:
+  scrape_interval: 15s  # Scrape metrics every 15 seconds
+  evaluation_interval: 15s  # Evaluate rules every 15 seconds
+  external_labels:
+    cluster: 'convergeai'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# Load alert rules
+rule_files:
+  - 'alerts.yml'
+
+# Scrape configurations
+scrape_configs:
+  # ConvergeAI Backend API
+  - job_name: 'convergeai-backend'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: '/api/v1/metrics'
+    static_configs:
+      - targets: ['host.docker.internal:8000']  # For Docker on Windows/Mac
+        # - targets: ['172.17.0.1:8000']  # For Docker on Linux
+        labels:
+          service: 'backend'
+          app: 'convergeai'
+    
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
