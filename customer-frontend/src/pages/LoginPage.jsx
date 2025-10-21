@@ -91,10 +91,10 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
-      {/* Professional Background with Subtle Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50">
-        {/* Geometric Pattern Overlay */}
-        <div className="absolute inset-0 opacity-[0.03]">
+      {/* Calm Background with Soft Gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-primary-50/20 to-secondary-50/20">
+        {/* Subtle Geometric Pattern */}
+        <div className="absolute inset-0 opacity-[0.02]">
           <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <pattern
@@ -114,45 +114,45 @@ const LoginPage = () => {
             <rect width="100%" height="100%" fill="url(#grid)" />
           </svg>
         </div>
-        {/* Subtle Accent Shapes */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-indigo-100/20 to-transparent rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-blue-100/20 to-transparent rounded-full blur-3xl"></div>
+        {/* Soft Floating Blobs */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-primary-100/30 to-transparent rounded-full blur-3xl animate-float"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-secondary-100/30 to-transparent rounded-full blur-3xl animate-float animation-delay-2000"></div>
       </div>
 
       <div className="w-full max-w-md relative z-10">
-        {/* Logo with Creative Font */}
+        {/* Logo with Modern Typography */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-block group">
             <h1
-              className="text-5xl font-black tracking-tight bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 bg-clip-text text-transparent group-hover:scale-105 transition-transform duration-300 drop-shadow-sm"
+              className="text-5xl font-black tracking-tight bg-gradient-to-r from-primary-500 via-primary-600 to-secondary-500 bg-clip-text text-transparent group-hover:scale-105 transition-all duration-300 ease-in-out drop-shadow-sm"
               style={{
-                fontFamily: "'Poppins', 'Inter', sans-serif",
+                fontFamily: "'Poppins', sans-serif",
                 letterSpacing: "-0.02em",
               }}
             >
-              Converge<span className="text-indigo-600">AI</span>
+              Converge<span className="text-primary-600">AI</span>
             </h1>
-            <p className="text-xs text-slate-500 mt-1 font-medium tracking-wider">
-              VOICE-POWERED SERVICES
+            <p className="text-xs text-slate-600 mt-2 font-medium tracking-wider">
+              AI-POWERED SERVICE PLATFORM
             </p>
           </Link>
         </div>
 
-        {/* Login Card */}
-        <Card className="shadow-2xl border border-slate-200/50 backdrop-blur-sm">
+        {/* Login Card with Soft Shadow */}
+        <Card className="shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-slate-200/60 backdrop-blur-sm bg-white/95 rounded-2xl">
           <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-2xl font-bold text-center text-slate-900">
+            <CardTitle className="text-2xl font-bold text-center text-slate-800">
               Welcome back
             </CardTitle>
             <CardDescription className="text-center text-slate-600">
-              Sign in to continue
+              Sign in to your account
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {/* Error Message */}
+            {/* Error Message with Soft Styling */}
             {error && (
-              <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">
+              <div className="bg-error-50 text-error-600 text-sm p-3 rounded-xl border border-error-200 animate-fade-in">
                 {error}
               </div>
             )}
@@ -173,7 +173,7 @@ const LoginPage = () => {
                   placeholder="name@example.com or mobile number"
                   value={formData.identifier}
                   onChange={handleChange}
-                  className="h-11"
+                  className="h-11 rounded-xl border-slate-200 focus:border-primary-400 focus:ring-primary-400/20 transition-all duration-300"
                   disabled={loading}
                   required
                 />
@@ -190,7 +190,7 @@ const LoginPage = () => {
                   </label>
                   <Link
                     to="/forgot-password"
-                    className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                    className="text-xs text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200"
                   >
                     Forgot Password?
                   </Link>
@@ -203,14 +203,14 @@ const LoginPage = () => {
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={handleChange}
-                    className="h-11 pr-10"
+                    className="h-11 pr-10 rounded-xl border-slate-200 focus:border-primary-400 focus:ring-primary-400/20 transition-all duration-300"
                     disabled={loading}
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-all duration-200"
                     disabled={loading}
                   >
                     {showPassword ? (
@@ -222,10 +222,10 @@ const LoginPage = () => {
                 </div>
               </div>
 
-              {/* Submit Button */}
+              {/* Submit Button with Gradient */}
               <Button
                 type="submit"
-                className="w-full h-11 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium shadow-lg hover:shadow-xl transition-all duration-300"
+                className="w-full h-11 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-primary-600 hover:to-secondary-600 text-white font-medium rounded-xl shadow-[0_4px_20px_rgba(108,99,255,0.3)] hover:shadow-[0_6px_24px_rgba(108,99,255,0.4)] hover:scale-[1.02] transition-all duration-300 ease-in-out"
                 disabled={loading}
               >
                 {loading ? (
@@ -245,17 +245,17 @@ const LoginPage = () => {
                 <span className="w-full border-t border-slate-200" />
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-white px-2 text-slate-500">or</span>
+                <span className="bg-white px-3 text-slate-500 font-medium">or continue with</span>
               </div>
             </div>
 
-            {/* Social Login */}
+            {/* Social Login with Soft Hover */}
             <div className="grid grid-cols-2 gap-3">
               <Button
                 variant="outline"
                 type="button"
                 disabled={loading}
-                className="h-11 bg-white hover:bg-blue-50 hover:border-blue-300 border-slate-200 transition-all duration-200"
+                className="h-11 bg-white hover:bg-slate-50 hover:border-primary-300 border-slate-200 rounded-xl transition-all duration-300 ease-in-out hover:scale-[1.02]"
               >
                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                   <path
@@ -281,7 +281,7 @@ const LoginPage = () => {
                 variant="outline"
                 type="button"
                 disabled={loading}
-                className="h-11 bg-white hover:bg-blue-50 hover:border-blue-300 border-slate-200 transition-all duration-200"
+                className="h-11 bg-white hover:bg-slate-50 hover:border-primary-300 border-slate-200 rounded-xl transition-all duration-300 ease-in-out hover:scale-[1.02]"
               >
                 <svg
                   className="mr-2 h-4 w-4"
@@ -295,12 +295,12 @@ const LoginPage = () => {
             </div>
           </CardContent>
 
-          <CardFooter className="flex flex-col space-y-4 pt-6">
+          <CardFooter className="flex flex-col space-y-4 pt-6 border-t border-slate-100">
             <div className="text-sm text-center text-slate-600">
               Don't have an account?{" "}
               <Link
                 to="/signup"
-                className="text-indigo-600 font-semibold hover:text-indigo-700"
+                className="text-primary-600 font-semibold hover:text-primary-700 transition-colors duration-200"
               >
                 Sign up
               </Link>
