@@ -25,3 +25,22 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Development logs (local only)
+dev-logs/
+
+# Cache and library files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Markdown files except README
+*.md
+!README.md

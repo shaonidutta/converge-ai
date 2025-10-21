@@ -78,6 +78,16 @@ export const ADDRESS_ENDPOINTS = {
 };
 
 /**
+ * Chat/AI Assistant Endpoints
+ */
+export const CHAT_ENDPOINTS = {
+  SEND_MESSAGE: `${API_VERSION}/chat/message`,
+  GET_HISTORY: (sessionId) => `${API_VERSION}/chat/history/${sessionId}`,
+  LIST_SESSIONS: `${API_VERSION}/chat/sessions`,
+  DELETE_SESSION: (sessionId) => `${API_VERSION}/chat/sessions/${sessionId}`,
+};
+
+/**
  * Health Check Endpoint
  */
 export const HEALTH_ENDPOINT = '/health';
@@ -92,6 +102,7 @@ export const API_ENDPOINTS = {
   CART: CART_ENDPOINTS,
   BOOKING: BOOKING_ENDPOINTS,
   ADDRESS: ADDRESS_ENDPOINTS,
+  CHAT: CHAT_ENDPOINTS,
   HEALTH: HEALTH_ENDPOINT,
 };
 
