@@ -1,0 +1,333 @@
+/**
+ * BookingDetailPage Component
+ * Displays detailed information about a single booking
+ */
+
+import React, { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  MapPin,
+  IndianRupee,
+  User,
+  Phone,
+  Mail,
+  FileText,
+  XCircle,
+  RefreshCw,
+  CheckCircle,
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { useBooking, useBookingActions } from '../hooks/useBookings';
+import Navbar from '../components/common/Navbar';
+import Footer from '../components/common/Footer';
+import BookingStatusBadge from '../components/bookings/BookingStatusBadge';
+import LoadingSkeleton from '../components/common/LoadingSkeleton';
+import CancelBookingModal from '../components/bookings/CancelBookingModal';
+import RescheduleModal from '../components/bookings/RescheduleModal';
+
+const BookingDetailPage = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { booking, loading, error, refetch } = useBooking(id);
+  const { cancelBooking, rescheduleBooking, loading: actionLoading } = useBookingActions();
+
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+
+  const formatDate = (dateString) => {
+    try {
+      return format(new Date(dateString), 'MMMM d, yyyy');
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatTime = (timeString) => {
+    try {
+      const [hours] = timeString.split(':');
+      const hour = parseInt(hours);
+      const period = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+      return `${displayHour}:00 ${period}`;
+    } catch {
+      return timeString;
+    }
+  };
+
+  const handleCancelConfirm = async (reason) => {
+    try {
+      await cancelBooking(id, reason);
+      setShowCancelModal(false);
+      refetch();
+    } catch (error) {
+      console.error('Cancel failed:', error);
+    }
+  };
+
+  const handleRescheduleConfirm = async (rescheduleData) => {
+    try {
+      await rescheduleBooking(id, rescheduleData);
+      setShowRescheduleModal(false);
+      refetch();
+    } catch (error) {
+      console.error('Reschedule failed:', error);
+    }
+  };
+
+  const canCancel = ['pending', 'confirmed'].includes(booking?.status?.toLowerCase());
+  const canReschedule = ['pending', 'confirmed'].includes(booking?.status?.toLowerCase());
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <Navbar />
+
+      <main className="flex-1 pt-20 pb-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Back Button */}
+          <button
+            onClick={() => navigate('/bookings')}
+            className="flex items-center gap-2 text-slate-600 hover:text-primary-500 mb-6 transition-colors duration-200"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            <span className="font-medium">Back to Bookings</span>
+          </button>
+
+          {loading ? (
+            <div className="space-y-6">
+              <LoadingSkeleton className="h-32" />
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                  <LoadingSkeleton className="h-64" />
+                  <LoadingSkeleton className="h-48" />
+                </div>
+                <LoadingSkeleton className="h-96" />
+              </div>
+            </div>
+          ) : error ? (
+            <div className="p-8 bg-red-50 border border-red-200 rounded-xl text-red-700 text-center">
+              <p className="font-medium mb-2">Failed to load booking details</p>
+              <p className="text-sm mb-4">{error}</p>
+              <button
+                onClick={refetch}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : !booking ? (
+            <div className="p-8 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-center">
+              <p className="font-medium">Booking not found</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Header */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-xl border border-slate-200 p-6"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-gradient-to-br from-primary-100 to-secondary-100 rounded-xl flex items-center justify-center">
+                      <span className="text-3xl">{booking.rate_card?.subcategory?.icon || '🛠️'}</span>
+                    </div>
+                    <div>
+                      <h1 className="text-2xl font-bold text-slate-900">
+                        {booking.rate_card?.subcategory?.name || 'Service'}
+                      </h1>
+                      <p className="text-slate-600">
+                        {booking.rate_card?.subcategory?.category?.name || 'Category'}
+                      </p>
+                    </div>
+                  </div>
+                  <BookingStatusBadge status={booking.status} size="lg" />
+                </div>
+              </motion.div>
+
+              {/* Main Content */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column - Details */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Schedule Details */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="bg-white rounded-xl border border-slate-200 p-6"
+                  >
+                    <h2 className="text-lg font-bold text-slate-900 mb-4">Schedule Details</h2>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                          <Calendar className="h-5 w-5 text-primary-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-slate-600">Date</p>
+                          <p className="font-semibold text-slate-900">
+                            {formatDate(booking.scheduled_date)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-secondary-100 rounded-lg flex items-center justify-center">
+                          <Clock className="h-5 w-5 text-secondary-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-slate-600">Time</p>
+                          <p className="font-semibold text-slate-900">
+                            {formatTime(booking.scheduled_time)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* Address Details */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="bg-white rounded-xl border border-slate-200 p-6"
+                  >
+                    <h2 className="text-lg font-bold text-slate-900 mb-4">Service Location</h2>
+                    {booking.address ? (
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 bg-accent-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <MapPin className="h-5 w-5 text-accent-500" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900">{booking.address.address_type}</p>
+                          <p className="text-slate-600 mt-1">
+                            {booking.address.street_address}
+                            {booking.address.apartment_number && `, ${booking.address.apartment_number}`}
+                          </p>
+                          <p className="text-slate-600">
+                            {booking.address.city}, {booking.address.state} {booking.address.postal_code}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-slate-500">Address not available</p>
+                    )}
+                  </motion.div>
+
+                  {/* Special Instructions */}
+                  {booking.special_instructions && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className="bg-white rounded-xl border border-slate-200 p-6"
+                    >
+                      <h2 className="text-lg font-bold text-slate-900 mb-4">Special Instructions</h2>
+                      <div className="flex items-start gap-3">
+                        <FileText className="h-5 w-5 text-slate-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-slate-600">{booking.special_instructions}</p>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* Right Column - Actions & Summary */}
+                <div className="space-y-6">
+                  {/* Action Buttons */}
+                  {(canCancel || canReschedule) && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                      className="bg-white rounded-xl border border-slate-200 p-6 space-y-3"
+                    >
+                      <h2 className="text-lg font-bold text-slate-900 mb-4">Actions</h2>
+                      {canReschedule && (
+                        <motion.button
+                          onClick={() => setShowRescheduleModal(true)}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:shadow-[0_4px_12px_rgba(59,130,246,0.3)] transition-all duration-200"
+                        >
+                          <RefreshCw className="h-5 w-5" />
+                          Reschedule
+                        </motion.button>
+                      )}
+                      {canCancel && (
+                        <motion.button
+                          onClick={() => setShowCancelModal(true)}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-red-500 text-red-500 font-semibold rounded-xl hover:bg-red-50 transition-all duration-200"
+                        >
+                          <XCircle className="h-5 w-5" />
+                          Cancel Booking
+                        </motion.button>
+                      )}
+                    </motion.div>
+                  )}
+
+                  {/* Payment Summary */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="bg-white rounded-xl border border-slate-200 p-6"
+                  >
+                    <h2 className="text-lg font-bold text-slate-900 mb-4">Payment Summary</h2>
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-slate-600">
+                        <span>Subtotal</span>
+                        <div className="flex items-center gap-1">
+                          <IndianRupee className="h-4 w-4" />
+                          <span>{(booking.total_amount / 1.18).toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between text-slate-600">
+                        <span>Tax (18% GST)</span>
+                        <div className="flex items-center gap-1">
+                          <IndianRupee className="h-4 w-4" />
+                          <span>{(booking.total_amount - booking.total_amount / 1.18).toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
+                        <span className="font-bold text-slate-900">Total</span>
+                        <div className="flex items-center gap-1 text-xl font-bold text-slate-900">
+                          <IndianRupee className="h-5 w-5" />
+                          <span>{booking.total_amount?.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      <Footer />
+
+      {/* Modals */}
+      <CancelBookingModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        onConfirm={handleCancelConfirm}
+        booking={booking}
+        loading={actionLoading}
+      />
+
+      <RescheduleModal
+        isOpen={showRescheduleModal}
+        onClose={() => setShowRescheduleModal(false)}
+        onConfirm={handleRescheduleConfirm}
+        booking={booking}
+        loading={actionLoading}
+      />
+    </div>
+  );
+};
+
+export default BookingDetailPage;
+
