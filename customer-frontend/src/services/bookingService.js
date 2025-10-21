@@ -4,6 +4,7 @@
  */
 
 import api from './api';
+import { format } from 'date-fns';
 
 /**
  * Fetch user's bookings with optional filters

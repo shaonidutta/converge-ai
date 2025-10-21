@@ -5,6 +5,8 @@ import SignupPage from "./pages/SignupPage";
 import Home from "./pages/Home";
 import ServiceDetailPage from "./pages/ServiceDetailPage";
 import RateCardsPage from "./pages/RateCardsPage";
+import CartPage from "./pages/CartPage";
+import CheckoutPage from "./pages/CheckoutPage";
 import LisaChatBubble from "./components/chat/LisaChatBubble";
 import LisaChatWindow from "./components/chat/LisaChatWindow";
 
@@ -22,6 +24,8 @@ function App() {
         <Route path="/home" element={<Home />} />
         <Route path="/services/:categoryId" element={<ServiceDetailPage />} />
         <Route path="/services/:categoryId/:subcategoryId" element={<RateCardsPage />} />
+        <Route path="/cart" element={<CartPage />} />
+        <Route path="/checkout" element={<CheckoutPage />} />
       </Routes>
 
       {/* Global Chat Components */}
