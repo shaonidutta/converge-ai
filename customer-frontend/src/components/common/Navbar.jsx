@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import Logo from '../Logo';
 import AddressSelector from './AddressSelector';
+import NotificationBell from '../notifications/NotificationBell';
 import { Button } from '../ui/button';
 import { getStoredUser, clearAuth } from '../../api/axiosConfig';
 import { useAddresses } from '../../hooks/useAddresses';
@@ -151,6 +152,9 @@ const Navbar = ({ onAddAddress }) => {
                 </motion.span>
               )}
             </button>
+
+            {/* Notification Bell */}
+            <NotificationBell />
 
             {/* User Menu */}
             <div className="relative" ref={userMenuRef}>
