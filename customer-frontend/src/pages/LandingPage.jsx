@@ -359,28 +359,6 @@ const LandingPageNew = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8 }}
             >
-              {/* Badge with AI Icon */}
-              <motion.div
-                className="inline-flex items-center gap-3 px-5 py-3 bg-white/90 backdrop-blur-xl rounded-full border border-slate-200/60 shadow-[0_4px_20px_rgba(0,0,0,0.05)]"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-              >
-                <div className="relative">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center">
-                    <Sparkles className="h-4 w-4 text-white" />
-                  </div>
-                  <motion.div
-                    className="absolute inset-0 rounded-full bg-primary-500/50"
-                    animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
-                </div>
-                <span className="text-sm font-semibold text-slate-700">
-                  Powered by AI Technology
-                </span>
-              </motion.div>
-
               {/* Main Heading with New Colors */}
               <div className="space-y-4">
                 <h1 className="text-6xl md:text-7xl font-black leading-tight">
