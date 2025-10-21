@@ -21,14 +21,14 @@ import AddressSelector from './AddressSelector';
 import { Button } from '../ui/button';
 import { getStoredUser, clearAuth } from '../../api/axiosConfig';
 import { useAddresses } from '../../hooks/useAddresses';
+import { useCart } from '../../hooks/useCart';
 
 /**
  * Navbar Component
  * @param {Object} props
- * @param {number} props.cartItemCount - Number of items in cart
  * @param {Function} props.onAddAddress - Callback to open add address modal
  */
-const Navbar = ({ cartItemCount = 0, onAddAddress }) => {
+const Navbar = ({ onAddAddress }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState(null);
@@ -39,6 +39,9 @@ const Navbar = ({ cartItemCount = 0, onAddAddress }) => {
 
   // Fetch addresses
   const { addresses, selectedAddress, selectAddress, loading: addressesLoading } = useAddresses();
+
+  // Get cart data
+  const { totalItems } = useCart();
 
   // Get user data
   useEffect(() => {
@@ -137,13 +140,14 @@ const Navbar = ({ cartItemCount = 0, onAddAddress }) => {
               className="relative p-2 hover:bg-slate-100 rounded-lg transition-colors duration-200"
             >
               <ShoppingCart className="h-5 w-5 text-slate-700" />
-              {cartItemCount > 0 && (
+              {totalItems > 0 && (
                 <motion.span
+                  key={totalItems}
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-primary-500 to-secondary-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-[0_2px_8px_rgba(108,99,255,0.4)]"
                 >
-                  {cartItemCount > 9 ? '9+' : cartItemCount}
+                  {totalItems > 9 ? '9+' : totalItems}
                 </motion.span>
               )}
             </button>

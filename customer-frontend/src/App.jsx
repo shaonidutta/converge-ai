@@ -3,6 +3,8 @@ import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import Home from "./pages/Home";
+import ServiceDetailPage from "./pages/ServiceDetailPage";
+import RateCardsPage from "./pages/RateCardsPage";
 
 /**
  * Main App Component
@@ -16,6 +18,8 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/home" element={<Home />} />
+        <Route path="/services/:categoryId" element={<ServiceDetailPage />} />
+        <Route path="/services/:categoryId/:subcategoryId" element={<RateCardsPage />} />
       </Routes>
     </Router>
   );
