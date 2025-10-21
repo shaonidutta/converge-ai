@@ -12,6 +12,7 @@ import BookingDetailPage from "./pages/BookingDetailPage";
 import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
 import MyReviewsPage from "./pages/MyReviewsPage";
+import SearchResultsPage from "./pages/SearchResultsPage";
 import LisaChatBubble from "./components/chat/LisaChatBubble";
 import LisaChatWindow from "./components/chat/LisaChatWindow";
 
@@ -27,6 +28,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/home" element={<Home />} />
+        <Route path="/search" element={<SearchResultsPage />} />
         <Route path="/services/:categoryId" element={<ServiceDetailPage />} />
         <Route path="/services/:categoryId/:subcategoryId" element={<RateCardsPage />} />
         <Route path="/cart" element={<CartPage />} />
