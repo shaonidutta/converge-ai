@@ -15,7 +15,8 @@ import Footer from '../components/common/Footer';
 import HeroSection from '../components/home/HeroSection';
 import ServicesSection from '../components/home/ServicesSection';
 import RecentBookingsSection from '../components/home/RecentBookingsSection';
-import LisaChatBubble, { LisaChatWindow } from '../components/chat/LisaChatBubble';
+import LisaChatBubble from '../components/chat/LisaChatBubble';
+import LisaChatWindow from '../components/chat/LisaChatWindow';
 
 /**
  * Home Component
@@ -23,7 +24,6 @@ import LisaChatBubble, { LisaChatWindow } from '../components/chat/LisaChatBubbl
 const Home = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
 
   // Fetch data using custom hooks
@@ -80,10 +80,7 @@ const Home = () => {
     alert('Add address functionality will be available in Phase 7');
   };
 
-  // Handle chat bubble click
-  const handleChatClick = () => {
-    setIsChatOpen(!isChatOpen);
-  };
+
 
   // Show loading state
   if (!user) {
@@ -131,16 +128,10 @@ const Home = () => {
       <Footer />
 
       {/* Lisa AI Chat Bubble */}
-      <LisaChatBubble
-        onClick={handleChatClick}
-        unreadCount={0} // TODO: Get from chat context/state
-      />
+      <LisaChatBubble />
 
       {/* Lisa Chat Window */}
-      <LisaChatWindow
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-      />
+      <LisaChatWindow />
     </div>
   );
 };
