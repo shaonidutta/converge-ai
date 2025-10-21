@@ -108,14 +108,14 @@ const LandingPageNew = () => {
     { icon: MapPin, label: "Cities Covered", value: 150, suffix: "+" },
   ];
 
-  // Features data - AI Voice Agent is the main product
+  // Features data - Updated with new design
   const features = [
     {
-      icon: HeadphonesIcon,
-      title: "AI Voice Agent",
+      icon: Sparkles,
+      title: "AI-Powered Assistant",
       description:
-        "Talk naturally to our AI voice assistant. Book services, get recommendations, and manage appointments hands-free.",
-      gradient: "from-primary to-purple-600",
+        "Chat with Lisa, our intelligent AI assistant. Get instant help, book services, and manage appointments effortlessly.",
+      gradient: "from-primary-500 to-secondary-500",
       featured: true,
     },
     {
@@ -123,46 +123,46 @@ const LandingPageNew = () => {
       title: "Easy Booking",
       description:
         "Book services in minutes with our streamlined process. Choose time slots that work for you.",
-      gradient: "from-secondary to-cyan-600",
+      gradient: "from-secondary-500 to-primary-500",
     },
     {
       icon: Zap,
       title: "Quick Response",
       description:
         "Fast service delivery with real-time tracking and instant updates on your service status.",
-      gradient: "from-accent to-orange-600",
+      gradient: "from-accent-500 to-accent-600",
     },
     {
       icon: Shield,
       title: "Secure & Reliable",
       description:
         "Your data is protected with enterprise-grade security. All professionals are verified.",
-      gradient: "from-emerald-500 to-green-600",
+      gradient: "from-success-500 to-success-600",
     },
     {
       icon: CreditCard,
       title: "Flexible Payment",
       description:
         "Multiple payment options including cards, UPI, wallets, and cash on delivery.",
-      gradient: "from-blue-500 to-indigo-600",
+      gradient: "from-primary-400 to-primary-600",
     },
     {
       icon: Star,
       title: "Quality Service",
       description:
         "Verified professionals delivering top-notch service with satisfaction guarantee.",
-      gradient: "from-pink-500 to-rose-600",
+      gradient: "from-secondary-400 to-secondary-600",
     },
   ];
 
-  // Services data
+  // Services data with new color scheme
   const services = [
     {
       icon: Home,
       title: "Home Cleaning",
       description: "Professional cleaning services for your home",
       price: "Starting at ₹499",
-      gradient: "from-primary to-purple-600",
+      gradient: "from-primary-500 to-primary-600",
       popular: true,
     },
     {
@@ -170,7 +170,7 @@ const LandingPageNew = () => {
       title: "Repairs & Maintenance",
       description: "Expert technicians for all your repair needs",
       price: "Starting at ₹299",
-      gradient: "from-secondary to-cyan-600",
+      gradient: "from-secondary-500 to-secondary-600",
       popular: false,
     },
     {
@@ -178,7 +178,7 @@ const LandingPageNew = () => {
       title: "Painting",
       description: "Transform your space with professional painters",
       price: "Starting at ₹999",
-      gradient: "from-accent to-orange-600",
+      gradient: "from-accent-500 to-accent-600",
       popular: false,
     },
     {
@@ -186,7 +186,7 @@ const LandingPageNew = () => {
       title: "Electrical",
       description: "Licensed electricians for safe installations",
       price: "Starting at ₹399",
-      gradient: "from-emerald-500 to-green-600",
+      gradient: "from-success-500 to-success-600",
       popular: true,
     },
   ];
@@ -254,15 +254,15 @@ const LandingPageNew = () => {
               ))}
             </div>
 
-            {/* CTA Buttons */}
+            {/* CTA Buttons with New Color Scheme */}
             <div className="hidden md:flex items-center gap-4">
               <Link to="/login">
-                <Button variant="ghost" className="font-medium">
+                <Button variant="ghost" className="font-medium text-slate-700 hover:text-primary-600 transition-colors duration-200">
                   Login
                 </Button>
               </Link>
               <Link to="/signup">
-                <Button className="bg-gradient-to-r from-primary to-secondary hover:shadow-glow font-medium">
+                <Button className="bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-primary-600 hover:to-secondary-600 text-white font-medium rounded-xl shadow-[0_4px_20px_rgba(108,99,255,0.3)] hover:shadow-[0_6px_24px_rgba(108,99,255,0.4)] hover:scale-[1.02] transition-all duration-300">
                   Get Started
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -317,17 +317,17 @@ const LandingPageNew = () => {
         </div>
       </motion.nav>
 
-      {/* Hero Section - Completely Redesigned */}
+      {/* Hero Section with New Color Scheme */}
       <section
         id="home"
-        className="relative min-h-screen flex items-center overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50"
+        className="relative min-h-screen flex items-center overflow-hidden bg-gradient-to-br from-slate-50 via-white to-primary-50/20"
       >
         {/* Subtle Grid Background */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px]" />
 
-        {/* Animated Gradient Orbs */}
+        {/* Animated Gradient Orbs with New Colors */}
         <motion.div
-          className="absolute top-1/4 -left-20 w-96 h-96 bg-gradient-to-br from-indigo-400/30 to-purple-400/30 rounded-full blur-3xl"
+          className="absolute top-1/4 -left-20 w-96 h-96 bg-gradient-to-br from-primary-300/30 to-primary-400/30 rounded-full blur-3xl"
           animate={{
             scale: [1, 1.2, 1],
             x: [0, 50, 0],
@@ -336,7 +336,7 @@ const LandingPageNew = () => {
           transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
         />
         <motion.div
-          className="absolute bottom-1/4 -right-20 w-96 h-96 bg-gradient-to-br from-cyan-400/30 to-blue-400/30 rounded-full blur-3xl"
+          className="absolute bottom-1/4 -right-20 w-96 h-96 bg-gradient-to-br from-secondary-300/30 to-secondary-400/30 rounded-full blur-3xl"
           animate={{
             scale: [1.2, 1, 1.2],
             x: [0, -50, 0],
@@ -359,29 +359,29 @@ const LandingPageNew = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8 }}
             >
-              {/* Badge with Voice Icon */}
+              {/* Badge with AI Icon */}
               <motion.div
-                className="inline-flex items-center gap-3 px-5 py-3 bg-white/80 backdrop-blur-xl rounded-full border border-slate-200 shadow-lg"
+                className="inline-flex items-center gap-3 px-5 py-3 bg-white/90 backdrop-blur-xl rounded-full border border-slate-200/60 shadow-[0_4px_20px_rgba(0,0,0,0.05)]"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
               >
                 <div className="relative">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                    <HeadphonesIcon className="h-4 w-4 text-white" />
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center">
+                    <Sparkles className="h-4 w-4 text-white" />
                   </div>
                   <motion.div
-                    className="absolute inset-0 rounded-full bg-indigo-500/50"
+                    className="absolute inset-0 rounded-full bg-primary-500/50"
                     animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
                     transition={{ duration: 2, repeat: Infinity }}
                   />
                 </div>
                 <span className="text-sm font-semibold text-slate-700">
-                  Powered by AI Voice Technology
+                  Powered by AI Technology
                 </span>
               </motion.div>
 
-              {/* Main Heading */}
+              {/* Main Heading with New Colors */}
               <div className="space-y-4">
                 <h1 className="text-6xl md:text-7xl font-black leading-tight">
                   <span className="text-slate-900">Professional</span>
@@ -389,11 +389,11 @@ const LandingPageNew = () => {
                   <span className="text-slate-900">Home Services,</span>
                   <br />
                   <span className="relative inline-block">
-                    <span className="relative z-10 bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 bg-clip-text text-transparent">
+                    <span className="relative z-10 bg-gradient-to-r from-primary-600 via-primary-500 to-secondary-500 bg-clip-text text-transparent">
                       Simplified
                     </span>
                     <motion.div
-                      className="absolute -bottom-2 left-0 right-0 h-4 bg-gradient-to-r from-indigo-400/30 to-purple-400/30 rounded-full blur-sm"
+                      className="absolute -bottom-2 left-0 right-0 h-4 bg-gradient-to-r from-primary-400/30 to-secondary-400/30 rounded-full blur-sm"
                       animate={{ scaleX: [0.8, 1, 0.8] }}
                       transition={{ duration: 3, repeat: Infinity }}
                     />
@@ -408,7 +408,7 @@ const LandingPageNew = () => {
                 support and seamless booking.
               </p>
 
-              {/* Feature Pills */}
+              {/* Feature Pills with New Colors */}
               <div className="flex flex-wrap gap-3">
                 {[
                   { icon: Zap, text: "Instant Booking" },
@@ -417,12 +417,12 @@ const LandingPageNew = () => {
                 ].map((item, i) => (
                   <motion.div
                     key={i}
-                    className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full border border-slate-200 shadow-sm"
+                    className="flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-sm rounded-full border border-slate-200/60 shadow-[0_2px_10px_rgba(0,0,0,0.05)]"
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.5, delay: 0.4 + i * 0.1 }}
                   >
-                    <item.icon className="h-4 w-4 text-indigo-600" />
+                    <item.icon className="h-4 w-4 text-primary-600" />
                     <span className="text-sm font-semibold text-slate-700">
                       {item.text}
                     </span>
@@ -430,42 +430,36 @@ const LandingPageNew = () => {
                 ))}
               </div>
 
-              {/* CTA Buttons */}
+              {/* CTA Buttons with New Colors */}
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Link to="/signup">
                   <Button
                     size="lg"
-                    className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-600 hover:shadow-2xl hover:shadow-indigo-500/50 text-lg px-10 py-7 group relative overflow-hidden"
+                    className="w-full sm:w-auto bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-primary-600 hover:to-secondary-600 text-white text-lg px-10 py-7 rounded-xl shadow-[0_4px_20px_rgba(108,99,255,0.3)] hover:shadow-[0_6px_24px_rgba(108,99,255,0.4)] hover:scale-[1.02] transition-all duration-300 group relative overflow-hidden"
                   >
                     <span className="relative z-10 flex items-center">
-                      Try Voice Booking
+                      Get Started Now
                       <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                     </span>
-                    <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-indigo-600"
-                      initial={{ x: "100%" }}
-                      whileHover={{ x: 0 }}
-                      transition={{ duration: 0.3 }}
-                    />
                   </Button>
                 </Link>
                 <Link to="/login">
                   <Button
                     size="lg"
-                    className="w-full sm:w-auto bg-white/80 backdrop-blur-sm text-slate-900 border-2 border-slate-200 hover:border-indigo-600 hover:bg-white text-lg px-10 py-7 shadow-lg"
+                    className="w-full sm:w-auto bg-white/90 backdrop-blur-sm text-slate-900 border-2 border-slate-200/60 hover:border-primary-400 hover:bg-white text-lg px-10 py-7 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_24px_rgba(0,0,0,0.08)] transition-all duration-300"
                   >
                     Sign In
                   </Button>
                 </Link>
               </div>
 
-              {/* Social Proof */}
+              {/* Social Proof with New Colors */}
               <div className="flex items-center gap-6 pt-4">
                 <div className="flex -space-x-3">
                   {[1, 2, 3, 4].map((i) => (
                     <div
                       key={i}
-                      className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-600 border-2 border-white flex items-center justify-center text-white text-xs font-bold"
+                      className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-secondary-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold"
                     >
                       {String.fromCharCode(64 + i)}
                     </div>

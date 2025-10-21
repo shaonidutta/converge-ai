@@ -29,16 +29,16 @@ const Logo = ({ className = "", size = "default" }) => {
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          {/* Gradient Definitions */}
+          {/* Gradient Definitions with New Color Scheme */}
           <defs>
             <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#6366F1" />
-              <stop offset="50%" stopColor="#8B5CF6" />
-              <stop offset="100%" stopColor="#06B6D4" />
+              <stop offset="0%" stopColor="#6C63FF" />
+              <stop offset="50%" stopColor="#8B7FFF" />
+              <stop offset="100%" stopColor="#00BFA6" />
             </linearGradient>
             <linearGradient id="logoGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#06B6D4" />
-              <stop offset="100%" stopColor="#6366F1" />
+              <stop offset="0%" stopColor="#00BFA6" />
+              <stop offset="100%" stopColor="#6C63FF" />
             </linearGradient>
           </defs>
 
@@ -88,10 +88,10 @@ const Logo = ({ className = "", size = "default" }) => {
         />
       </motion.div>
 
-      {/* Text Logo */}
+      {/* Text Logo with New Color Scheme */}
       <div className="flex flex-col">
         <motion.span
-          className="text-2xl font-bold bg-gradient-to-r from-primary via-purple-600 to-secondary bg-clip-text text-transparent"
+          className="text-2xl font-bold bg-gradient-to-r from-primary-600 via-primary-500 to-secondary-500 bg-clip-text text-transparent"
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
@@ -99,12 +99,12 @@ const Logo = ({ className = "", size = "default" }) => {
           ConvergeAI
         </motion.span>
         <motion.span
-          className="text-[10px] font-medium text-muted-foreground tracking-wider uppercase"
+          className="text-[10px] font-medium text-slate-600 tracking-wider uppercase"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.4 }}
         >
-          Smart Services
+          AI-Powered Services
         </motion.span>
       </div>
     </div>
