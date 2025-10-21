@@ -110,6 +110,13 @@ const api = {
      * @returns {Promise} API response
      */
     logout: () => apiClient.post('/api/v1/auth/logout'),
+
+    /**
+     * Change password
+     * @param {Object} passwordData - Password data (current_password, new_password)
+     * @returns {Promise} API response
+     */
+    changePassword: (passwordData) => apiClient.post('/api/v1/auth/change-password', passwordData),
   },
 
   // ============================================
@@ -321,6 +328,46 @@ const api = {
      * @returns {Promise} API response
      */
     endSession: (sessionId) => apiClient.delete(`/api/v1/chat/sessions/${sessionId}`),
+  },
+
+  // ============================================
+  // Customer Profile APIs
+  // ============================================
+  customers: {
+    /**
+     * Get current customer profile
+     * @returns {Promise} API response with customer data
+     */
+    getProfile: () => apiClient.get('/api/v1/customers/me'),
+
+    /**
+     * Update customer profile
+     * @param {Object} profileData - Updated profile data
+     * @returns {Promise} API response
+     */
+    updateProfile: (profileData) => apiClient.put('/api/v1/customers/me', profileData),
+
+    /**
+     * Get customer statistics
+     * @returns {Promise} API response with stats
+     */
+    getStats: () => apiClient.get('/api/v1/customers/me/stats'),
+
+    /**
+     * Upload profile avatar
+     * @param {FormData} formData - Form data with avatar file
+     * @returns {Promise} API response
+     */
+    uploadAvatar: (formData) => apiClient.post('/api/v1/customers/me/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+
+    /**
+     * Delete customer account
+     * @param {Object} data - Confirmation data (password)
+     * @returns {Promise} API response
+     */
+    deleteAccount: (data) => apiClient.delete('/api/v1/customers/me', { data }),
   },
 
   // ============================================
