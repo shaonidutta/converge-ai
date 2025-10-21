@@ -8,8 +8,8 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, s
 from pydantic import BaseModel
 
 from src.services.document_service import DocumentService
-from src.api.dependencies.auth import get_current_user
-from src.models.user import User
+from src.core.security.dependencies import get_current_user
+from src.core.models import User
 
 
 logger = logging.getLogger(__name__)
