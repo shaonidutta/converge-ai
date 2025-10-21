@@ -290,6 +290,40 @@ const api = {
   },
 
   // ============================================
+  // Chat APIs
+  // ============================================
+  chat: {
+    /**
+     * Send a chat message
+     * @param {Object} messageData - Message data (message, session_id, channel)
+     * @returns {Promise} API response with user and assistant messages
+     */
+    sendMessage: (messageData) => apiClient.post('/api/v1/chat/message', messageData),
+
+    /**
+     * Get chat history for a session
+     * @param {string} sessionId - Session ID
+     * @param {Object} params - Query parameters (limit, skip)
+     * @returns {Promise} API response with messages array
+     */
+    getHistory: (sessionId, params = {}) => apiClient.get(`/api/v1/chat/history/${sessionId}`, { params }),
+
+    /**
+     * Get all chat sessions
+     * @param {Object} params - Query parameters (limit, skip)
+     * @returns {Promise} API response with sessions array
+     */
+    getSessions: (params = {}) => apiClient.get('/api/v1/chat/sessions', { params }),
+
+    /**
+     * End a chat session
+     * @param {string} sessionId - Session ID
+     * @returns {Promise} API response
+     */
+    endSession: (sessionId) => apiClient.delete(`/api/v1/chat/sessions/${sessionId}`),
+  },
+
+  // ============================================
   // Health Check API
   // ============================================
   health: {

@@ -1,20 +1,21 @@
 /**
  * LisaChatBubble Component
  * Floating AI assistant chat bubble
+ * Integrated with ChatContext
  */
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, MessageCircle } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
+import { useChat } from '../../hooks/useChat';
 
 /**
  * LisaChatBubble Component
- * @param {Object} props
- * @param {Function} props.onClick - Callback when bubble is clicked
- * @param {number} props.unreadCount - Number of unread messages
+ * Opens chat window when clicked
  */
-const LisaChatBubble = ({ onClick, unreadCount = 0 }) => {
+const LisaChatBubble = () => {
   const [isHovered, setIsHovered] = useState(false);
+  const { openChat, unreadCount } = useChat();
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
@@ -36,7 +37,7 @@ const LisaChatBubble = ({ onClick, unreadCount = 0 }) => {
 
       {/* Chat Bubble */}
       <motion.button
-        onClick={onClick}
+        onClick={openChat}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         whileHover={{ scale: 1.1, rotate: 5 }}
@@ -127,61 +128,6 @@ const LisaChatBubble = ({ onClick, unreadCount = 0 }) => {
         className="absolute top-4 right-4 w-1 h-1 rounded-full bg-accent-400 blur-sm"
       />
     </div>
-  );
-};
-
-/**
- * LisaChatWindow Component (Placeholder for Phase 8)
- * Full chat window that opens when bubble is clicked
- */
-export const LisaChatWindow = ({ isOpen, onClose }) => {
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 20, scale: 0.95 }}
-          transition={{ duration: 0.3, ease: 'easeOut' }}
-          className="fixed bottom-24 right-6 w-96 h-[600px] bg-white rounded-2xl shadow-[0_12px_48px_rgba(0,0,0,0.15)] border border-slate-200 overflow-hidden z-50"
-        >
-          {/* Header */}
-          <div className="bg-gradient-to-r from-primary-500 to-secondary-500 px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                <Sparkles className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-white font-bold">Lisa</h3>
-                <p className="text-xs text-white/80">AI Assistant</p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors duration-200"
-            >
-              <X className="h-5 w-5 text-white" />
-            </button>
-          </div>
-
-          {/* Chat Content - Placeholder */}
-          <div className="flex items-center justify-center h-[calc(100%-80px)] bg-slate-50">
-            <div className="text-center px-6">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-100 to-secondary-100 flex items-center justify-center mx-auto mb-4">
-                <MessageCircle className="h-8 w-8 text-primary-600" />
-              </div>
-              <h4 className="text-lg font-bold text-slate-900 mb-2">
-                Chat Coming Soon!
-              </h4>
-              <p className="text-sm text-slate-600">
-                The full chat interface will be available in Phase 8.
-                Stay tuned!
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
   );
 };
 

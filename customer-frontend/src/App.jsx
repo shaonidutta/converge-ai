@@ -5,6 +5,8 @@ import SignupPage from "./pages/SignupPage";
 import Home from "./pages/Home";
 import ServiceDetailPage from "./pages/ServiceDetailPage";
 import RateCardsPage from "./pages/RateCardsPage";
+import LisaChatBubble from "./components/chat/LisaChatBubble";
+import LisaChatWindow from "./components/chat/LisaChatWindow";
 
 /**
  * Main App Component
@@ -21,6 +23,10 @@ function App() {
         <Route path="/services/:categoryId" element={<ServiceDetailPage />} />
         <Route path="/services/:categoryId/:subcategoryId" element={<RateCardsPage />} />
       </Routes>
+
+      {/* Global Chat Components */}
+      <LisaChatBubble />
+      <LisaChatWindow />
     </Router>
   );
 }
