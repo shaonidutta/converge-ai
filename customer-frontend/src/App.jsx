@@ -11,6 +11,7 @@ import BookingsPage from "./pages/BookingsPage";
 import BookingDetailPage from "./pages/BookingDetailPage";
 import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
+import MyReviewsPage from "./pages/MyReviewsPage";
 import LisaChatBubble from "./components/chat/LisaChatBubble";
 import LisaChatWindow from "./components/chat/LisaChatWindow";
 
@@ -34,6 +35,7 @@ function App() {
         <Route path="/bookings/:id" element={<BookingDetailPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/reviews" element={<MyReviewsPage />} />
       </Routes>
 
       {/* Global Chat Components */}

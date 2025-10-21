@@ -3,9 +3,9 @@
  * Displays detailed information about a single booking
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
   Calendar,
@@ -19,24 +19,45 @@ import {
   XCircle,
   RefreshCw,
   CheckCircle,
+  Star,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useBooking, useBookingActions } from '../hooks/useBookings';
+import { useCanReview, useReviewActions } from '../hooks/useReviews';
+import { fetchReviewByBooking } from '../services/reviewService';
 import Navbar from '../components/common/Navbar';
 import Footer from '../components/common/Footer';
 import BookingStatusBadge from '../components/bookings/BookingStatusBadge';
 import LoadingSkeleton from '../components/common/LoadingSkeleton';
 import CancelBookingModal from '../components/bookings/CancelBookingModal';
 import RescheduleModal from '../components/bookings/RescheduleModal';
+import ReviewForm from '../components/reviews/ReviewForm';
+import ReviewCard from '../components/reviews/ReviewCard';
 
 const BookingDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { booking, loading, error, refetch } = useBooking(id);
   const { cancelBooking, rescheduleBooking, loading: actionLoading } = useBookingActions();
+  const { canReview, reason: reviewReason } = useCanReview(id, booking?.status);
+  const { submit: submitReview, update: updateReview, remove: deleteReview, loading: reviewLoading } = useReviewActions();
 
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [existingReview, setExistingReview] = useState(null);
+  const [editingReview, setEditingReview] = useState(null);
+
+  // Fetch existing review for this booking
+  useEffect(() => {
+    const loadReview = async () => {
+      if (id) {
+        const review = await fetchReviewByBooking(parseInt(id));
+        setExistingReview(review);
+      }
+    };
+    loadReview();
+  }, [id]);
 
   const formatDate = (dateString) => {
     try {
@@ -75,6 +96,44 @@ const BookingDetailPage = () => {
       refetch();
     } catch (error) {
       console.error('Reschedule failed:', error);
+    }
+  };
+
+  const handleReviewSubmit = async (reviewData) => {
+    try {
+      if (editingReview) {
+        await updateReview(editingReview.id, reviewData);
+        alert('Review updated successfully!');
+      } else {
+        await submitReview(parseInt(id), reviewData);
+        alert('Review submitted successfully!');
+      }
+      setShowReviewForm(false);
+      setEditingReview(null);
+      // Reload review
+      const review = await fetchReviewByBooking(parseInt(id));
+      setExistingReview(review);
+    } catch (error) {
+      alert(error.message || 'Failed to submit review');
+    }
+  };
+
+  const handleEditReview = (review) => {
+    setEditingReview(review);
+    setShowReviewForm(true);
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    if (!confirm('Are you sure you want to delete this review? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await deleteReview(reviewId);
+      setExistingReview(null);
+      alert('Review deleted successfully!');
+    } catch (error) {
+      alert('Failed to delete review');
     }
   };
 
@@ -235,7 +294,7 @@ const BookingDetailPage = () => {
                 {/* Right Column - Actions & Summary */}
                 <div className="space-y-6">
                   {/* Action Buttons */}
-                  {(canCancel || canReschedule) && (
+                  {(canCancel || canReschedule || (canReview && !existingReview)) && (
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -243,6 +302,20 @@ const BookingDetailPage = () => {
                       className="bg-white rounded-xl border border-slate-200 p-6 space-y-3"
                     >
                       <h2 className="text-lg font-bold text-slate-900 mb-4">Actions</h2>
+
+                      {/* Review Button */}
+                      {canReview && !existingReview && (
+                        <motion.button
+                          onClick={() => setShowReviewForm(true)}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-yellow-500 to-amber-500 text-white font-semibold rounded-xl hover:shadow-[0_4px_12px_rgba(245,158,11,0.3)] transition-all duration-200"
+                        >
+                          <Star className="h-5 w-5" />
+                          Write a Review
+                        </motion.button>
+                      )}
+
                       {canReschedule && (
                         <motion.button
                           onClick={() => setShowRescheduleModal(true)}
@@ -265,6 +338,38 @@ const BookingDetailPage = () => {
                           Cancel Booking
                         </motion.button>
                       )}
+                    </motion.div>
+                  )}
+
+                  {/* Review Display */}
+                  {existingReview && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15 }}
+                      className="bg-white rounded-xl border border-slate-200 p-6"
+                    >
+                      <h2 className="text-lg font-bold text-slate-900 mb-4">Your Review</h2>
+                      <ReviewCard
+                        review={existingReview}
+                        showActions={true}
+                        onEdit={handleEditReview}
+                        onDelete={handleDeleteReview}
+                      />
+                    </motion.div>
+                  )}
+
+                  {/* Review Not Available Message */}
+                  {!canReview && !existingReview && reviewReason && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15 }}
+                      className="bg-slate-50 rounded-xl border border-slate-200 p-4"
+                    >
+                      <p className="text-sm text-slate-600 text-center">
+                        {reviewReason}
+                      </p>
                     </motion.div>
                   )}
 
@@ -325,6 +430,22 @@ const BookingDetailPage = () => {
         booking={booking}
         loading={actionLoading}
       />
+
+      {/* Review Form Modal */}
+      <AnimatePresence>
+        {showReviewForm && (
+          <ReviewForm
+            booking={booking}
+            existingReview={editingReview}
+            onSubmit={handleReviewSubmit}
+            onCancel={() => {
+              setShowReviewForm(false);
+              setEditingReview(null);
+            }}
+            loading={reviewLoading}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -15,6 +15,7 @@ import {
   MapPin,
   Settings,
   ChevronDown,
+  Star,
 } from 'lucide-react';
 import Logo from '../Logo';
 import AddressSelector from './AddressSelector';
@@ -212,6 +213,17 @@ const Navbar = ({ onAddAddress }) => {
                       >
                         <Calendar className="h-4 w-4 text-slate-400" />
                         My Bookings
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          navigate('/reviews');
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors duration-200 flex items-center gap-3"
+                      >
+                        <Star className="h-4 w-4 text-slate-400" />
+                        My Reviews
                       </button>
 
                       <button
