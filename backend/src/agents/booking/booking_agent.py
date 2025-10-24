@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 import logging
 
 from src.services.booking_service import BookingService
+from src.services.response_generator import ResponseGenerator
 from src.core.models import User, Address, Cart, CartItem, RateCard, Provider, ProviderPincode, Pincode, Booking
 from src.schemas.customer import CreateBookingRequest
 
@@ -37,12 +38,13 @@ class BookingAgent:
     def __init__(self, db: AsyncSession):
         """
         Initialize BookingAgent
-        
+
         Args:
             db: Async database session
         """
         self.db = db
         self.booking_service = BookingService(db)
+        self.response_generator = ResponseGenerator()
     
     async def execute(
         self,
@@ -88,7 +90,7 @@ class BookingAgent:
             return await self._modify_booking(entities, user)
         else:
             return {
-                "response": "I'm not sure what you want to do with the booking. Could you please clarify?",
+                "response": f"I'm not quite sure what you'd like to do with your booking. Could you let me know if you want to book, cancel, reschedule, or modify something?",
                 "action_taken": "error",
                 "metadata": {"error": "unknown_action", "action": action}
             }
@@ -96,25 +98,37 @@ class BookingAgent:
     async def _create_booking(self, entities: Dict[str, Any], user: User) -> Dict[str, Any]:
         """
         Create a new booking from slot-filled entities
-        
+
         Args:
             entities: Contains service_type, date, time, location
             user: Current user
-        
+
         Returns:
             Response dict with booking details
         """
         try:
-            # Step 1: Get user's address for the specified pincode
-            pincode = entities.get("location")
-            if not pincode:
+            # Step 1: Parse location entity
+            location = entities.get("location")
+            if not location:
+                # This should never happen - slot-filling should collect all required entities
+                raise ValueError("Missing required entity 'location'. Slot-filling should have collected this.")
+
+            # Parse location to extract pincode and address components
+            import re
+            pincode_match = re.search(r'\b(\d{6})\b', location)
+            if not pincode_match:
                 return {
-                    "response": "I need your location (pincode) to create the booking.",
-                    "action_taken": "missing_entity",
-                    "metadata": {"missing": "location"}
+                    "response": f"I couldn't find a valid pincode in '{location}'. Please provide a 6-digit pincode.",
+                    "action_taken": "invalid_pincode",
+                    "metadata": {"location": location}
                 }
-            
-            # Find address with this pincode
+
+            pincode = pincode_match.group(1)
+
+            # Check if location is a full address (contains commas)
+            is_full_address = ',' in location
+
+            # Find existing address with this pincode
             address_result = await self.db.execute(
                 select(Address).where(
                     Address.user_id == user.id,
@@ -122,22 +136,71 @@ class BookingAgent:
                 )
             )
             address = address_result.scalar_one_or_none()
-            
+
             if not address:
-                return {
-                    "response": f"I couldn't find an address with pincode {pincode} in your account. Please add this address first.",
-                    "action_taken": "address_not_found",
-                    "metadata": {"pincode": pincode}
-                }
+                # Auto-create address if we have a full address
+                if is_full_address:
+                    # Parse full address: "123 Main Street, Bangalore, Karnataka, 560001"
+                    # Expected format: street, city, state, pincode
+                    parts = [p.strip() for p in location.split(',')]
+
+                    if len(parts) >= 3:
+                        # Extract components
+                        address_line1 = parts[0]  # "123 Main Street"
+                        city = parts[1] if len(parts) >= 2 else "Unknown"  # "Bangalore"
+                        state = parts[2] if len(parts) >= 3 else "Unknown"  # "Karnataka"
+
+                        # Auto-create address
+                        from src.services.address_service import AddressService
+                        from src.schemas.customer import AddressRequest
+
+                        address_request = AddressRequest(
+                            address_line1=address_line1,
+                            address_line2=None,
+                            city=city,
+                            state=state,
+                            pincode=pincode,
+                            is_default=False
+                        )
+
+                        address_service = AddressService(self.db)
+                        address_response = await address_service.add_address(address_request, user)
+
+                        # Fetch the created address
+                        address_result = await self.db.execute(
+                            select(Address).where(Address.id == address_response.id)
+                        )
+                        address = address_result.scalar_one()
+
+                        logger.info(f"Auto-created address for user {user.id}: {address_line1}, {city}, {state}, {pincode}")
+                    else:
+                        # Invalid address format
+                        return {
+                            "response": f"I couldn't parse the address '{location}'. Please provide in format: 'Street, City, State, Pincode'",
+                            "action_taken": "invalid_address_format",
+                            "metadata": {"location": location}
+                        }
+                else:
+                    # Only pincode provided, need full address
+                    return {
+                        "response": f"I need your complete address for pincode {pincode}. Please provide:\n"
+                                  f"1. Address line 1 (street, building)\n"
+                                  f"2. City\n"
+                                  f"3. State\n\n"
+                                  f"Example: '123 Main Street, Mumbai, Maharashtra, {pincode}'",
+                        "action_taken": "address_details_needed",
+                        "metadata": {
+                            "pincode": pincode,
+                            "needed_fields": ["address_line1", "city", "state"]
+                        }
+                    }
             
             # Step 2: Validate provider availability in this pincode
+            # Note: Validation will attempt to find providers, but will gracefully proceed if none found
             validation_result = await self._validate_provider_availability(pincode)
             if not validation_result["is_valid"]:
-                return {
-                    "response": validation_result["message"],
-                    "action_taken": "provider_not_available",
-                    "metadata": {"pincode": pincode, "details": validation_result}
-                }
+                logger.warning(f"[BookingAgent] No providers available for pincode {pincode}, but proceeding with booking")
+                # Don't return error - let booking service handle provider assignment
             
             # Step 3: Parse date and time
             date_str = entities.get("date")
@@ -150,10 +213,62 @@ class BookingAgent:
                     "metadata": {"missing": ["date", "time"] if not date_str and not time_str else ["date"] if not date_str else ["time"]}
                 }
             
-            # Step 4: Create booking request
-            # Note: Assumes user has already added items to cart via separate flow
-            # In production, you might want to add cart items here based on service_type
-            
+            # Step 4: Auto-add service to cart if not already present
+            service_type = entities.get("service_type", "").lower()
+
+            # Map service types to subcategory IDs and default rate cards
+            service_mapping = {
+                "ac": {"subcategory_id": 9, "rate_card_id": 18},  # AC Repair - Basic
+                "ac_repair": {"subcategory_id": 9, "rate_card_id": 18},
+                "ac_installation": {"subcategory_id": 10, "rate_card_id": 21},
+                "ac_gas": {"subcategory_id": 11, "rate_card_id": 24},
+                "refrigerator": {"subcategory_id": 12, "rate_card_id": 27},
+                "washing_machine": {"subcategory_id": 13, "rate_card_id": 29},
+                "plumbing": {"subcategory_id": 17, "rate_card_id": 33},
+                "electrical": {"subcategory_id": 24, "rate_card_id": 48},
+                "cleaning": {"subcategory_id": 1, "rate_card_id": 1},
+            }
+
+            # Get rate card for the service type
+            service_info = service_mapping.get(service_type)
+            if not service_info:
+                # Default to AC Repair if service type not recognized
+                logger.warning(f"Unknown service type '{service_type}', defaulting to AC Repair")
+                service_info = service_mapping["ac"]
+
+            # Add to cart using CartService
+            from src.services.cart_service import CartService
+            from src.schemas.customer import AddToCartRequest
+
+            cart_service = CartService(self.db)
+
+            # Check if cart already has items
+            cart = await cart_service.get_or_create_cart(user.id)
+            cart_items_result = await self.db.execute(
+                select(CartItem).where(CartItem.cart_id == cart.id)
+            )
+            existing_items = cart_items_result.scalars().all()
+
+            if not existing_items:
+                # Add service to cart
+                try:
+                    add_to_cart_request = AddToCartRequest(
+                        rate_card_id=service_info["rate_card_id"],
+                        quantity=1
+                    )
+                    await cart_service.add_to_cart(add_to_cart_request, user)
+                    logger.info(f"Auto-added service to cart: rate_card_id={service_info['rate_card_id']}")
+                except Exception as e:
+                    logger.error(f"Failed to add service to cart: {e}")
+                    return {
+                        "response": f"Sorry, I couldn't add the {service_type} service to your cart. Please try again.",
+                        "action_taken": "cart_add_failed",
+                        "metadata": {"error": str(e)}
+                    }
+            else:
+                logger.info(f"Cart already has {len(existing_items)} items, skipping auto-add")
+
+            # Step 5: Create booking request
             request = CreateBookingRequest(
                 address_id=address.id,
                 preferred_date=date_str,
@@ -161,15 +276,25 @@ class BookingAgent:
                 payment_method=entities.get("payment_method", "card"),  # Default to card
                 special_instructions=entities.get("special_instructions")
             )
-            
-            # Step 5: Create booking using BookingService
+
+            # Step 6: Create booking using BookingService
             booking_response = await self.booking_service.create_booking(request, user)
-            
-            # Step 6: Return success response
+
+            # Step 7: Generate natural response using ResponseGenerator
+            response_text = await self.response_generator.generate_booking_confirmation(
+                booking_data={
+                    "booking_number": booking_response.booking_number,
+                    "total_amount": float(booking_response.total_amount),
+                    "date": str(booking_response.preferred_date),
+                    "time": str(booking_response.preferred_time)
+                },
+                conversation_history=None,  # TODO: Pass conversation history from coordinator
+                user_name=user.first_name
+            )
+
+            # Step 8: Return success response
             return {
-                "response": f"✅ Booking confirmed! Your booking ID is {booking_response.booking_number}. "
-                           f"Total amount: ₹{booking_response.total_amount}. "
-                           f"Scheduled for {booking_response.preferred_date} at {booking_response.preferred_time}.",
+                "response": response_text,
                 "action_taken": "booking_created",
                 "metadata": {
                     "booking_id": booking_response.id,
@@ -271,40 +396,50 @@ class BookingAgent:
     
     async def _cancel_booking(self, entities: Dict[str, Any], user: User) -> Dict[str, Any]:
         """
-        Cancel an existing booking
-        
+        Cancel an existing booking using CancellationAgent with policy enforcement
+
+        This method delegates to CancellationAgent which handles:
+        - Policy-based refund calculation (100%, 50%, 25%, or 0% based on timing)
+        - Booking eligibility validation
+        - Status checks
+        - Wallet refund processing
+
         Args:
             entities: Contains booking_id, reason
             user: Current user
-        
+
         Returns:
-            Response dict with cancellation details
+            Response dict with cancellation details including policy-based refund
         """
         try:
             booking_id = entities.get("booking_id")
-            reason = entities.get("reason", "Customer requested cancellation")
-            
+
             if not booking_id:
                 return {
                     "response": "I need the booking ID to cancel. Could you provide it?",
                     "action_taken": "missing_entity",
                     "metadata": {"missing": "booking_id"}
                 }
-            
-            # Cancel booking using BookingService
-            result = await self.booking_service.cancel_booking(int(booking_id), reason, user)
-            
-            return {
-                "response": f"✅ Booking {result.booking_number} has been cancelled. "
-                           f"Refund of ₹{result.total_amount} will be processed within 5-7 business days.",
-                "action_taken": "booking_cancelled",
-                "metadata": {
-                    "booking_id": result.id,
-                    "booking_number": result.booking_number,
-                    "refund_amount": float(result.total_amount),
-                    "status": result.status
-                }
-            }
+
+            # Use CancellationAgent for policy-based cancellation
+            # This ensures cancellation policies are enforced correctly
+            from src.agents.cancellation.cancellation_agent import CancellationAgent
+
+            cancellation_agent = CancellationAgent(self.db)
+
+            # CancellationAgent handles:
+            # - Time-based refund calculation
+            # - Policy enforcement
+            # - Status validation
+            # - Wallet refunds
+            result = await cancellation_agent.execute(
+                message="",  # Not needed, we have entities
+                user=user,
+                session_id="",  # Not needed for cancellation
+                entities=entities
+            )
+
+            return result
             
         except ValueError as e:
             return {
