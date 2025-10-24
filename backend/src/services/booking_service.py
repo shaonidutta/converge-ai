@@ -99,8 +99,14 @@ class BookingService:
         logger.debug(f"Found {len(cart_items)} items in cart")
 
         # Validate provider availability in user's pincode
+        # Note: This will log warnings if no providers found, but won't block booking
         logger.debug("Validating provider availability")
-        await self._validate_provider_availability(address.pincode, cart_items)
+        try:
+            await self._validate_provider_availability(address.pincode, cart_items)
+        except ValueError as e:
+            # Log warning but don't block booking - let system assign provider later
+            logger.warning(f"Provider validation warning for pincode {address.pincode}: {e}")
+            logger.info("Proceeding with booking - provider will be assigned based on availability")
 
         # Calculate total amount
         total_amount = sum(item[0].total_price for item in cart_items)
@@ -503,6 +509,29 @@ class BookingService:
             created_at=booking.created_at.isoformat()
         )
 
+    async def get_booking_by_number(
+        self,
+        booking_number: str,
+        user: User
+    ) -> Optional[Booking]:
+        """
+        Get booking by booking number
+
+        Args:
+            booking_number: Booking number (e.g., "BK123456")
+            user: Current user
+
+        Returns:
+            Booking object or None if not found
+        """
+        result = await self.db.execute(
+            select(Booking).where(
+                Booking.booking_number == booking_number.upper(),
+                Booking.user_id == user.id
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def cancel_booking(
         self,
         booking_id: int,
@@ -532,6 +561,32 @@ class BookingService:
         if not booking:
             raise ValueError("Booking not found")
 
+    async def cancel_booking_by_number(
+        self,
+        booking_number: str,
+        reason: str,
+        user: User
+    ) -> BookingResponse:
+        """
+        Cancel a booking by booking number
+
+        Args:
+            booking_number: Booking number (e.g., "BK123456")
+            reason: Cancellation reason
+            user: Current user
+
+        Returns:
+            BookingResponse with cancelled booking details
+
+        Raises:
+            ValueError: If booking cannot be cancelled
+        """
+        # Get booking by booking number
+        booking = await self.get_booking_by_number(booking_number, user)
+
+        if not booking:
+            raise ValueError(f"Booking {booking_number} not found")
+
         # Check if booking can be cancelled
         if booking.status not in [BookingStatus.PENDING, BookingStatus.CONFIRMED]:
             raise ValueError(
@@ -540,7 +595,7 @@ class BookingService:
 
         # Update booking status
         booking.status = BookingStatus.CANCELLED
-        booking.cancellation_reason = request.reason
+        booking.cancellation_reason = reason
         booking.cancelled_at = datetime.now(timezone.utc)
 
         # Update booking items status
@@ -559,11 +614,14 @@ class BookingService:
             booking.payment_status = PaymentStatus.REFUNDED
 
         await self.db.commit()
+        await self.db.refresh(booking)
 
         logger.info(
-            f"Booking cancelled: id={booking.id}, user_id={user.id}, "
-            f"reason={request.reason}"
+            f"Booking cancelled: id={booking.id}, number={booking.booking_number}, user_id={user.id}, reason={reason}"
         )
+
+        # Return booking response
+        return await self._build_booking_response(booking)
 
     async def _validate_provider_availability(
         self,

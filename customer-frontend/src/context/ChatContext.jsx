@@ -11,6 +11,7 @@
 
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { sendMessage as sendMessageAPI, getChatHistory } from '../services/chatService';
+import { isAuthenticated } from '../api/axiosConfig';
 
 // Create Chat Context
 export const ChatContext = createContext(null);
@@ -81,6 +82,21 @@ export const ChatProvider = ({ children }) => {
   const sendMessage = useCallback(async (text) => {
     if (!text.trim()) return;
 
+    // Check if user is authenticated
+    if (!isAuthenticated()) {
+      // Add error message asking user to log in
+      const authErrorMessage = {
+        id: Date.now(),
+        role: 'assistant',
+        message: 'Please log in to chat with Lisa. Click the "Login" button in the navigation bar to get started! 🔐',
+        created_at: new Date().toISOString(),
+        isError: true,
+      };
+      setMessages(prev => [...prev, authErrorMessage]);
+      setError('Authentication required');
+      return;
+    }
+
     // Add user message immediately
     const userMessage = {
       id: Date.now(),
@@ -96,7 +112,7 @@ export const ChatProvider = ({ children }) => {
     try {
       // Send to backend
       const response = await sendMessageAPI(text, sessionId);
-      
+
       // Update session ID if new
       if (response.session_id && response.session_id !== sessionId) {
         setSessionId(response.session_id);
@@ -111,7 +127,7 @@ export const ChatProvider = ({ children }) => {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-      
+
       // Increment unread count if chat is closed
       if (!isOpen) {
         setUnreadCount(prev => prev + 1);
@@ -119,12 +135,17 @@ export const ChatProvider = ({ children }) => {
     } catch (err) {
       setError(err.message);
       console.error('Error sending message:', err);
-      
-      // Add error message
+
+      // Check if it's an authentication error
+      const isAuthError = err.message.includes('401') || err.message.includes('Unauthorized') || err.message.includes('authentication');
+
+      // Add appropriate error message
       const errorMessage = {
         id: Date.now() + 1,
         role: 'assistant',
-        message: 'Sorry, I encountered an error. Please try again.',
+        message: isAuthError
+          ? 'Your session has expired. Please log in again to continue chatting. 🔐'
+          : 'Sorry, I encountered an error. Please try again.',
         created_at: new Date().toISOString(),
         isError: true,
       };

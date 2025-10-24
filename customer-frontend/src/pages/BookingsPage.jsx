@@ -11,7 +11,7 @@ import Navbar from '../components/common/Navbar';
 import Footer from '../components/common/Footer';
 import BookingCard from '../components/bookings/BookingCard';
 import BookingFilters from '../components/bookings/BookingFilters';
-import LoadingSkeleton from '../components/common/LoadingSkeleton';
+import { CardSkeleton } from '../components/common/LoadingSkeleton';
 import CancelBookingModal from '../components/bookings/CancelBookingModal';
 import RescheduleModal from '../components/bookings/RescheduleModal';
 
@@ -113,7 +113,7 @@ const BookingsPage = () => {
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <LoadingSkeleton key={i} className="h-64" />
+                <CardSkeleton key={i} className="h-64" />
               ))}
             </div>
           ) : error ? (

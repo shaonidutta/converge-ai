@@ -9,6 +9,7 @@ Hybrid approach for intent classification:
 
 import json
 import logging
+import re
 from typing import List, Dict, Tuple, Optional, TYPE_CHECKING
 from datetime import datetime, timezone
 
@@ -89,8 +90,14 @@ class IntentClassifier:
             # For potential multi-intent queries, pass to LLM
             if high_confidence_intents and len(high_confidence_intents) == 1:
                 # Check if message might contain multiple intents (has "and", "also", etc.)
-                multi_intent_keywords = [' and ', ' also ', ' plus ', ' then ', ' after ']
-                has_multi_intent_signal = any(keyword in message.lower() for keyword in multi_intent_keywords)
+                # Exclude "day after tomorrow" from triggering multi-intent detection
+                message_lower = message.lower()
+                multi_intent_keywords = [' and ', ' also ', ' plus ', ' then ', ' after that ', ' and then ']
+                has_multi_intent_signal = any(keyword in message_lower for keyword in multi_intent_keywords)
+
+                # Special case: "day after tomorrow" should NOT trigger multi-intent
+                if " after " in message_lower and "day after tomorrow" not in message_lower:
+                    has_multi_intent_signal = True
 
                 if not has_multi_intent_signal:
                     logger.info(f"High-confidence single intent pattern match: {high_confidence_intents}")
@@ -217,8 +224,17 @@ class IntentClassifier:
         # Get structured output from LLM
         structured_llm = self.llm_client.with_structured_output(IntentClassificationResult)
 
-        # Invoke LLM
-        result = structured_llm.invoke(prompt)
+        # Invoke LLM with retry logic
+        from src.nlp.llm.gemini_client import with_retry
+
+        @with_retry(max_retries=3, initial_delay=1.0, backoff_factor=2.0)
+        def invoke_with_retry():
+            return structured_llm.invoke(prompt)
+
+        result = invoke_with_retry()
+
+        # Normalize entities extracted by LLM (pass original message for fallback extraction)
+        result = self._normalize_llm_entities(result, original_message=message)
 
         # Validate and filter intents
         result = self._validate_and_filter_intents(result)
@@ -229,7 +245,85 @@ class IntentClassifier:
             result.context_summary = self._build_context_summary(conversation_history, dialog_state)
 
         return result
-    
+
+    def _normalize_llm_entities(
+        self,
+        result: "IntentClassificationResult",
+        original_message: Optional[str] = None
+    ) -> "IntentClassificationResult":
+        """
+        Normalize entities extracted by LLM using centralized normalizer
+        Also adds fallback action extraction if LLM missed it
+
+        Args:
+            result: Classification result with raw entities from LLM
+            original_message: Original user message for fallback extraction
+
+        Returns:
+            Result with normalized entities
+        """
+        from src.utils.entity_normalizer import normalize_entities
+        import json
+
+        for intent_result in result.intents:
+            entities = intent_result.entities
+            if not entities:
+                continue
+
+            # Use centralized normalizer
+            normalized_entities = normalize_entities(entities)
+
+            # Fallback: If action is missing for booking_management intent, try to extract it
+            if (intent_result.intent == "booking_management" and
+                "action" not in normalized_entities and
+                original_message):
+
+                action = self._extract_action_fallback(original_message)
+                if action:
+                    normalized_entities["action"] = action
+                    logger.info(f"[_normalize_llm_entities] Fallback extracted action: {action}")
+
+            # Update entities with normalized values
+            if normalized_entities:
+                intent_result.entities_json = json.dumps(normalized_entities)
+                logger.info(f"[_normalize_llm_entities] Normalized entities: {normalized_entities}")
+
+        return result
+
+    def _extract_action_fallback(self, message: str) -> Optional[str]:
+        """
+        Fallback method to extract action from message using pattern matching
+
+        Args:
+            message: User message
+
+        Returns:
+            Extracted action or None
+        """
+        message_lower = message.lower()
+
+        # Check for booking-related phrases
+        if re.search(r'\b(i want to|i need to|i would like to|i\'d like to)\s+(book|schedule|arrange)', message_lower):
+            return "book"
+        elif re.search(r'\b(i want|i need|i would like|i\'d like)\b', message_lower):
+            # If followed by service keywords, assume booking intent
+            service_keywords = ["ac", "air conditioning", "plumbing", "plumber", "cleaning",
+                              "electrical", "electrician", "painting", "appliance", "repair", "service"]
+            if any(keyword in message_lower for keyword in service_keywords):
+                return "book"
+
+        # Check for direct action keywords
+        if re.search(r'\b(book|schedule|arrange|set up)\b', message_lower):
+            return "book"
+        elif re.search(r'\bcancel\b', message_lower):
+            return "cancel"
+        elif re.search(r'\b(reschedule|change date|move)\b', message_lower):
+            return "reschedule"
+        elif re.search(r'\b(modify|update|edit)\b', message_lower):
+            return "modify"
+
+        return None
+
     def _validate_and_filter_intents(
         self,
         result: "IntentClassificationResult"

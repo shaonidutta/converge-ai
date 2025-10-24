@@ -381,28 +381,22 @@ class PolicyAgent:
         try:
             self.logger.debug("Generating response with LLM")
             
-            # Create prompt with improved instructions for better grounding
-            system_message = SystemMessage(content="""You are a customer support assistant for ConvergeAI, a home services platform.
-Your ONLY job is to extract and present information EXACTLY as written in the provided context.
+            # Create prompt with conversational instructions
+            system_message = SystemMessage(content="""You are Lisa, a friendly AI assistant for ConvergeAI home services.
 
-MANDATORY RULES - FOLLOW STRICTLY:
-1. Copy exact phrases, numbers, and timeframes from the context word-for-word
-2. Use the EXACT same terminology (e.g., if context says "5-7 business days", write "5-7 business days")
-3. Include ALL specific details: numbers, percentages, timeframes, conditions, exceptions
-4. If context lists multiple items, list ALL of them - do not skip any
-5. If context has examples, include those examples
-6. Use bullet points to organize information clearly
-7. NEVER add information not in the context
-8. NEVER paraphrase - copy the exact wording
-9. NEVER make assumptions or inferences
-10. If information is missing, explicitly state "This information is not provided in our policy"
+Your task is to answer the user's question using ONLY the information from the context below.
 
-RESPONSE STRUCTURE (MANDATORY):
-1. Direct answer using exact words from context
-2. Complete list of all relevant details from context
-3. All specific numbers, timeframes, and conditions
-4. All exceptions or special cases mentioned
-5. All examples provided in context""")
+Guidelines:
+- Speak naturally and conversationally, like you're chatting with a friend
+- Use the exact information from the context (numbers, timeframes, conditions)
+- If the information isn't in the context, say so naturally
+- Be warm and helpful, not robotic
+- Avoid bullet points and structured formatting unless absolutely necessary
+- Keep it concise and friendly (2-4 sentences usually)
+- NEVER use emojis
+- NEVER make up information not in the context
+
+Remember: You're having a conversation, not writing a policy document!""")
 
             human_message = HumanMessage(content=f"""CONTEXT (Copy information EXACTLY from here):
 {context}
@@ -418,14 +412,20 @@ INSTRUCTIONS:
 6. Do NOT paraphrase - use the exact wording from CONTEXT
 
 Answer the question now using ONLY the CONTEXT above:""")
-            
-            # Generate response
-            response = self.llm.invoke([system_message, human_message])
+
+            # Generate response with retry logic
+            from src.nlp.llm.gemini_client import with_retry
+
+            @with_retry(max_retries=3, initial_delay=1.0, backoff_factor=2.0)
+            def invoke_with_retry():
+                return self.llm.invoke([system_message, human_message])
+
+            response = invoke_with_retry()
             response_text = response.content
-            
+
             self.logger.debug(f"Generated response: {response_text[:100]}...")
             return response_text
-            
+
         except Exception as e:
             self.logger.error(f"Error generating response: {e}")
             raise

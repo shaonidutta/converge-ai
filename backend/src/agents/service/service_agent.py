@@ -16,6 +16,7 @@ from decimal import Decimal
 
 from src.core.models import User, Category, Subcategory, RateCard, Provider
 from src.services.category_service import CategoryService
+from src.services.response_generator import ResponseGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +35,13 @@ class ServiceAgent:
     def __init__(self, db: AsyncSession):
         """
         Initialize ServiceAgent
-        
+
         Args:
             db: Database session
         """
         self.db = db
         self.category_service = CategoryService(db)
+        self.response_generator = ResponseGenerator()
         logger.info("ServiceAgent initialized")
     
     async def execute(
@@ -268,18 +270,24 @@ class ServiceAgent:
                     "metadata": {"subcategory_id": subcategory_id}
                 }
             
-            # Format response
-            response_lines = ["Here are the available services:\n"]
-            for idx, rc in enumerate(rate_cards, 1):
-                price_text = f"₹{rc.price:,.2f}"
-                if rc.strike_price:
-                    price_text = f"₹{rc.price:,.2f} (was ₹{rc.strike_price:,.2f})"
-                response_lines.append(f"{idx}. {rc.name} - {price_text}")
-            
-            response_lines.append("\nWould you like details on any service, or shall I help you book one?")
-            
+            # Generate natural response using ResponseGenerator
+            services_data = [
+                {
+                    "name": rc.name,
+                    "price": float(rc.price),
+                    "strike_price": float(rc.strike_price) if rc.strike_price else None
+                }
+                for rc in rate_cards
+            ]
+
+            response_text = await self.response_generator.generate_service_list_response(
+                services=services_data,
+                conversation_history=None,  # TODO: Pass conversation history from coordinator
+                user_name=user.first_name
+            )
+
             return {
-                "response": "\n".join(response_lines),
+                "response": response_text,
                 "action_taken": "services_listed",
                 "metadata": {
                     "subcategory_id": subcategory_id,

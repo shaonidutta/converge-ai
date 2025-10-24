@@ -238,8 +238,14 @@ docker-volumes/
 # ============================================
 # Test Results and Test Scripts
 # ============================================
+# Test output files (should never be in root)
 test_results.json
 test_*.json
+test_*.txt
+*_test_*.json
+*_test_*.txt
+
+# Test scripts in scripts folder
 scripts/test_*.py
 scripts/seed_*.py
 scripts/verify_*.py

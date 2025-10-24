@@ -103,7 +103,14 @@ class SlotFillingService:
             # 1. Get conversation history
             history = await self._get_conversation_history(session_id, limit=10)
 
-            # 2. Create initial state
+            # 2. Load existing dialog state to get previously collected entities
+            dialog_state = await self.dialog_manager.get_active_state(session_id)
+            collected_entities = dialog_state.collected_entities if dialog_state else {}
+            needed_entities = dialog_state.needed_entities if dialog_state else []
+
+            logger.info(f"[SlotFillingService] Loaded dialog state: collected={collected_entities}, needed={needed_entities}")
+
+            # 3. Create initial state with previously collected entities
             state = create_initial_state(
                 user_id=user.id,
                 session_id=session_id,
@@ -112,7 +119,11 @@ class SlotFillingService:
                 conversation_history=history
             )
 
-            # 3. Run slot-filling graph
+            # Populate with previously collected entities
+            state['collected_entities'] = collected_entities
+            state['needed_entities'] = needed_entities
+
+            # 4. Run slot-filling graph
             logger.info("[SlotFillingService] Running slot-filling graph...")
             final_state = await run_slot_filling_graph(
                 state=state,

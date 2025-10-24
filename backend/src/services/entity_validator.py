@@ -17,6 +17,7 @@ Design Principles:
 """
 
 import logging
+import re
 from typing import Any, Optional, Dict, List
 from datetime import datetime, date, timedelta
 from pydantic import BaseModel
@@ -207,45 +208,124 @@ class EntityValidator:
     async def _validate_location(self, value: Any) -> ValidationResult:
         """Validate location (pincode or city)"""
         config = self.config["location"]
-        
-        # Check if it's a pincode (6 digits)
-        if isinstance(value, str) and value.isdigit() and len(value) == 6:
+
+        # Reject obviously invalid locations
+        if not value or not isinstance(value, str):
+            return ValidationResult(
+                is_valid=False,
+                error_message="Please provide a valid location (city name or pincode)"
+            )
+
+        value_str = str(value).strip()
+
+        # Check if it's a full address (contains comma-separated parts and pincode)
+        # Pattern: street, city, state, pincode OR city, pincode
+        full_address_pattern = r'.+,\s*.+,\s*.+,?\s*\d{6}'
+        if re.search(full_address_pattern, value_str):
+            # Extract pincode from full address for validation
+            pincode_match = re.search(r'\b(\d{6})\b', value_str)
+            if pincode_match:
+                pincode = pincode_match.group(1)
+                # Validate pincode if required
+                if config["require_pincode_validation"]:
+                    try:
+                        from src.core.models import Pincode
+                        result = await self.db.execute(
+                            select(Pincode).where(Pincode.pincode == pincode)
+                        )
+                        pincode_obj = result.scalar_one_or_none()
+
+                        if pincode_obj and pincode_obj.is_serviceable:
+                            logger.info(f"[EntityValidator] Full address validated: {value_str} (pincode {pincode} is serviceable)")
+                            return ValidationResult(
+                                is_valid=True,
+                                normalized_value=value_str
+                            )
+                        else:
+                            # Graceful degradation: Accept address but log warning
+                            logger.warning(f"[EntityValidator] Pincode {pincode} not in serviceable list, but accepting address for booking attempt")
+                            return ValidationResult(
+                                is_valid=True,
+                                normalized_value=value_str
+                            )
+                    except Exception as e:
+                        logger.error(f"[EntityValidator] Pincode validation error: {e}")
+                        # If DB check fails, accept the address (graceful degradation)
+                        logger.info(f"[EntityValidator] Accepting full address due to validation error: {value_str}")
+                        return ValidationResult(
+                            is_valid=True,
+                            normalized_value=value_str
+                        )
+                else:
+                    # No validation required, accept full address
+                    logger.info(f"[EntityValidator] Accepting full address (validation disabled): {value_str}")
+                    return ValidationResult(
+                        is_valid=True,
+                        normalized_value=value_str
+                    )
+
+        # Reject if it looks like a sentence or contains common non-location words
+        invalid_keywords = [
+            "book", "service", "want", "need", "repair", "fix", "help",
+            "schedule", "appointment", "tomorrow", "today", "yesterday"
+        ]
+        value_lower = value_str.lower()
+        if any(keyword in value_lower for keyword in invalid_keywords):
+            return ValidationResult(
+                is_valid=False,
+                error_message="That doesn't look like a valid location. Please provide a city name or 6-digit pincode"
+            )
+
+        # Check if it's a pincode (6 digits only)
+        if value_str.isdigit() and len(value_str) == 6:
             if config["require_pincode_validation"]:
                 # Query database to check if pincode is serviceable
                 try:
                     from src.core.models import Pincode
                     result = await self.db.execute(
-                        select(Pincode).where(Pincode.pincode == value)
+                        select(Pincode).where(Pincode.pincode == value_str)
                     )
                     pincode_obj = result.scalar_one_or_none()
-                    
-                    if pincode_obj:
+
+                    if pincode_obj and pincode_obj.is_serviceable:
+                        logger.info(f"[EntityValidator] Pincode {value_str} validated and is serviceable")
                         return ValidationResult(
                             is_valid=True,
-                            normalized_value=value
+                            normalized_value=value_str
                         )
                     else:
+                        # Graceful degradation: Accept pincode but log warning
+                        logger.warning(f"[EntityValidator] Pincode {value_str} not in serviceable list, but accepting for booking attempt")
                         return ValidationResult(
-                            is_valid=False,
-                            error_message=f"Sorry, we don't service pincode {value} yet. Please try a different pincode or city name"
+                            is_valid=True,
+                            normalized_value=value_str
                         )
                 except Exception as e:
                     logger.error(f"[EntityValidator] Pincode validation error: {e}")
                     # If DB check fails, accept the pincode (graceful degradation)
+                    logger.info(f"[EntityValidator] Accepting pincode {value_str} due to validation error")
                     return ValidationResult(
                         is_valid=True,
-                        normalized_value=value
+                        normalized_value=value_str
                     )
             else:
+                logger.info(f"[EntityValidator] Accepting pincode {value_str} (validation disabled)")
                 return ValidationResult(
                     is_valid=True,
-                    normalized_value=value
+                    normalized_value=value_str
                 )
-        
-        # If it's a city name, accept it (can add city validation later)
+
+        # If it's a city name (1-3 words, no invalid keywords), accept it
+        if 1 <= len(value_str.split()) <= 3:
+            return ValidationResult(
+                is_valid=True,
+                normalized_value=value_str.title()
+            )
+
+        # Reject everything else
         return ValidationResult(
-            is_valid=True,
-            normalized_value=value
+            is_valid=False,
+            error_message="Please provide a valid city name or 6-digit pincode"
         )
     
     async def _validate_service_type(self, value: Any) -> ValidationResult:

@@ -83,11 +83,12 @@ class CancellationAgent:
                 }
             
             # Get booking details
-            booking = await self._get_booking(int(booking_id), user)
-            
+            # booking_id can be either the internal ID (int) or booking_number (string like "BK123456")
+            booking = await self._get_booking(booking_id, user)
+
             if not booking:
                 return {
-                    "response": f"❌ Booking #{booking_id} not found. Please check the booking number and try again.",
+                    "response": f"❌ Booking {booking_id} not found. Please check the booking number and try again.",
                     "action_taken": "booking_not_found",
                     "metadata": {"booking_id": booking_id}
                 }
@@ -130,23 +131,34 @@ class CancellationAgent:
                 "metadata": {"error": str(e)}
             }
     
-    async def _get_booking(self, booking_id: int, user: User) -> Booking:
+    async def _get_booking(self, booking_identifier: str | int, user: User) -> Booking:
         """
-        Get booking by ID for the current user
-        
+        Get booking by ID or booking number for the current user
+
         Args:
-            booking_id: Booking ID
+            booking_identifier: Booking ID (int) or booking number (str like "BK123456")
             user: Current user
-        
+
         Returns:
             Booking object or None
         """
-        result = await self.db.execute(
-            select(Booking).where(
-                Booking.id == booking_id,
-                Booking.user_id == user.id
+        # Try to determine if it's an ID (int) or booking number (string)
+        if isinstance(booking_identifier, int):
+            # Query by internal ID
+            result = await self.db.execute(
+                select(Booking).where(
+                    Booking.id == booking_identifier,
+                    Booking.user_id == user.id
+                )
             )
-        )
+        else:
+            # Query by booking number (string like "BK123456")
+            result = await self.db.execute(
+                select(Booking).where(
+                    Booking.booking_number == str(booking_identifier).upper(),
+                    Booking.user_id == user.id
+                )
+            )
         return result.scalar_one_or_none()
     
     async def _can_cancel_booking(self, booking: Booking) -> tuple[bool, str]:

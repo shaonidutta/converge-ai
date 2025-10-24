@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Plus, Home, Briefcase, MapPinned } from 'lucide-react';
 import { useAddresses } from '../../hooks/useAddresses';
-import LoadingSkeleton from '../common/LoadingSkeleton';
+import { CardSkeleton } from '../common/LoadingSkeleton';
 
 const AddressSelector = ({ selectedAddressId, onAddressSelect, error }) => {
   const { addresses, loading, error: fetchError } = useAddresses();
@@ -27,8 +27,8 @@ const AddressSelector = ({ selectedAddressId, onAddressSelect, error }) => {
   if (loading) {
     return (
       <div className="space-y-3">
-        <LoadingSkeleton className="h-24" />
-        <LoadingSkeleton className="h-24" />
+        <CardSkeleton className="h-24" />
+        <CardSkeleton className="h-24" />
       </div>
     );
   }

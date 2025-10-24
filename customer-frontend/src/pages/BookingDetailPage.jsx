@@ -28,7 +28,7 @@ import { fetchReviewByBooking } from '../services/reviewService';
 import Navbar from '../components/common/Navbar';
 import Footer from '../components/common/Footer';
 import BookingStatusBadge from '../components/bookings/BookingStatusBadge';
-import LoadingSkeleton from '../components/common/LoadingSkeleton';
+import { CardSkeleton } from '../components/common/LoadingSkeleton';
 import CancelBookingModal from '../components/bookings/CancelBookingModal';
 import RescheduleModal from '../components/bookings/RescheduleModal';
 import ReviewForm from '../components/reviews/ReviewForm';
@@ -157,13 +157,13 @@ const BookingDetailPage = () => {
 
           {loading ? (
             <div className="space-y-6">
-              <LoadingSkeleton className="h-32" />
+              <CardSkeleton className="h-32" />
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                  <LoadingSkeleton className="h-64" />
-                  <LoadingSkeleton className="h-48" />
+                  <CardSkeleton className="h-64" />
+                  <CardSkeleton className="h-48" />
                 </div>
-                <LoadingSkeleton className="h-96" />
+                <CardSkeleton className="h-96" />
               </div>
             </div>
           ) : error ? (
@@ -386,21 +386,21 @@ const BookingDetailPage = () => {
                         <span>Subtotal</span>
                         <div className="flex items-center gap-1">
                           <IndianRupee className="h-4 w-4" />
-                          <span>{(booking.total_amount / 1.18).toFixed(2)}</span>
+                          <span>{(parseFloat(booking.total_amount) / 1.18).toFixed(2)}</span>
                         </div>
                       </div>
                       <div className="flex justify-between text-slate-600">
                         <span>Tax (18% GST)</span>
                         <div className="flex items-center gap-1">
                           <IndianRupee className="h-4 w-4" />
-                          <span>{(booking.total_amount - booking.total_amount / 1.18).toFixed(2)}</span>
+                          <span>{(parseFloat(booking.total_amount) - parseFloat(booking.total_amount) / 1.18).toFixed(2)}</span>
                         </div>
                       </div>
                       <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
                         <span className="font-bold text-slate-900">Total</span>
                         <div className="flex items-center gap-1 text-xl font-bold text-slate-900">
                           <IndianRupee className="h-5 w-5" />
-                          <span>{booking.total_amount?.toFixed(2)}</span>
+                          <span>{booking.total_amount ? parseFloat(booking.total_amount).toFixed(2) : '0.00'}</span>
                         </div>
                       </div>
                     </div>

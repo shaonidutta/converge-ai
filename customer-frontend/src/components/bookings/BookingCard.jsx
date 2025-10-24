@@ -84,7 +84,7 @@ const BookingCard = ({ booking, onCancel, onReschedule }) => {
       <div className="flex items-center justify-between pt-4 border-t border-slate-200">
         <div className="flex items-center gap-1 text-lg font-bold text-slate-900">
           <IndianRupee className="h-5 w-5" />
-          <span>{booking.total_amount?.toFixed(2) || '0.00'}</span>
+          <span>{booking.total_amount ? parseFloat(booking.total_amount).toFixed(2) : '0.00'}</span>
         </div>
 
         {/* Quick Actions */}

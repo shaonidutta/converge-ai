@@ -65,7 +65,7 @@ const CartItem = ({ item }) => {
             </div>
             <div className="flex items-center gap-1">
               <IndianRupee className="h-4 w-4" />
-              <span>{item.price.toFixed(2)}</span>
+              <span>{parseFloat(item.price).toFixed(2)}</span>
             </div>
           </div>
 

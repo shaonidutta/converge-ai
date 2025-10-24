@@ -1,79 +1,13 @@
-import axios from 'axios';
-
 /**
- * API Configuration
- * Base URL for the backend API
+ * API Service
+ * Uses the centralized axios instance from api/axiosConfig.js
+ * This ensures consistent authentication and error handling across the app
  */
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-/**
- * Axios instance with default configuration
- * Includes interceptors for request/response handling
- */
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  timeout: 30000, // 30 seconds
-});
+import axiosInstance from '../api/axiosConfig';
 
-/**
- * Request Interceptor
- * Adds authentication token to requests if available
- */
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-/**
- * Response Interceptor
- * Handles token refresh and error responses
- */
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-
-    // Handle 401 Unauthorized - Token expired
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/api/v1/auth/refresh`, {
-            refresh_token: refreshToken,
-          });
-
-          const { access_token } = response.data;
-          localStorage.setItem('access_token', access_token);
-
-          // Retry original request with new token
-          originalRequest.headers.Authorization = `Bearer ${access_token}`;
-          return apiClient(originalRequest);
-        }
-      } catch (refreshError) {
-        // Refresh failed - logout user
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      }
-    }
-
-    return Promise.reject(error);
-  }
-);
+// Use the centralized axios instance (no duplicate interceptors)
+const apiClient = axiosInstance;
 
 /**
  * API Service Object
@@ -305,7 +239,9 @@ const api = {
      * @param {Object} messageData - Message data (message, session_id, channel)
      * @returns {Promise} API response with user and assistant messages
      */
-    sendMessage: (messageData) => apiClient.post('/api/v1/chat/message', messageData),
+    sendMessage: (messageData) => apiClient.post('/api/v1/chat/message', messageData, {
+      timeout: 60000, // 60 seconds for chat messages (LLM processing takes time)
+    }),
 
     /**
      * Get chat history for a session
@@ -383,5 +319,5 @@ const api = {
 };
 
 export default api;
-export { apiClient, API_BASE_URL };
+export { apiClient };
 

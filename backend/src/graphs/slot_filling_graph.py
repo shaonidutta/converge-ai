@@ -24,6 +24,7 @@ from datetime import datetime
 
 from langgraph.graph import StateGraph, END
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from src.graphs.state import SlotFillingState
 from src.nlp.intent.classifier import IntentClassifier
@@ -123,15 +124,29 @@ async def check_follow_up_node(
     """
     try:
         logger.info(f"[check_follow_up_node] Checking if follow-up...")
-        
+
+        # Check if this is the first message in slot-filling (no last_question_asked)
+        last_question = state.get('last_question_asked')
+        if not last_question:
+            logger.info(f"[check_follow_up_node] First message in slot-filling, not a follow-up")
+            return {
+                "is_follow_up": False,
+                "follow_up_confidence": 0.0,
+                "expected_entity": None,
+                "metadata": {
+                    **state.get("metadata", {}),
+                    "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["check_follow_up_node"]
+                }
+            }
+
         # Check if follow-up
         follow_up_result = await dialog_manager.is_follow_up_response(
             message=state['current_message'],
             session_id=state['session_id']
         )
-        
+
         logger.info(f"[check_follow_up_node] Is follow-up: {follow_up_result.is_follow_up}, Confidence: {follow_up_result.confidence}")
-        
+
         return {
             "is_follow_up": follow_up_result.is_follow_up,
             "follow_up_confidence": follow_up_result.confidence,
@@ -159,23 +174,70 @@ async def extract_entity_node(
 ) -> Dict[str, Any]:
     """
     Node: Extract entity value from follow-up response
-    
+
     Args:
         state: Current conversation state
         entity_extractor: Entity extractor service
-        
+
     Returns:
         Updated state with extracted entity
     """
     try:
-        logger.info(f"[extract_entity_node] Extracting entity: {state.get('expected_entity')}")
-        
-        # Extract entity
+        expected_entity = state.get('expected_entity')
+        logger.info(f"[extract_entity_node] Extracting entity: {expected_entity}")
+
+        # Check if entity was already extracted by intent classifier
+        collected_entities = state.get('collected_entities', {})
+
+        # Check if the expected entity was already extracted
+        if expected_entity and expected_entity in collected_entities:
+            logger.info(f"[extract_entity_node] ✅ Expected entity '{expected_entity}' already extracted by intent classifier: {collected_entities[expected_entity]}")
+            # Use the entity extracted by intent classifier
+            return {
+                "extracted_entity": {
+                    "entity_type": expected_entity,
+                    "entity_value": collected_entities[expected_entity],
+                    "normalized_value": collected_entities[expected_entity],
+                    "confidence": 0.95,
+                    "extraction_method": "intent_classifier"
+                },
+                "extraction_failed": False,
+                "metadata": {
+                    **state.get("metadata", {}),
+                    "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["extract_entity_node"]
+                }
+            }
+
+        # Check if user provided a DIFFERENT entity than what we asked for
+        # This happens when user says "day after tomorrow" when we asked for location
+        needed_entities = state.get('needed_entities', [])
+        for entity_key in collected_entities:
+            if entity_key in needed_entities and entity_key != expected_entity:
+                logger.info(f"[extract_entity_node] ⚠️  User provided '{entity_key}' instead of expected '{expected_entity}'. Accepting it and will ask for '{expected_entity}' later.")
+                # User provided a different entity - accept it and mark extraction as failed
+                # so we ask for the expected entity again
+                return {
+                    "extracted_entity": {
+                        "entity_type": entity_key,
+                        "entity_value": collected_entities[entity_key],
+                        "normalized_value": collected_entities[entity_key],
+                        "confidence": 0.95,
+                        "extraction_method": "intent_classifier_different"
+                    },
+                    "extraction_failed": False,  # Entity was extracted, just not the expected one
+                    "metadata": {
+                        **state.get("metadata", {}),
+                        "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["extract_entity_node"],
+                        "extracted_different_entity": True
+                    }
+                }
+
+        # Extract entity from message
         extraction_result = await entity_extractor.extract_from_follow_up(
             message=state['current_message'],
-            expected_entity=EntityType(state['expected_entity']),
+            expected_entity=EntityType(expected_entity),
             context={
-                "collected_entities": state.get('collected_entities', {}),
+                "collected_entities": collected_entities,
                 "last_question": state.get('last_question_asked'),
                 "user_id": state['user_id']
             }
@@ -183,7 +245,7 @@ async def extract_entity_node(
         
         if extraction_result:
             logger.info(f"[extract_entity_node] Extracted: {extraction_result.entity_type} = {extraction_result.entity_value}")
-            
+
             return {
                 "extracted_entity": extraction_result.model_dump(),
                 "metadata": {
@@ -192,12 +254,13 @@ async def extract_entity_node(
                 }
             }
         else:
-            logger.warning(f"[extract_entity_node] Failed to extract entity")
+            # Entity not found in message - this is NOT an error, just means we need to ask for it
+            logger.info(f"[extract_entity_node] Entity not found in message, will ask for it")
             return {
-                "error": {
-                    "type": "EntityExtractionError",
-                    "message": f"Could not extract {state.get('expected_entity')} from message",
-                    "node": "extract_entity_node"
+                "extraction_failed": True,
+                "metadata": {
+                    **state.get("metadata", {}),
+                    "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["extract_entity_node"]
                 }
             }
     
@@ -228,9 +291,23 @@ async def validate_entity_node(
     """
     try:
         logger.info(f"[validate_entity_node] Validating entity...")
-        
+
         extracted = state.get('extracted_entity', {})
-        
+
+        # Check if extraction was successful
+        if not extracted or 'entity_type' not in extracted:
+            logger.warning(f"[validate_entity_node] No entity extracted, skipping validation")
+            return {
+                "validation_result": {
+                    "is_valid": False,
+                    "error_message": "Could not extract entity from message"
+                },
+                "metadata": {
+                    **state.get("metadata", {}),
+                    "validation_skipped": True
+                }
+            }
+
         # Validate entity
         validation_result = await entity_validator.validate(
             entity_type=EntityType(extracted['entity_type']),
@@ -338,13 +415,15 @@ async def update_dialog_state_node(
 
 
 async def determine_needed_entities_node(
-    state: SlotFillingState
+    state: SlotFillingState,
+    db: AsyncSession = None
 ) -> Dict[str, Any]:
     """
     Node: Determine which entities are still needed
 
     Args:
         state: Current conversation state
+        db: Database session (optional, for checking existing addresses)
 
     Returns:
         Updated state with needed entities list
@@ -369,8 +448,9 @@ async def determine_needed_entities_node(
             action = collected.get("action", "")
 
             if action == "book":
-                # For booking, we need: service_type, date, time, location
-                required_entities = ["service_type", "date", "time", "location"]
+                # For booking, we need: service_type, location, date, time
+                # Order matters: location first (to check availability), then date/time
+                required_entities = ["service_type", "location", "date", "time"]
             elif action == "cancel":
                 # For cancellation, we need: booking_id
                 required_entities = ["booking_id"]
@@ -383,6 +463,44 @@ async def determine_needed_entities_node(
 
         # Filter out already collected entities
         needed = [e for e in required_entities if e not in collected]
+
+        # Special check: If location is needed for booking, check if user has existing addresses
+        logger.info(f"[determine_needed_entities_node] Checking auto-fill conditions: location_needed={'location' in needed}, intent={intent}, action={collected.get('action')}, db={db is not None}")
+
+        if "location" in needed and intent == "booking_management" and collected.get("action") == "book" and db:
+            # Check if user has any saved addresses
+            from src.core.models import Address
+            user_id = state.get('user_id')
+            logger.info(f"[determine_needed_entities_node] Checking addresses for user_id: {user_id}")
+
+            if user_id:
+                try:
+                    # Check for default address first, then any address
+                    address_result = await db.execute(
+                        select(Address)
+                        .where(Address.user_id == user_id)
+                        .order_by(Address.is_default.desc(), Address.created_at.desc())
+                        .limit(1)
+                    )
+                    existing_address = address_result.scalar_one_or_none()
+                    logger.info(f"[determine_needed_entities_node] Found existing address: {existing_address is not None}")
+
+                    if existing_address:
+                        # User has an existing address - auto-fill location
+                        # Format: "address_line1, city, state, pincode"
+                        auto_location = f"{existing_address.address_line1}, {existing_address.city}, {existing_address.state}, {existing_address.pincode}"
+                        collected['location'] = auto_location
+                        needed.remove('location')
+                        logger.info(f"[determine_needed_entities_node] ✅ Auto-filled location from existing address: {auto_location}")
+                    else:
+                        logger.info(f"[determine_needed_entities_node] No existing address found for user {user_id}")
+                except Exception as e:
+                    logger.warning(f"[determine_needed_entities_node] Error checking existing addresses: {e}")
+                    import traceback
+                    logger.warning(f"[determine_needed_entities_node] Traceback: {traceback.format_exc()}")
+                    # Continue without auto-fill - will ask user for location
+            else:
+                logger.warning(f"[determine_needed_entities_node] No user_id in state")
 
         logger.info(f"[determine_needed_entities_node] Required: {required_entities}, Collected: {list(collected.keys())}, Needed: {needed}")
 
@@ -650,7 +768,7 @@ def create_slot_filling_graph(
         return await update_dialog_state_node(state, dialog_manager)
 
     async def _determine_needed_entities(state):
-        return await determine_needed_entities_node(state)
+        return await determine_needed_entities_node(state, db)
 
     async def _generate_question(state):
         return await generate_question_node(state, question_generator)
@@ -700,13 +818,22 @@ def create_slot_filling_graph(
         }
     )
 
-    # extract_entity → check error → validate_entity
+    # extract_entity → check if extraction failed or succeeded
+    def route_after_extraction(state: SlotFillingState) -> str:
+        """Route after entity extraction"""
+        if state.get('error'):
+            return "error"
+        if state.get('extraction_failed'):
+            return "ask_again"
+        return "validate"
+
     graph.add_conditional_edges(
         "extract_entity",
-        should_route_to_error,
+        route_after_extraction,
         {
             "error": "handle_error",
-            "continue": "validate_entity"
+            "ask_again": "generate_question",  # Entity not found, ask again
+            "validate": "validate_entity"
         }
     )
 

@@ -44,7 +44,8 @@ class LLMClient:
             **kwargs: Additional model-specific parameters
         """
         # Get configuration from environment or use defaults
-        self.model_name = model or os.getenv("LLM_MODEL", os.getenv("GEMINI_DEFAULT_MODEL", "gemini-1.5-flash-8b"))
+        # Note: gemini-1.5-flash-8b is not available in v1beta API, use gemini-2.0-flash instead
+        self.model_name = model or os.getenv("LLM_MODEL", os.getenv("GEMINI_MODEL", "gemini-2.0-flash"))
         self.temperature = temperature if temperature is not None else float(os.getenv("LLM_TEMPERATURE", "0.7"))
         self.max_tokens = max_tokens or int(os.getenv("LLM_MAX_TOKENS", "8192"))
 
@@ -164,7 +165,8 @@ class LLMClient:
             LLMClient configured for intent classification
         """
         # Use faster, cheaper model for classification
-        model = os.getenv("INTENT_CLASSIFICATION_MODEL", os.getenv("GEMINI_DEFAULT_MODEL", "gemini-1.5-flash-8b"))
+        # Default to gemini-2.0-flash (gemini-1.5-flash-8b is not available in v1beta)
+        model = os.getenv("INTENT_CLASSIFICATION_MODEL", os.getenv("GEMINI_MODEL", "gemini-2.0-flash"))
 
         return cls(
             model=model,

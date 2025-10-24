@@ -17,7 +17,7 @@ import ProfileStats from '../components/profile/ProfileStats';
 import ProfileForm from '../components/profile/ProfileForm';
 import AddressCard from '../components/profile/AddressCard';
 import AddressForm from '../components/profile/AddressForm';
-import LoadingSkeleton from '../components/common/LoadingSkeleton';
+import { CardSkeleton } from '../components/common/LoadingSkeleton';
 
 const ProfilePage = () => {
   const { profile, loading: profileLoading, error: profileError, refetch: refetchProfile, updateProfileData } = useProfile();
@@ -121,10 +121,10 @@ const ProfilePage = () => {
 
           {profileLoading ? (
             <div className="space-y-6">
-              <LoadingSkeleton className="h-48" />
+              <CardSkeleton className="h-48" />
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[1, 2, 3, 4].map((i) => (
-                  <LoadingSkeleton key={i} className="h-32" />
+                  <CardSkeleton key={i} className="h-32" />
                 ))}
               </div>
             </div>
@@ -228,7 +228,7 @@ const ProfilePage = () => {
                 ) : addressesLoading ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[1, 2].map((i) => (
-                      <LoadingSkeleton key={i} className="h-48" />
+                      <CardSkeleton key={i} className="h-48" />
                     ))}
                   </div>
                 ) : addressesError ? (

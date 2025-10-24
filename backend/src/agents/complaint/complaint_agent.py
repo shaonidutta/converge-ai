@@ -17,6 +17,7 @@ from sqlalchemy import select
 
 from src.core.models import User, Complaint, ComplaintUpdate, Booking
 from src.core.models.complaint import ComplaintType, ComplaintPriority, ComplaintStatus
+from src.services.response_generator import ResponseGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -62,12 +63,13 @@ class ComplaintAgent:
     def __init__(self, db: AsyncSession):
         """
         Initialize ComplaintAgent
-        
+
         Args:
             db: Database session
         """
         self.db = db
         self.logger = logging.getLogger(__name__)
+        self.response_generator = ResponseGenerator()
     
     async def execute(
         self,
@@ -194,32 +196,23 @@ class ComplaintAgent:
             f"type={complaint_type.value}, priority={priority.value}"
         )
         
-        # Build response
-        response_parts = [
-            f"✅ Your complaint has been registered successfully.",
-            f"\n📋 Complaint Details:",
-            f"   • Complaint ID: #{complaint.id}",
-            f"   • Type: {complaint_type.value.replace('_', ' ').title()}",
-            f"   • Priority: {priority.value.upper()}",
-            f"   • Status: {ComplaintStatus.OPEN.value.upper()}",
-        ]
-        
-        if booking:
-            response_parts.append(f"   • Related Booking: {booking.booking_number}")
-        
-        response_parts.extend([
-            f"\n⏰ Expected Response: Within {self.SLA_RESPONSE_TIME[priority]} hour(s)",
-            f"   Expected Resolution: Within {self.SLA_RESOLUTION_TIME[priority]} hour(s)",
-            f"\n📞 Our support team will contact you soon.",
-        ])
-        
-        if priority == ComplaintPriority.CRITICAL:
-            response_parts.append(f"\n🚨 This has been marked as CRITICAL and will be escalated immediately.")
-        
-        response_parts.append(f"\nYou can check the status anytime by providing your complaint ID #{complaint.id}.")
-        
+        # Generate natural response using ResponseGenerator
+        response_text = await self.response_generator.generate_complaint_response(
+            complaint_data={
+                "complaint_id": complaint.id,
+                "type": complaint_type.value.replace('_', ' ').title(),
+                "priority": priority.value,
+                "sla_response_hours": self.SLA_RESPONSE_TIME[priority],
+                "sla_resolution_hours": self.SLA_RESOLUTION_TIME[priority],
+                "booking_number": booking.booking_number if booking else None,
+                "is_critical": priority == ComplaintPriority.CRITICAL
+            },
+            conversation_history=None,  # TODO: Pass conversation history from coordinator
+            user_name=user.first_name
+        )
+
         return {
-            "response": "\n".join(response_parts),
+            "response": response_text,
             "action_taken": "complaint_created",
             "metadata": {
                 "complaint_id": complaint.id,

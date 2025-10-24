@@ -4,8 +4,8 @@ Question Generator Service
 Generates natural, context-aware questions for missing entities in slot-filling conversations.
 
 Approach:
-- Template-based questions for core slot-filling (fast, consistent)
-- LLM-generated variants for augmentation and edge cases
+- LLM-generated questions for natural, context-aware phrasing
+- Template fallback for edge cases or LLM failures
 - Context-aware phrasing based on collected entities
 
 Design Principles:
@@ -18,6 +18,7 @@ Design Principles:
 import logging
 from typing import Dict, Any, Optional, List
 from src.nlp.intent.config import EntityType, IntentType
+from src.llm.gemini.client import LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -122,16 +123,17 @@ CONFIRMATION_TEMPLATES = {
 class QuestionGenerator:
     """
     Generates questions for missing entities in slot-filling conversations
-    
+
     Features:
-    - Template-based questions (fast, consistent)
+    - LLM-generated questions (natural, context-aware)
+    - Template fallback (for LLM failures)
     - Context-aware phrasing
-    - Variation support (multiple phrasings)
     - Confirmation message generation
     """
-    
-    def __init__(self):
-        self.templates = ENTITY_QUESTION_TEMPLATES
+
+    def __init__(self, llm_client: Optional[LLMClient] = None):
+        self.llm_client = llm_client or LLMClient()
+        self.templates = ENTITY_QUESTION_TEMPLATES  # Fallback templates
         self.confirmation_templates = CONFIRMATION_TEMPLATES
         self.question_count = {}  # Track question attempts per session
     
@@ -144,34 +146,103 @@ class QuestionGenerator:
         attempt_number: int = 0
     ) -> str:
         """
-        Generate question for missing entity
-        
+        Generate question for missing entity using LLM
+
         Args:
             entity_type: Type of entity to ask for
             intent: Current intent
             collected_entities: Already collected entities (for context)
             context: Additional context (session_id, user preferences, etc.)
             attempt_number: Number of times we've asked for this entity (0-indexed)
-            
+
         Returns:
             Question string
         """
         logger.info(f"[QuestionGenerator] Generating question for {entity_type.value}, intent: {intent.value}, attempt: {attempt_number}")
-        
-        # Get template for this entity + intent combination
-        question = self._get_template_question(entity_type, intent, attempt_number)
-        
-        # Add context if available
-        if collected_entities:
-            question = self._add_context_to_question(
-                question, 
-                entity_type, 
-                collected_entities
+
+        # Try LLM-generated question first
+        try:
+            question = self._generate_llm_question(
+                entity_type,
+                intent,
+                collected_entities,
+                context,
+                attempt_number
             )
-        
-        logger.info(f"[QuestionGenerator] Generated: {question[:100]}...")
-        return question
+            logger.info(f"[QuestionGenerator] LLM Generated: {question[:100]}...")
+            return question
+        except Exception as e:
+            logger.warning(f"[QuestionGenerator] LLM generation failed: {e}, falling back to template")
+            # Fallback to template
+            question = self._get_template_question(entity_type, intent, attempt_number)
+
+            # Add context if available
+            if collected_entities:
+                question = self._add_context_to_question(
+                    question,
+                    entity_type,
+                    collected_entities
+                )
+
+            logger.info(f"[QuestionGenerator] Template Generated: {question[:100]}...")
+            return question
     
+    def _generate_llm_question(
+        self,
+        entity_type: EntityType,
+        intent: IntentType,
+        collected_entities: Optional[Dict[str, Any]] = None,
+        context: Optional[Dict[str, Any]] = None,
+        attempt_number: int = 0
+    ) -> str:
+        """
+        Generate question using LLM for natural, context-aware phrasing
+        """
+        # Build context string
+        context_str = ""
+        if collected_entities:
+            context_items = [f"{k}: {v}" for k, v in collected_entities.items()]
+            context_str = f"\nAlready collected information: {', '.join(context_items)}"
+
+        # Build prompt
+        entity_name = entity_type.value.replace('_', ' ')
+        intent_name = intent.value.replace('_', ' ')
+
+        prompt = f"""You are Lisa, a friendly AI assistant helping users with home services.
+
+Current conversation context:
+- User intent: {intent_name}
+- Missing information: {entity_name}{context_str}
+- Attempt number: {attempt_number + 1}
+
+Generate a natural, conversational question to ask the user for the {entity_name}.
+
+Requirements:
+1. Be friendly and conversational
+2. Keep it concise (1-2 sentences max)
+3. Include helpful examples if appropriate
+4. Reference already collected information if relevant
+5. If this is a retry (attempt > 0), rephrase differently
+6. Do not use emojis
+7. Do not add any extra text, just the question
+
+Examples of good questions:
+- "What's your location or pincode?"
+- "Which date works best for you? (e.g., today, tomorrow, or a specific date)"
+- "What time would you prefer? (e.g., 10 AM, 2 PM, evening)"
+
+Generate the question:"""
+
+        # Call LLM
+        response = self.llm_client.invoke(prompt)
+        question = response.strip()
+
+        # Validate response
+        if not question or len(question) > 200:
+            raise ValueError(f"Invalid LLM response: {question}")
+
+        return question
+
     def _get_template_question(
         self,
         entity_type: EntityType,
@@ -179,19 +250,19 @@ class QuestionGenerator:
         attempt_number: int
     ) -> str:
         """
-        Get template question from predefined templates
-        
+        Get template question from predefined templates (fallback)
+
         Uses attempt_number to vary phrasing (avoid repetition)
         """
         if entity_type in self.templates:
             intent_templates = self.templates[entity_type]
-            
+
             if intent in intent_templates:
                 templates = intent_templates[intent]
             else:
                 # Fallback to first available template for this entity
                 templates = list(intent_templates.values())[0]
-            
+
             # Use attempt_number to cycle through variations
             if isinstance(templates, list):
                 template_index = attempt_number % len(templates)

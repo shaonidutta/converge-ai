@@ -73,7 +73,12 @@ INTENT_EXAMPLES: Dict[IntentType, List[str]] = {
         "How long does AC servicing take?",
         "What should I prepare before the service?",
         "Tell me about your warranty",
-        "What are the benefits of regular AC maintenance?"
+        "What are the benefits of regular AC maintenance?",
+        "can u help with services?",
+        "what services do you offer?",
+        "help me with services",
+        "show me available services",
+        "what kind of services are available?"
     ],
     
     IntentType.COMPLAINT: [

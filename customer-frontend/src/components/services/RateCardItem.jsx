@@ -69,11 +69,11 @@ const RateCardItem = ({ rateCard, onAddToCart, index = 0 }) => {
       <div className="mb-4">
         <div className="flex items-baseline gap-2">
           <span className="text-3xl font-bold text-slate-800">
-            ₹{price.toFixed(2)}
+            ₹{price ? price.toFixed(2) : '0.00'}
           </span>
           {strikePrice && (
             <span className="text-lg text-slate-400 line-through">
-              ₹{strikePrice.toFixed(2)}
+              ₹{strikePrice ? strikePrice.toFixed(2) : '0.00'}
             </span>
           )}
         </div>
@@ -126,7 +126,7 @@ const RateCardItem = ({ rateCard, onAddToCart, index = 0 }) => {
           <div className="flex items-center justify-between">
             <span className="text-sm text-slate-600">Total:</span>
             <span className="text-xl font-bold text-primary-600">
-              ₹{(price * quantity).toFixed(2)}
+              ₹{price ? (price * quantity).toFixed(2) : '0.00'}
             </span>
           </div>
         </motion.div>

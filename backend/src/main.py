@@ -15,6 +15,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,6 +26,20 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 import uvicorn
+
+# Load environment variables from .env file
+from dotenv import load_dotenv
+
+# Get the backend directory (parent of src)
+backend_dir = Path(__file__).parent.parent
+env_file = backend_dir / ".env"
+
+# Load .env file if it exists
+if env_file.exists():
+    load_dotenv(dotenv_path=env_file)
+    print(f"✅ Loaded environment variables from: {env_file}")
+else:
+    print(f"⚠️  .env file not found at: {env_file}")
 
 # =============================================
 # Configuration

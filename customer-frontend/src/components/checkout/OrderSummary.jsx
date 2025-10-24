@@ -47,7 +47,7 @@ const OrderSummary = ({
               </div>
               <p className="font-semibold text-slate-900 flex items-center">
                 <IndianRupee className="h-4 w-4" />
-                {(item.price * item.quantity).toFixed(2)}
+                {(parseFloat(item.price) * item.quantity).toFixed(2)}
               </p>
             </div>
           ))}

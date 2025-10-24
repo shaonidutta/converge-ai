@@ -6,12 +6,75 @@ Uses configuration from settings to initialize the client.
 """
 
 import logging
-from typing import Optional
+import time
+import asyncio
+from typing import Optional, Any, Callable
+from functools import wraps
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from src.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Rate limiting: Track last API call time to avoid hitting rate limits
+_last_api_call_time = 0
+_min_delay_between_calls = 0.5  # 500ms between calls = max 120 RPM (well under 15 RPM limit)
+
+
+def with_retry(max_retries: int = 3, initial_delay: float = 1.0, backoff_factor: float = 2.0):
+    """
+    Decorator to add exponential backoff retry logic to LLM calls
+
+    Args:
+        max_retries: Maximum number of retry attempts
+        initial_delay: Initial delay in seconds before first retry
+        backoff_factor: Multiplier for delay after each retry
+
+    Returns:
+        Decorated function with retry logic
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            delay = initial_delay
+            last_exception = None
+
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    error_msg = str(e)
+
+                    # Check if it's a retryable error (503, 429, or rate limit)
+                    is_retryable = (
+                        "503" in error_msg or
+                        "429" in error_msg or
+                        "overloaded" in error_msg.lower() or
+                        "rate limit" in error_msg.lower() or
+                        "quota" in error_msg.lower()
+                    )
+
+                    if not is_retryable or attempt == max_retries:
+                        # Not retryable or max retries reached
+                        logger.error(f"LLM call failed after {attempt + 1} attempts: {error_msg}")
+                        raise
+
+                    # Log retry attempt
+                    logger.warning(
+                        f"LLM call failed (attempt {attempt + 1}/{max_retries + 1}): {error_msg}. "
+                        f"Retrying in {delay:.1f}s..."
+                    )
+
+                    # Wait before retry
+                    time.sleep(delay)
+                    delay *= backoff_factor
+
+            # Should never reach here, but just in case
+            raise last_exception
+
+        return wrapper
+    return decorator
 
 
 def get_gemini_client(

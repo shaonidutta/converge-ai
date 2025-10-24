@@ -80,7 +80,11 @@ class EntityType(str, Enum):
     
     # Location entities
     LOCATION = "location"
-    
+    ADDRESS_LINE1 = "address_line1"
+    ADDRESS_LINE2 = "address_line2"
+    CITY = "city"
+    STATE = "state"
+
     # Identifiers
     BOOKING_ID = "booking_id"
     TRANSACTION_ID = "transaction_id"
@@ -112,8 +116,18 @@ INTENT_CONFIGS: Dict[IntentType, IntentConfig] = {
     IntentType.BOOKING_MANAGEMENT: IntentConfig(
         intent=IntentType.BOOKING_MANAGEMENT,
         description="User wants to book, cancel, reschedule, or modify a service booking",
-        required_entities=[EntityType.ACTION],
-        optional_entities=[EntityType.SERVICE_TYPE, EntityType.DATE, EntityType.TIME, EntityType.LOCATION, EntityType.BOOKING_ID],
+        required_entities=[EntityType.ACTION],  # Only ACTION is required; other entities depend on the action
+        optional_entities=[
+            EntityType.SERVICE_TYPE,
+            EntityType.BOOKING_ID,
+            EntityType.LOCATION,
+            EntityType.DATE,
+            EntityType.TIME,
+            EntityType.ADDRESS_LINE1,
+            EntityType.ADDRESS_LINE2,
+            EntityType.CITY,
+            EntityType.STATE
+        ],
         agent="BookingAgent",
         priority=10
     ),
@@ -133,7 +147,7 @@ INTENT_CONFIGS: Dict[IntentType, IntentConfig] = {
     ),
     IntentType.SERVICE_INFORMATION: IntentConfig(
         intent=IntentType.SERVICE_INFORMATION,
-        description="User wants information about a service (details, process, duration, requirements)",
+        description="User wants information about services offered, service categories, what services are available, or help with services",
         optional_entities=[EntityType.SERVICE_TYPE, EntityType.INFO_TYPE],
         agent="RAGAgent",
         priority=7
