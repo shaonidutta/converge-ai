@@ -332,18 +332,27 @@ class StructuredOutputModel:
 
     def _remove_additional_properties(self, schema: dict) -> dict:
         """
-        Recursively remove additionalProperties from JSON schema
+        Recursively remove unsupported JSON schema fields for Google Generative AI
+
+        Google Generative AI doesn't support several JSON schema fields that Pydantic generates:
+        - $defs: Schema definitions
+        - additionalProperties: Additional property constraints
+        - example: Example values
+        - title: Schema titles
+        - description: Field descriptions (sometimes causes issues)
 
         Args:
             schema: JSON schema dict
 
         Returns:
-            Modified schema without additionalProperties
+            Modified schema without unsupported fields
         """
         if isinstance(schema, dict):
-            # Remove additionalProperties key
-            if "additionalProperties" in schema:
-                del schema["additionalProperties"]
+            # Remove unsupported keys
+            unsupported_keys = ["additionalProperties", "$defs", "example", "title"]
+            for key in unsupported_keys:
+                if key in schema:
+                    del schema[key]
 
             # Recursively process nested schemas
             for key, value in schema.items():
