@@ -53,6 +53,37 @@ def normalize_date(raw_value: str) -> Optional[str]:
     if "next week" in value_lower:
         return (today + timedelta(days=7)).isoformat()
 
+    # Weekday names: "monday", "next monday", "this friday"
+    weekdays = {
+        'monday': 0, 'mon': 0,
+        'tuesday': 1, 'tue': 1, 'tues': 1,
+        'wednesday': 2, 'wed': 2,
+        'thursday': 3, 'thu': 3, 'thur': 3, 'thurs': 3,
+        'friday': 4, 'fri': 4,
+        'saturday': 5, 'sat': 5,
+        'sunday': 6, 'sun': 6
+    }
+
+    for weekday_name, weekday_num in weekdays.items():
+        if weekday_name in value_lower:
+            current_weekday = today.weekday()
+
+            if "next" in value_lower:
+                # Next occurrence of this weekday (at least 7 days from now)
+                days_ahead = (weekday_num - current_weekday + 7) % 7
+                if days_ahead == 0:  # If it's the same weekday, go to next week
+                    days_ahead = 7
+                target_date = today + timedelta(days=days_ahead)
+            else:
+                # This week's occurrence or next week if already passed
+                days_ahead = (weekday_num - current_weekday) % 7
+                if days_ahead == 0:  # If it's today, return today
+                    target_date = today
+                else:
+                    target_date = today + timedelta(days=days_ahead)
+
+            return target_date.isoformat()
+
     # ISO format (YYYY-MM-DD) - already normalized
     iso_match = re.match(r'^(\d{4})-(\d{2})-(\d{2})$', str(raw_value))
     if iso_match:

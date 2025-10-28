@@ -228,25 +228,43 @@ class BookingAgent:
             # Step 4: Auto-add service to cart if not already present
             service_type = entities.get("service_type", "").lower()
 
-            # Map service types to subcategory IDs and default rate cards
-            service_mapping = {
-                "ac": {"subcategory_id": 9, "rate_card_id": 18},  # AC Repair - Basic
-                "ac_repair": {"subcategory_id": 9, "rate_card_id": 18},
-                "ac_installation": {"subcategory_id": 10, "rate_card_id": 21},
-                "ac_gas": {"subcategory_id": 11, "rate_card_id": 24},
-                "refrigerator": {"subcategory_id": 12, "rate_card_id": 27},
-                "washing_machine": {"subcategory_id": 13, "rate_card_id": 29},
-                "plumbing": {"subcategory_id": 17, "rate_card_id": 33},
-                "electrical": {"subcategory_id": 24, "rate_card_id": 48},
-                "cleaning": {"subcategory_id": 1, "rate_card_id": 1},
-            }
+            # Try to get rate_card_id from service subcategory validation metadata
+            rate_card_id = entities.get("_metadata_rate_card_id")
 
-            # Get rate card for the service type
-            service_info = service_mapping.get(service_type)
-            if not service_info:
-                # Default to AC Repair if service type not recognized
-                logger.warning(f"Unknown service type '{service_type}', defaulting to AC Repair")
-                service_info = service_mapping["ac"]
+            logger.info(f"Checking for rate_card_id in entities: {list(entities.keys())}")
+            if rate_card_id:
+                logger.info(f"Found rate_card_id from metadata: {rate_card_id}")
+            else:
+                logger.info("No rate_card_id found in metadata, will use fallback mapping")
+
+            # If no rate_card_id from metadata, fall back to hardcoded mapping
+            if not rate_card_id:
+                logger.info(f"No rate_card_id from metadata, using fallback mapping for service_type: {service_type}")
+
+                # Map service types to subcategory IDs and default rate cards
+                service_mapping = {
+                    "ac": {"subcategory_id": 9, "rate_card_id": 18},  # AC Repair - Basic
+                    "ac_repair": {"subcategory_id": 9, "rate_card_id": 18},
+                    "ac_installation": {"subcategory_id": 10, "rate_card_id": 21},
+                    "ac_gas": {"subcategory_id": 11, "rate_card_id": 24},
+                    "refrigerator": {"subcategory_id": 12, "rate_card_id": 27},
+                    "washing_machine": {"subcategory_id": 13, "rate_card_id": 29},
+                    "plumbing": {"subcategory_id": 17, "rate_card_id": 33},
+                    "electrical": {"subcategory_id": 24, "rate_card_id": 48},
+                    "cleaning": {"subcategory_id": 1, "rate_card_id": 1},
+                    "painting": {"subcategory_id": 31, "rate_card_id": 60},  # Added painting
+                }
+
+                # Get rate card for the service type
+                service_info = service_mapping.get(service_type)
+                if not service_info:
+                    # Default to AC Repair if service type not recognized
+                    logger.warning(f"Unknown service type '{service_type}', defaulting to AC Repair")
+                    service_info = service_mapping["ac"]
+
+                rate_card_id = service_info["rate_card_id"]
+
+            logger.info(f"Using rate_card_id: {rate_card_id} for service_type: {service_type}")
 
             # Add to cart using CartService
             from src.services.cart_service import CartService
@@ -265,11 +283,11 @@ class BookingAgent:
                 # Add service to cart
                 try:
                     add_to_cart_request = AddToCartRequest(
-                        rate_card_id=service_info["rate_card_id"],
+                        rate_card_id=rate_card_id,
                         quantity=1
                     )
                     await cart_service.add_to_cart(add_to_cart_request, user)
-                    logger.info(f"Auto-added service to cart: rate_card_id={service_info['rate_card_id']}")
+                    logger.info(f"Auto-added service to cart: rate_card_id={rate_card_id}")
                 except Exception as e:
                     logger.error(f"Failed to add service to cart: {e}")
                     return {

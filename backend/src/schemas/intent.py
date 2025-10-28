@@ -6,7 +6,7 @@ Pydantic models for intent classification request/response.
 
 import json
 from typing import List, Dict, Optional, Any
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from src.nlp.intent.config import IntentType, EntityType
 
 
@@ -14,19 +14,40 @@ class IntentResult(BaseModel):
     """Single intent classification result"""
 
     model_config = {
-        "extra": "forbid",  # Forbid extra fields to avoid additionalProperties in JSON schema
+        "extra": "ignore",  # Ignore extra fields to allow LLM flexibility
         "json_schema_extra": {
             "example": {
                 "intent": "booking_management",
                 "confidence": 0.95,
-                "entities": {
-                    "action": "book",
-                    "service_type": "ac",
-                    "date": "2025-10-10"
-                }
+                "entities_json": "{\"action\": \"book\", \"service_type\": \"ac\", \"date\": \"2025-10-10\"}"
             }
         }
     }
+
+    @model_validator(mode='before')
+    @classmethod
+    def handle_entities_field(cls, data: Any) -> Any:
+        """Convert LLM's 'entities' field to 'entities_json' if needed"""
+        if isinstance(data, dict) and 'entities' in data and 'entities_json' not in data:
+            entities_value = data.pop('entities')  # Remove entities field
+            if entities_value is not None:
+                if isinstance(entities_value, dict):
+                    data['entities_json'] = json.dumps(entities_value) if entities_value else None
+                elif isinstance(entities_value, list):
+                    # Handle list format like ['plumbing']
+                    if entities_value and len(entities_value) == 1 and isinstance(entities_value[0], str):
+                        data['entities_json'] = json.dumps({"service_type": entities_value[0]})
+                    elif entities_value:
+                        data['entities_json'] = json.dumps({"values": entities_value})
+                    else:
+                        data['entities_json'] = None
+                elif isinstance(entities_value, str):
+                    data['entities_json'] = entities_value if entities_value else None
+                else:
+                    data['entities_json'] = None
+            else:
+                data['entities_json'] = None
+        return data
 
     intent: str = Field(..., description="Detected intent type")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score (0.0 to 1.0)")
@@ -65,19 +86,19 @@ class IntentClassificationResult(BaseModel):
     """
 
     model_config = {
-        "extra": "forbid",  # Forbid extra fields to avoid additionalProperties in JSON schema
+        "extra": "ignore",  # Ignore extra fields to allow LLM flexibility
         "json_schema_extra": {
             "example": {
                 "intents": [
                     {
                         "intent": "booking_management",
                         "confidence": 0.9,
-                        "entities": {"action": "book", "service_type": "ac"}
+                        "entities_json": "{\"action\": \"book\", \"service_type\": \"ac\"}"
                     },
                     {
                         "intent": "pricing_inquiry",
                         "confidence": 0.85,
-                        "entities": {"service_type": "ac"}
+                        "entities_json": "{\"service_type\": \"ac\"}"
                     }
                 ],
                 "primary_intent": "booking_management",
@@ -86,6 +107,34 @@ class IntentClassificationResult(BaseModel):
             }
         }
     }
+
+    @model_validator(mode='before')
+    @classmethod
+    def handle_intents_entities(cls, data: Any) -> Any:
+        """Convert LLM's 'entities' fields in intents array to 'entities_json'"""
+        if isinstance(data, dict) and 'intents' in data:
+            intents = data['intents']
+            if isinstance(intents, list):
+                for intent_item in intents:
+                    if isinstance(intent_item, dict) and 'entities' in intent_item and 'entities_json' not in intent_item:
+                        entities_value = intent_item.pop('entities')
+                        if entities_value is not None:
+                            if isinstance(entities_value, dict):
+                                intent_item['entities_json'] = json.dumps(entities_value) if entities_value else None
+                            elif isinstance(entities_value, list):
+                                if entities_value and len(entities_value) == 1 and isinstance(entities_value[0], str):
+                                    intent_item['entities_json'] = json.dumps({"service_type": entities_value[0]})
+                                elif entities_value:
+                                    intent_item['entities_json'] = json.dumps({"values": entities_value})
+                                else:
+                                    intent_item['entities_json'] = None
+                            elif isinstance(entities_value, str):
+                                intent_item['entities_json'] = entities_value if entities_value else None
+                            else:
+                                intent_item['entities_json'] = None
+                        else:
+                            intent_item['entities_json'] = None
+        return data
 
     intents: List[IntentResult] = Field(
         ...,
@@ -149,12 +198,12 @@ class IntentClassificationResponse(BaseModel):
                     {
                         "intent": "booking_management",
                         "confidence": 0.9,
-                        "entities": {"action": "book", "service_type": "ac"}
+                        "entities_json": "{\"action\": \"book\", \"service_type\": \"ac\"}"
                     },
                     {
                         "intent": "pricing_inquiry",
                         "confidence": 0.85,
-                        "entities": {"service_type": "ac"}
+                        "entities_json": "{\"service_type\": \"ac\"}"
                     }
                 ],
                 "primary_intent": "booking_management",

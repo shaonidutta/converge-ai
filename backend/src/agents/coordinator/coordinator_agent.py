@@ -251,6 +251,13 @@ class CoordinatorAgent:
                         mapped_entities['location'] = mapped_entities.pop('zip_code')
                         self.logger.info(f"Mapped 'zip_code' to 'location': {mapped_entities.get('location')}")
 
+                    # Add dialog state metadata to entities for agent use
+                    # This includes rate_card_id from service subcategory validation
+                    if dialog_state.metadata:
+                        for key, value in dialog_state.metadata.items():
+                            if key not in mapped_entities:  # Don't override existing entities
+                                mapped_entities[f"_metadata_{key}"] = value
+
                     # Create IntentResult with collected entities
                     from src.schemas.intent import IntentResult as IntentResultClass
                     intent_result_for_agent = IntentResultClass(

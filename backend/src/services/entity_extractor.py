@@ -17,7 +17,7 @@ Design Principles:
 
 import logging
 import re
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 
@@ -50,6 +50,48 @@ class EntityExtractor:
     def __init__(self, llm_client: Optional[LLMClient] = None):
         self.llm_client = llm_client
     
+    async def extract_multiple_entities(
+        self,
+        message: str,
+        expected_entities: List[EntityType],
+        context: Dict[str, Any]
+    ) -> Dict[str, EntityExtractionResult]:
+        """
+        Extract multiple entities from a single message
+
+        Args:
+            message: User's message
+            expected_entities: List of entity types we're expecting
+            context: Conversation context
+
+        Returns:
+            Dict mapping entity type to EntityExtractionResult
+        """
+        logger.info(f"[EntityExtractor] Extracting multiple entities {[e.value for e in expected_entities]} from: '{message}'")
+
+        results = {}
+
+        # First, try to extract combined date-time patterns
+        if EntityType.DATE in expected_entities and EntityType.TIME in expected_entities:
+            combined_results = self._extract_combined_date_time(message)
+            if combined_results:
+                for entity_type, result in combined_results.items():
+                    results[entity_type] = result
+                    logger.info(f"[EntityExtractor] Successfully extracted combined {entity_type}: {result.entity_value}")
+
+                # Remove date and time from expected entities since we found them
+                expected_entities = [e for e in expected_entities if e not in [EntityType.DATE, EntityType.TIME]]
+
+        # Try to extract remaining entity types
+        for entity_type in expected_entities:
+            if entity_type.value not in results:  # Don't re-extract already found entities
+                result = await self.extract_from_follow_up(message, entity_type, context)
+                if result:
+                    results[entity_type.value] = result
+                    logger.info(f"[EntityExtractor] Successfully extracted {entity_type.value}: {result.entity_value}")
+
+        return results
+
     async def extract_from_follow_up(
         self,
         message: str,
@@ -58,12 +100,12 @@ class EntityExtractor:
     ) -> Optional[EntityExtractionResult]:
         """
         Extract entity value from follow-up response
-        
+
         Args:
             message: User's follow-up message
             expected_entity: Entity type we're expecting
             context: Conversation context (collected entities, last question, etc.)
-            
+
         Returns:
             EntityExtractionResult or None if extraction failed
         """
@@ -256,16 +298,32 @@ class EntityExtractor:
             raw_value = message
             confidence = 0.8
         else:
-            # ISO or DD/MM/YYYY format
-            date_match = re.search(r'(\d{4})-(\d{2})-(\d{2})', message)
-            if date_match:
-                raw_value = date_match.group(0)
-                confidence = 0.95
-            else:
-                date_match = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})', message)
+            # Natural date formats like "31st October", "October 31st", "31 Oct"
+            natural_date_patterns = [
+                r'(\d{1,2})(st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)',
+                r'(\d{1,2})(st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)',
+                r'(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(st|nd|rd|th)?',
+                r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})(st|nd|rd|th)?'
+            ]
+
+            for pattern in natural_date_patterns:
+                date_match = re.search(pattern, message_lower)
                 if date_match:
                     raw_value = date_match.group(0)
                     confidence = 0.9
+                    break
+
+            if not raw_value:
+                # ISO or DD/MM/YYYY format
+                date_match = re.search(r'(\d{4})-(\d{2})-(\d{2})', message)
+                if date_match:
+                    raw_value = date_match.group(0)
+                    confidence = 0.95
+                else:
+                    date_match = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})', message)
+                    if date_match:
+                        raw_value = date_match.group(0)
+                        confidence = 0.9
 
         if raw_value:
             # Use centralized normalizer
@@ -280,7 +338,70 @@ class EntityExtractor:
                 )
 
         return None
-    
+
+    def _extract_combined_date_time(self, message: str) -> Optional[Dict[str, EntityExtractionResult]]:
+        """
+        Extract combined date-time patterns like 'tomorrow 4pm', 'next Monday at 2pm'
+
+        Args:
+            message: User's message
+
+        Returns:
+            Dict with 'date' and 'time' EntityExtractionResult or None
+        """
+        from src.utils.entity_normalizer import normalize_date, normalize_time
+
+        message_lower = message.lower().strip()
+        logger.info(f"[EntityExtractor] Trying to extract combined date-time from: '{message}'")
+
+        # Combined patterns for date + time
+        combined_patterns = [
+            # "tomorrow 4pm", "today 3pm"
+            r'(today|tomorrow|tmrw|tmr)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.))',
+            # "tomorrow at 4pm", "today at 3:30pm"
+            r'(today|tomorrow|tmrw|tmr)\s+at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.))',
+            # "31st October 4pm", "December 25th at 2pm"
+            r'(\d{1,2}(?:st|nd|rd|th)?\s+(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))\s+(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.))',
+            # "Monday 4pm", "next Friday at 3pm"
+            r'(?:next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\s+(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.))',
+        ]
+
+        for pattern in combined_patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                date_part = match.group(1).strip()
+                time_part = match.group(2).strip()
+
+                logger.info(f"[EntityExtractor] Found combined pattern - Date: '{date_part}', Time: '{time_part}'")
+
+                # Normalize date and time
+                normalized_date = normalize_date(date_part)
+                normalized_time = normalize_time(time_part)
+
+                if normalized_date and normalized_time:
+                    results = {}
+
+                    results['date'] = EntityExtractionResult(
+                        entity_type=EntityType.DATE.value,
+                        entity_value=date_part,
+                        confidence=0.9,
+                        normalized_value=normalized_date,
+                        extraction_method="combined_pattern"
+                    )
+
+                    results['time'] = EntityExtractionResult(
+                        entity_type=EntityType.TIME.value,
+                        entity_value=time_part,
+                        confidence=0.9,
+                        normalized_value=normalized_time,
+                        extraction_method="combined_pattern"
+                    )
+
+                    logger.info(f"[EntityExtractor] Successfully extracted combined date-time: {normalized_date} at {normalized_time}")
+                    return results
+
+        return None
+
     def _extract_time(self, message: str, message_lower: str) -> Optional[EntityExtractionResult]:
         """Extract time using centralized normalizer"""
         from src.utils.entity_normalizer import normalize_time

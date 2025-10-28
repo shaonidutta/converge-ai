@@ -61,6 +61,7 @@ class EntityType(str, Enum):
     
     # Service entities
     SERVICE_TYPE = "service_type"  # AC, plumbing, cleaning, electrical, etc.
+    SERVICE_SUBCATEGORY = "service_subcategory"  # Interior painting, exterior painting, etc.
     
     # Issue entities
     ISSUE_TYPE = "issue_type"  # quality, behavior, damage, late, no_show

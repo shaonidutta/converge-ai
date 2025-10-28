@@ -349,7 +349,15 @@ class StructuredOutputModel:
         """
         if isinstance(schema, dict):
             # Remove unsupported keys
-            unsupported_keys = ["additionalProperties", "$defs", "example", "title"]
+            unsupported_keys = [
+                "additionalProperties", "$defs", "example", "title",
+                "minItems", "maxItems", "minLength", "maxLength",
+                "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
+                "$ref", "$schema", "definitions", "default", "description",
+                "anyOf", "oneOf", "allOf", "not", "const", "enum", "format",
+                "pattern", "multipleOf", "uniqueItems", "contains", "propertyNames",
+                "if", "then", "else", "dependentRequired", "dependentSchemas"
+            ]
             for key in unsupported_keys:
                 if key in schema:
                     del schema[key]

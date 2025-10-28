@@ -43,6 +43,17 @@ ENTITY_QUESTION_TEMPLATES = {
             "What type of service do you need?"
         ],
     },
+    EntityType.SERVICE_SUBCATEGORY: {
+        IntentType.BOOKING_MANAGEMENT: [
+            "Which type of {service_type} service would you like?",
+            "What specific {service_type} service do you need?",
+            "Please choose from the available {service_type} options:"
+        ],
+        IntentType.PRICING_INQUIRY: [
+            "Which {service_type} service would you like pricing for?",
+            "What specific {service_type} service are you interested in?"
+        ],
+    },
     EntityType.DATE: {
         IntentType.BOOKING_MANAGEMENT: [
             "What date would you like to schedule the service?",
@@ -203,6 +214,28 @@ class QuestionGenerator:
         if collected_entities:
             context_items = [f"{k}: {v}" for k, v in collected_entities.items()]
             context_str = f"\nAlready collected information: {', '.join(context_items)}"
+
+        # Special handling for service subcategory questions
+        if entity_type == EntityType.SERVICE_SUBCATEGORY and context:
+            available_subcategories = context.get('available_subcategories', [])
+            service_type = context.get('service_type', 'service')
+
+            if available_subcategories:
+                # Format subcategories with prices
+                options_text = "\n\nAvailable options:\n"
+                for i, subcategory in enumerate(available_subcategories[:5], 1):  # Limit to 5 options
+                    name = subcategory.get('name', 'Unknown')
+                    rate_cards = subcategory.get('rate_cards', [])
+                    if rate_cards:
+                        # Show the cheapest option
+                        cheapest = min(rate_cards, key=lambda x: x.get('price', 0))
+                        price = cheapest.get('price', 0)
+                        options_text += f"{i}. {name} - Starting from ₹{price:.0f}\n"
+                    else:
+                        options_text += f"{i}. {name}\n"
+
+                # Generate a conversational question with options
+                return f"Which type of {service_type} service would you like?{options_text}\nJust tell me the name or number of your choice."
 
         # Build prompt
         # Special handling for booking_id: use "Order ID" instead of "booking id"

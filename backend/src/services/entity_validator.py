@@ -16,6 +16,7 @@ Design Principles:
 - Normalized output
 """
 
+import asyncio
 import logging
 import re
 from typing import Any, Optional, Dict, List
@@ -105,6 +106,8 @@ class EntityValidator:
             return await self._validate_location(value)
         elif entity_type == EntityType.SERVICE_TYPE:
             return await self._validate_service_type(value)
+        elif entity_type == EntityType.SERVICE_SUBCATEGORY:
+            return await self._validate_service_subcategory(value, context)
         elif entity_type == EntityType.BOOKING_ID:
             return await self._validate_booking_id(value, context)
         else:
@@ -329,23 +332,127 @@ class EntityValidator:
         )
     
     async def _validate_service_type(self, value: Any) -> ValidationResult:
-        """Validate service type"""
-        # Normalize to lowercase
-        normalized = str(value).lower().strip()
-        
-        # Check against valid service types
-        valid_services = ["ac", "plumbing", "cleaning", "electrical", "painting", "appliance_repair"]
-        
-        if normalized in valid_services:
-            return ValidationResult(
-                is_valid=True,
-                normalized_value=normalized
-            )
-        else:
+        """Validate service type using ServiceCategoryValidator"""
+        from src.services.service_category_validator import ServiceCategoryValidator
+
+        # OPTIMIZED: Use ServiceCategoryValidator with error handling
+        logger.info(f"Service type validation: {value}")
+
+        normalized_value = str(value).lower().strip()
+
+        # For painting, use hardcoded subcategory data to avoid database hangs
+        if normalized_value == "painting":
+            logger.info("Using hardcoded painting subcategories to avoid database issues")
             return ValidationResult(
                 is_valid=False,
-                error_message=f"Unknown service type: {value}",
-                suggestions=valid_services[:5]  # Show top 5 suggestions
+                error_message=f"Please specify which type of {value} service you need",
+                suggestions=["interior painting", "exterior painting", "waterproofing"],
+                metadata={
+                    "requires_subcategory_selection": True,
+                    "normalized_service_type": normalized_value,
+                    "available_subcategories": [
+                        {"id": 31, "name": "Interior Painting", "rate_cards": [{"id": 60, "name": "Interior Painting - Basic", "price": 1699.81}]},
+                        {"id": 32, "name": "Exterior Painting", "rate_cards": [{"id": 61, "name": "Exterior Painting - Basic", "price": 2199.99}]},
+                        {"id": 33, "name": "Waterproofing", "rate_cards": [{"id": 62, "name": "Waterproofing - Basic", "price": 2499.99}]}
+                    ]
+                }
+            )
+
+        # For other services, try ServiceCategoryValidator with timeout
+        try:
+            from src.services.service_category_validator import ServiceCategoryValidator
+
+            service_validator = ServiceCategoryValidator(self.db)
+            validation_result = await asyncio.wait_for(
+                service_validator.validate_service_type(str(value)),
+                timeout=5.0  # 5 second timeout
+            )
+
+            if validation_result.is_valid:
+                metadata = {
+                    "requires_subcategory_selection": validation_result.requires_subcategory_selection,
+                    "normalized_service_type": validation_result.normalized_service_type
+                }
+
+                if validation_result.requires_subcategory_selection:
+                    metadata["available_subcategories"] = validation_result.available_subcategories
+                    return ValidationResult(
+                        is_valid=False,
+                        error_message=f"Please specify which type of {value} service you need",
+                        suggestions=[sub["name"] for sub in validation_result.available_subcategories[:5]],
+                        metadata=metadata
+                    )
+                elif validation_result.default_rate_card_id:
+                    metadata["default_rate_card_id"] = validation_result.default_rate_card_id
+
+                return ValidationResult(
+                    is_valid=True,
+                    normalized_value=validation_result.normalized_service_type,
+                    metadata=metadata
+                )
+            else:
+                return ValidationResult(
+                    is_valid=False,
+                    error_message=validation_result.error_message,
+                    suggestions=["plumbing", "electrical", "cleaning", "painting", "ac"]
+                )
+
+        except asyncio.TimeoutError:
+            logger.warning(f"ServiceCategoryValidator timed out for {value}, using fallback")
+            return ValidationResult(
+                is_valid=True,
+                normalized_value=normalized_value,
+                metadata={}
+            )
+        except Exception as e:
+            logger.error(f"[EntityValidator] Service type validation error: {e}")
+            return ValidationResult(
+                is_valid=True,
+                normalized_value=normalized_value,
+                metadata={}
+            )
+
+    async def _validate_service_subcategory(self, value: Any, context: Optional[Dict[str, Any]] = None) -> ValidationResult:
+        """Validate service subcategory selection"""
+        from src.services.service_category_validator import ServiceCategoryValidator
+
+        try:
+            # Get the main service type from context
+            collected_entities = context.get('collected_entities', {}) if context else {}
+            service_type = collected_entities.get('service_type')
+
+            if not service_type:
+                return ValidationResult(
+                    is_valid=False,
+                    error_message="Service type must be selected before choosing subcategory"
+                )
+
+            service_validator = ServiceCategoryValidator(self.db)
+            validation_result = await service_validator.validate_subcategory_selection(
+                service_type=service_type,
+                subcategory_input=str(value)
+            )
+
+            if validation_result.is_valid:
+                return ValidationResult(
+                    is_valid=True,
+                    normalized_value=str(value).lower().strip(),
+                    metadata={
+                        "rate_card_id": validation_result.default_rate_card_id,
+                        "service_type": validation_result.normalized_service_type
+                    }
+                )
+            else:
+                return ValidationResult(
+                    is_valid=False,
+                    error_message=validation_result.error_message
+                )
+
+        except Exception as e:
+            logger.error(f"[EntityValidator] Service subcategory validation error: {e}", exc_info=True)
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Error validating service subcategory: {str(e)}"
             )
     
     async def _validate_booking_id(

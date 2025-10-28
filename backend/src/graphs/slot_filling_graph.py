@@ -340,7 +340,49 @@ async def extract_entity_node(
                     }
                 }
 
-        # Extract entity from message
+        # Check if we should try to extract multiple entities
+        # This happens when user provides combined input like "tomorrow 4pm"
+        needed_entities = state.get('needed_entities', [])
+        multiple_needed = len(needed_entities) > 1
+
+        if multiple_needed:
+            # Try to extract multiple entities from the message
+            logger.info(f"[extract_entity_node] Trying to extract multiple entities: {needed_entities}")
+            multiple_results = await entity_extractor.extract_multiple_entities(
+                message=state['current_message'],
+                expected_entities=[EntityType(e) for e in needed_entities],
+                context={
+                    "collected_entities": collected_entities,
+                    "last_question": state.get('last_question_asked'),
+                    "user_id": state['user_id']
+                }
+            )
+
+            # If we found multiple entities, return the expected one but store all
+            if multiple_results:
+                logger.info(f"[extract_entity_node] Found multiple entities: {list(multiple_results.keys())}")
+
+                # Store all extracted entities for later processing
+                state_update = {
+                    "multiple_entities_extracted": multiple_results,
+                    "metadata": {
+                        **state.get("metadata", {}),
+                        "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["extract_entity_node"],
+                        "multiple_extraction": True
+                    }
+                }
+
+                # Return the expected entity if found
+                if expected_entity in multiple_results:
+                    state_update["extracted_entity"] = multiple_results[expected_entity].model_dump()
+                    return state_update
+                else:
+                    # Return the first entity found
+                    first_entity = next(iter(multiple_results.values()))
+                    state_update["extracted_entity"] = first_entity.model_dump()
+                    return state_update
+
+        # Extract single entity from message (original logic)
         extraction_result = await entity_extractor.extract_from_follow_up(
             message=state['current_message'],
             expected_entity=EntityType(expected_entity),
@@ -466,7 +508,8 @@ async def update_dialog_state_node(
         
         validation_result = state.get('validation_result', {})
         extracted = state.get('extracted_entity', {})
-        
+        multiple_extracted = state.get('multiple_entities_extracted', {})
+
         if validation_result.get('is_valid'):
             # Add entity to collected entities
             entity_type = extracted['entity_type']
@@ -476,7 +519,16 @@ async def update_dialog_state_node(
             collected = state.get('collected_entities', {}).copy()
             collected[entity_type] = entity_value
 
-            needed = [e for e in state.get('needed_entities', []) if e != entity_type]
+            # If we extracted multiple entities, add them all (if they're valid)
+            if multiple_extracted:
+                logger.info(f"[update_dialog_state_node] Processing multiple extracted entities: {list(multiple_extracted.keys())}")
+                for entity_key, entity_result in multiple_extracted.items():
+                    if entity_key != entity_type:  # Don't duplicate the main entity
+                        # For now, assume other entities are valid (we can add validation later)
+                        collected[entity_key] = entity_result.normalized_value or entity_result.entity_value
+                        logger.info(f"[update_dialog_state_node] Added additional entity: {entity_key} = {collected[entity_key]}")
+
+            needed = [e for e in state.get('needed_entities', []) if e not in collected]
 
             # Save ALL collected entities to database (not just the new one)
             # This ensures that entities from previous turns are not lost
@@ -504,7 +556,54 @@ async def update_dialog_state_node(
             # Validation failed
             error_msg = validation_result.get('error_message', 'Invalid value')
             logger.warning(f"[update_dialog_state_node] Validation failed: {error_msg}")
-            
+
+            # Special handling for service type that requires subcategory selection
+            entity_type = extracted.get('entity_type')
+            validation_metadata = validation_result.get('metadata', {})
+
+            if (entity_type == 'service_type' and
+                validation_metadata.get('requires_subcategory_selection')):
+
+                logger.info(f"[update_dialog_state_node] Service type requires subcategory selection")
+
+                # Store the service type and available subcategories for question generation
+                collected = state.get('collected_entities', {}).copy()
+                collected['service_type'] = validation_metadata.get('normalized_service_type')
+
+                # Add service_subcategory to needed entities
+                needed = state.get('needed_entities', []).copy()
+                if 'service_subcategory' not in needed:
+                    needed.insert(0, 'service_subcategory')  # Insert at beginning for immediate handling
+
+                # Save state with service type and subcategory requirement
+                from src.schemas.dialog_state import DialogStateUpdate
+                await dialog_manager.update_state(
+                    session_id=state['session_id'],
+                    update_data=DialogStateUpdate(
+                        collected_entities=collected,
+                        needed_entities=needed,
+                        metadata={
+                            "available_subcategories": validation_metadata.get('available_subcategories', []),
+                            "service_type": validation_metadata.get('normalized_service_type')
+                        }
+                    )
+                )
+
+                logger.info(f"[update_dialog_state_node] Added service_subcategory to needed entities: {needed}")
+
+                return {
+                    "collected_entities": collected,
+                    "needed_entities": needed,
+                    "validation_errors": [error_msg],
+                    "question_attempt_count": state.get('question_attempt_count', 0) + 1,
+                    "metadata": {
+                        **state.get("metadata", {}),
+                        "available_subcategories": validation_metadata.get('available_subcategories', []),
+                        "service_type": validation_metadata.get('normalized_service_type'),
+                        "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["update_dialog_state_node"]
+                    }
+                }
+
             return {
                 "validation_errors": state.get('validation_errors', []) + [error_msg],
                 "question_attempt_count": state.get('question_attempt_count', 0) + 1
@@ -581,6 +680,7 @@ async def determine_needed_entities_node(
             # Check if user has any saved addresses
             from src.core.models import Address
             user_id = state.get('user_id')
+            session_id = state.get('session_id')
             logger.info(f"[determine_needed_entities_node] Checking addresses for user_id: {user_id}")
 
             if user_id:
@@ -602,6 +702,23 @@ async def determine_needed_entities_node(
                         collected['location'] = auto_location
                         needed.remove('location')
                         logger.info(f"[determine_needed_entities_node] ✅ Auto-filled location from existing address: {auto_location}")
+
+                        # IMPORTANT: Save the auto-filled location to database immediately
+                        # This ensures it persists across turns
+                        if session_id:
+                            try:
+                                from src.services.dialog_state_manager import DialogStateManager
+                                from src.schemas.dialog_state import DialogStateUpdate
+                                dialog_manager = DialogStateManager(db)
+                                await dialog_manager.update_state(
+                                    session_id=session_id,
+                                    update_data=DialogStateUpdate(
+                                        collected_entities=collected
+                                    )
+                                )
+                                logger.info(f"[determine_needed_entities_node] ✅ Saved auto-filled location to database")
+                            except Exception as save_error:
+                                logger.warning(f"[determine_needed_entities_node] Failed to save auto-filled location: {save_error}")
                     else:
                         logger.info(f"[determine_needed_entities_node] No existing address found for user {user_id}")
                 except Exception as e:
@@ -716,10 +833,18 @@ async def generate_question_node(
             primary_intent = state.get('primary_intent')
             intent_enum = IntentType(primary_intent) if isinstance(primary_intent, str) else primary_intent
 
+            # Build context for question generation
+            context = {}
+            if next_entity == 'service_subcategory':
+                # Pass available subcategories for service subcategory questions
+                context['available_subcategories'] = state.get('metadata', {}).get('available_subcategories', [])
+                context['service_type'] = state.get('metadata', {}).get('service_type', '')
+
             original_question = question_generator.generate(
                 entity_type=EntityType(next_entity),
                 intent=intent_enum,
-                collected_entities=state.get('collected_entities', {})
+                collected_entities=state.get('collected_entities', {}),
+                context=context
             )
             question += original_question
         else:
@@ -727,10 +852,18 @@ async def generate_question_node(
             primary_intent = state.get('primary_intent')
             intent_enum = IntentType(primary_intent) if isinstance(primary_intent, str) else primary_intent
 
+            # Build context for question generation
+            context = {}
+            if next_entity == 'service_subcategory':
+                # Pass available subcategories for service subcategory questions
+                context['available_subcategories'] = state.get('metadata', {}).get('available_subcategories', [])
+                context['service_type'] = state.get('metadata', {}).get('service_type', '')
+
             question = question_generator.generate(
                 entity_type=EntityType(next_entity),
                 intent=intent_enum,
-                collected_entities=state.get('collected_entities', {})
+                collected_entities=state.get('collected_entities', {}),
+                context=context
             )
 
         logger.info(f"[generate_question_node] Question: {question[:100]}...")
