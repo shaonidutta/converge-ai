@@ -49,16 +49,17 @@ class ServiceAgent:
         intent: str,
         entities: Dict[str, Any],
         user: User,
-        session_id: str
+        session_id: str,
+        message: str = None
     ) -> Dict[str, Any]:
         """
         Main execution method - routes to appropriate handler based on action
-        
+
         Args:
-            intent: Intent type (should be "service_inquiry")
+            intent: Intent type (should be "service_inquiry" or "service_information")
             entities: Extracted entities from slot-filling
                 {
-                    "action": "browse_categories" | "browse_subcategories" | "browse_services" | 
+                    "action": "browse_categories" | "browse_subcategories" | "browse_services" |
                               "search" | "details" | "recommend",
                     "category_id": 1 (optional),
                     "subcategory_id": 1 (optional),
@@ -69,13 +70,20 @@ class ServiceAgent:
                 }
             user: Current authenticated user
             session_id: Chat session ID
-        
+            message: Original user message (optional, used for smart inference)
+
         Returns:
             Response dict with service information
         """
-        logger.info(f"ServiceAgent.execute called: intent={intent}, action={entities.get('action')}, user_id={user.id}")
-        
+        logger.info(f"ServiceAgent.execute called: intent={intent}, action={entities.get('action')}, user_id={user.id}, message='{message[:50] if message else None}...'")
+
         try:
+            # If no action provided and we have the original message, infer action and query
+            if "action" not in entities and message:
+                logger.info(f"[ServiceAgent] No action in entities, inferring from message: '{message}'")
+                entities = await self._infer_action_and_query(message, entities)
+                logger.info(f"[ServiceAgent] Inferred entities: {entities}")
+
             # Get action from entities
             action = entities.get("action", "browse_categories")
             
@@ -634,6 +642,74 @@ class ServiceAgent:
                 "action_taken": "error",
                 "metadata": {"error": str(e)}
             }
+
+    async def _infer_action_and_query(self, message: str, entities: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Infer action and query from user message when not provided in entities
+
+        Uses pattern matching to determine:
+        - Action: search, browse_categories, browse_subcategories, details, recommend
+        - Query: service name or category to search for
+
+        Args:
+            message: Original user message
+            entities: Existing entities dict (may be empty)
+
+        Returns:
+            Updated entities dict with inferred action and query
+        """
+        import re
+
+        message_lower = message.lower().strip()
+        updated_entities = entities.copy()
+
+        # Pattern 1: "what categories" or "show categories" → browse_categories
+        if re.search(r'\b(what|which|show|list|display)\s+(service\s+)?(categories|types)', message_lower):
+            updated_entities["action"] = "browse_categories"
+            logger.info(f"[_infer_action_and_query] Matched pattern: browse_categories")
+            return updated_entities
+
+        # Pattern 2: "show me X services" or "tell me about X" → search with query
+        search_patterns = [
+            r'\b(show|tell|give)\s+(me\s+)?(about\s+)?(?P<query>[\w\s]+?)\s+(services?|repair|maintenance)',
+            r'\b(search|find|look\s+for)\s+(?P<query>[\w\s]+)',
+            r'\b(do\s+you\s+have|have\s+you\s+got)\s+(?P<query>[\w\s]+?)\s+(services?|repair)',
+            r'\b(?P<query>ac|plumbing|electrical|cleaning|painting|carpentry|appliance)\s+(services?|repair)',
+        ]
+
+        for pattern in search_patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                query = match.group('query').strip()
+                # Clean up common words
+                query = re.sub(r'\b(the|a|an|some|any)\b', '', query).strip()
+                if query:
+                    updated_entities["action"] = "search"
+                    updated_entities["query"] = query
+                    logger.info(f"[_infer_action_and_query] Matched search pattern: query='{query}'")
+                    return updated_entities
+
+        # Pattern 3: Single word service type → search
+        service_keywords = ['ac', 'plumbing', 'electrical', 'cleaning', 'painting', 'carpentry',
+                           'appliance', 'pest', 'water', 'salon', 'packers', 'movers']
+        for keyword in service_keywords:
+            if keyword in message_lower:
+                updated_entities["action"] = "search"
+                updated_entities["query"] = keyword
+                logger.info(f"[_infer_action_and_query] Matched service keyword: query='{keyword}'")
+                return updated_entities
+
+        # Default: If message mentions "services" but no specific pattern, browse categories
+        if 'service' in message_lower or 'category' in message_lower:
+            updated_entities["action"] = "browse_categories"
+            logger.info(f"[_infer_action_and_query] Default to browse_categories (mentions 'service')")
+        else:
+            # Last resort: search with entire message as query
+            updated_entities["action"] = "search"
+            updated_entities["query"] = message_lower
+            logger.info(f"[_infer_action_and_query] Last resort: search with full message as query")
+
+        return updated_entities
 
 
 # Export

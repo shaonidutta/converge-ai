@@ -56,35 +56,85 @@ class CoordinatorAgent:
         "complaint": "complaint",  # Route to ComplaintAgent
         "data_query": "sql",  # Route to SQLAgent for data queries
         "general_query": "coordinator",  # Handle general queries in coordinator
+        "out_of_scope": "coordinator",  # Handle out-of-scope queries in coordinator
+        "unclear_intent": "coordinator",  # Handle unclear intents in coordinator
     }
     
     def __init__(self, db: AsyncSession):
         """
         Initialize CoordinatorAgent
-        
+
         Args:
             db: Database session for operations
         """
         self.db = db
         self.logger = logging.getLogger(__name__)
-        
+
         # Initialize intent classifier
         try:
             self.llm_client = LLMClient.create_for_intent_classification()
             self.intent_classifier = IntentClassifier(llm_client=self.llm_client)
-            
-            # Initialize specialized agents
-            self.policy_agent = PolicyAgent(db=db)
-            self.service_agent = ServiceAgent(db=db)
-            self.booking_agent = BookingAgent(db=db)
-            self.cancellation_agent = CancellationAgent(db=db)
-            self.complaint_agent = ComplaintAgent(db=db)
-            self.sql_agent = SQLAgent(db=db)
-            
+
+            # Lazy initialization: agents are created only when needed
+            self._policy_agent = None
+            self._service_agent = None
+            self._booking_agent = None
+            self._cancellation_agent = None
+            self._complaint_agent = None
+            self._sql_agent = None
+
             self.logger.info("CoordinatorAgent initialized successfully")
         except Exception as e:
             self.logger.error(f"Error initializing CoordinatorAgent: {e}")
             raise
+
+    @property
+    def policy_agent(self):
+        """Lazy initialization of PolicyAgent"""
+        if self._policy_agent is None:
+            self.logger.info("Initializing PolicyAgent (lazy)")
+            self._policy_agent = PolicyAgent(db=self.db)
+        return self._policy_agent
+
+    @property
+    def service_agent(self):
+        """Lazy initialization of ServiceAgent"""
+        if self._service_agent is None:
+            self.logger.info("Initializing ServiceAgent (lazy)")
+            self._service_agent = ServiceAgent(db=self.db)
+        return self._service_agent
+
+    @property
+    def booking_agent(self):
+        """Lazy initialization of BookingAgent"""
+        if self._booking_agent is None:
+            self.logger.info("Initializing BookingAgent (lazy)")
+            self._booking_agent = BookingAgent(db=self.db)
+        return self._booking_agent
+
+    @property
+    def cancellation_agent(self):
+        """Lazy initialization of CancellationAgent"""
+        if self._cancellation_agent is None:
+            self.logger.info("Initializing CancellationAgent (lazy)")
+            self._cancellation_agent = CancellationAgent(db=self.db)
+        return self._cancellation_agent
+
+    @property
+    def complaint_agent(self):
+        """Lazy initialization of ComplaintAgent"""
+        if self._complaint_agent is None:
+            self.logger.info("Initializing ComplaintAgent (lazy)")
+            self._complaint_agent = ComplaintAgent(db=self.db)
+        return self._complaint_agent
+
+    @property
+    def sql_agent(self):
+        """Lazy initialization of SQLAgent"""
+        if self._sql_agent is None:
+            self.logger.info("Initializing SQLAgent (lazy)")
+            self._sql_agent = SQLAgent(db=self.db)
+        return self._sql_agent
     
     async def execute(
         self,
@@ -145,6 +195,51 @@ class CoordinatorAgent:
                     channel="web"
                 )
 
+                # Check if intent has changed (user is asking a different question)
+                intent_changed = result.metadata.get("intent_changed", False)
+                if intent_changed:
+                    self.logger.info(f"Intent changed during slot-filling from {dialog_state.intent} to {result.metadata.get('intent')}")
+
+                    # Clear the dialog state
+                    await dialog_manager.clear_state(session_id)
+
+                    # Re-classify and handle the new intent
+                    intent_result, classification_method = await self.intent_classifier.classify(
+                        message=message,
+                        conversation_history=conversation_history
+                    )
+
+                    # Get primary intent details
+                    primary_intent_obj = intent_result.intents[0]
+
+                    # Route to appropriate agent
+                    response = await self._route_to_agent(
+                        intent_result=primary_intent_obj,
+                        user=user,
+                        session_id=session_id,
+                        message=message,
+                        conversation_history=conversation_history
+                    )
+
+                    # Store conversation
+                    await self._store_conversation(
+                        user_id=user_id,
+                        session_id=session_id,
+                        user_message=message,
+                        assistant_response=response["response"],
+                        intent=intent_result.primary_intent,
+                        agent_used=response.get("agent_used", "unknown")
+                    )
+
+                    return {
+                        "response": response["response"],
+                        "intent": intent_result.primary_intent,
+                        "confidence": primary_intent_obj.confidence,
+                        "agent_used": response.get("agent_used", "unknown"),
+                        "classification_method": classification_method,
+                        "metadata": response.get("metadata", {})
+                    }
+
                 # If slot-filling is complete, execute the agent
                 if result.should_trigger_agent:
                     self.logger.info(f"Slot-filling complete, executing agent with entities: {result.collected_entities}")
@@ -169,7 +264,8 @@ class CoordinatorAgent:
                         intent_result=intent_result_for_agent,
                         user=user,
                         session_id=session_id,
-                        message=message
+                        message=message,
+                        conversation_history=conversation_history
                     )
 
                     # Clear the dialog state
@@ -268,12 +364,20 @@ class CoordinatorAgent:
                     from src.schemas.dialog_state import DialogStateCreate
                     from src.core.models.dialog_state import DialogStateType
 
+                    # IMPORTANT: Only include entities that don't need validation/normalization
+                    # Entities like date, time need to be validated by the slot-filling graph
+                    # Safe entities: action, service_type, booking_id, status_filter, sort_by, location (if from address)
+                    entities_needing_validation = {'date', 'time'}
+                    safe_entities = {k: v for k, v in collected_entities.items() if k not in entities_needing_validation}
+
+                    self.logger.info(f"Safe entities for dialog state: {safe_entities}")
+
                     dialog_state_data = DialogStateCreate(
                         session_id=session_id,
                         user_id=user_id,
                         intent=intent_result.primary_intent,
                         state=DialogStateType.COLLECTING_INFO,
-                        collected_entities=collected_entities,
+                        collected_entities=safe_entities,  # Only include safe entities
                         needed_entities=missing_entities,
                         channel="web"
                     )
@@ -330,7 +434,8 @@ class CoordinatorAgent:
                     intent_result=primary_intent_obj,
                     user=user,
                     session_id=session_id,
-                    message=message  # Pass original message for agents that need it
+                    message=message,  # Pass original message for agents that need it
+                    conversation_history=conversation_history
                 )
             else:
                 # Multiple intents - handle sequentially
@@ -383,7 +488,8 @@ class CoordinatorAgent:
         intent_result: IntentResult,
         user: User,
         session_id: str,
-        message: str = ""  # Original message for agents that need it
+        message: str = "",  # Original message for agents that need it
+        conversation_history: Optional[List[Dict[str, str]]] = None  # Conversation history for context
     ) -> Dict[str, Any]:
         """
         Route request to appropriate specialized agent
@@ -393,6 +499,7 @@ class CoordinatorAgent:
             user: User object
             session_id: Session ID
             message: Original user message (for agents that need full context)
+            conversation_history: Conversation history for context-aware responses
 
         Returns:
             Agent response dictionary
@@ -406,12 +513,16 @@ class CoordinatorAgent:
         self.logger.info(f"Routing intent '{intent}' to {agent_type} agent")
 
         try:
-            # Handle coordinator-level intents (greetings, general queries)
+            # Handle coordinator-level intents (greetings, general queries, out-of-scope, unclear)
             if agent_type == "coordinator":
                 if intent == "greeting":
-                    return await self._handle_greeting(user, message)
+                    return await self._handle_greeting(user, message, conversation_history)
                 elif intent == "general_query":
-                    return await self._handle_general_query(user, message)
+                    return await self._handle_general_query(user, message, conversation_history)
+                elif intent == "out_of_scope":
+                    return await self._handle_out_of_scope(user, message, conversation_history)
+                elif intent == "unclear_intent":
+                    return await self._handle_unclear_intent(user, message, conversation_history)
                 else:
                     # Unknown coordinator intent, fallback to policy
                     self.logger.warning(f"Unknown coordinator intent '{intent}', falling back to policy agent")
@@ -422,7 +533,8 @@ class CoordinatorAgent:
                     intent=intent,
                     entities=entities,
                     user=user,
-                    session_id=session_id
+                    session_id=session_id,
+                    message=message  # Pass original message for RAG query
                 )
                 response["agent_used"] = "policy"
                 
@@ -431,7 +543,8 @@ class CoordinatorAgent:
                     intent=intent,
                     entities=entities,
                     user=user,
-                    session_id=session_id
+                    session_id=session_id,
+                    message=message  # Pass original message for smart inference
                 )
                 response["agent_used"] = "service"
                 
@@ -478,7 +591,8 @@ class CoordinatorAgent:
                     intent=intent,
                     entities=entities,
                     user=user,
-                    session_id=session_id
+                    session_id=session_id,
+                    message=message  # Pass original message for RAG query
                 )
                 response["agent_used"] = "policy_fallback"
             
@@ -493,71 +607,267 @@ class CoordinatorAgent:
                 "metadata": {"error": str(e)}
             }
 
-    async def _handle_greeting(self, user: User, message: str) -> Dict[str, Any]:
+    async def _handle_greeting(
+        self,
+        user: User,
+        message: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
         """
-        Handle greeting intent
-
-        Greetings are simple, stateless responses that don't require specialized agent logic.
+        Handle greeting intent using LLM for natural, context-aware responses
 
         Args:
             user: User object
             message: Original greeting message
+            conversation_history: Previous conversation for context
 
         Returns:
             Greeting response dictionary
         """
         user_name = user.first_name or "there"
 
-        # Generate natural greeting response
-        response = (
-            f"Hi {user_name}! I'm Lisa, your ConvergeAI assistant. "
-            f"I can help you book home services like AC repair, plumbing, cleaning, and more. "
-            f"I can also check prices, manage your bookings, and answer policy questions. "
-            f"What can I do for you today?"
-        )
+        # Use LLM to generate a natural, context-aware greeting
+        from src.llm.gemini.prompts import get_system_prompt
 
-        self.logger.info(f"Handled greeting for user {user.id}")
+        # Build context-aware prompt
+        context_info = ""
+        if conversation_history and len(conversation_history) > 0:
+            context_info = f"\n\nPrevious conversation context: The user has interacted with you before."
+
+        prompt = f"""The user said: "{message}"
+
+Generate a warm, friendly greeting response that:
+1. Greets the user by name: {user_name}
+2. Introduces yourself as Lisa, their ConvergeAI assistant
+3. Briefly mentions you can help with home services (AC repair, plumbing, cleaning, electrical, etc.)
+4. Asks how you can help them today
+5. Keeps it natural and conversational (2-3 sentences)
+{context_info}
+
+Remember: Be friendly, not robotic. No emojis, no bullet points, no structured formatting."""
+
+        try:
+            response_text = await self.llm_client.generate(
+                prompt=prompt,
+                system_prompt=get_system_prompt("conversational_response"),
+                temperature=0.7
+            )
+
+            self.logger.info(f"Generated LLM greeting for user {user.id}")
+
+        except Exception as e:
+            self.logger.error(f"Error generating greeting response: {e}")
+            # Fallback response (only used if LLM fails)
+            response_text = (
+                f"Hi {user_name}! I'm Lisa, your ConvergeAI assistant. "
+                f"I can help you book home services like AC repair, plumbing, cleaning, and more. "
+                f"What can I do for you today?"
+            )
 
         return {
-            "response": response,
+            "response": response_text,
             "action_taken": "greeting_handled",
             "agent_used": "coordinator",
             "metadata": {
                 "user_name": user_name,
-                "greeting_message": message
+                "greeting_message": message,
+                "llm_generated": True
             }
         }
 
-    async def _handle_general_query(self, user: User, message: str) -> Dict[str, Any]:
+    async def _handle_general_query(
+        self,
+        user: User,
+        message: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
         """
-        Handle general query intent
-
-        General queries are broad questions that don't fit specific categories.
-        Provide helpful information about available services.
+        Handle general query intent using LLM for natural, context-aware responses
 
         Args:
             user: User object
             message: Original query message
+            conversation_history: Previous conversation for context
 
         Returns:
             General query response dictionary
         """
-        # For general queries, provide helpful information
-        response = (
-            f"I'm here to help! I can assist you with booking home services, "
-            f"checking prices and availability, managing your bookings, "
-            f"handling complaints, and answering policy questions. "
-            f"What would you like to know?"
-        )
+        user_name = user.first_name or "there"
 
-        self.logger.info(f"Handled general query for user {user.id}: {message[:50]}...")
+        # Use LLM to generate a natural, context-aware response
+        from src.llm.gemini.prompts import get_system_prompt
+
+        # Build context-aware prompt
+        context_info = ""
+        if conversation_history and len(conversation_history) > 0:
+            recent_history = conversation_history[-3:] if len(conversation_history) > 3 else conversation_history
+            context_info = "\n\nRecent conversation:\n"
+            for msg in recent_history:
+                role = msg.get("role", "unknown").capitalize()
+                content = msg.get("content", "")
+                context_info += f"{role}: {content}\n"
+
+        prompt = f"""The user asked: "{message}"
+
+This is a general query. Generate a warm, helpful response that:
+1. Acknowledges their question
+2. Explains what you can help with (booking services, checking prices, managing bookings, answering policy questions)
+3. Offers to assist them
+4. Keeps it natural and conversational (2-3 sentences)
+5. Uses the user's name: {user_name}
+{context_info}
+
+Remember: Be friendly and helpful, not robotic. No emojis, no bullet points, no structured formatting."""
+
+        try:
+            response_text = await self.llm_client.generate(
+                prompt=prompt,
+                system_prompt=get_system_prompt("conversational_response"),
+                temperature=0.7
+            )
+
+            self.logger.info(f"Generated LLM general query response for user {user.id}")
+
+        except Exception as e:
+            self.logger.error(f"Error generating general query response: {e}")
+            # Fallback response (only used if LLM fails)
+            response_text = (
+                f"I'm here to help, {user_name}! I can assist you with booking home services, "
+                f"checking prices and availability, managing your bookings, and answering policy questions. "
+                f"What would you like to know?"
+            )
 
         return {
-            "response": response,
+            "response": response_text,
             "action_taken": "general_query_handled",
             "agent_used": "coordinator",
             "metadata": {
-                "query": message
+                "query": message,
+                "llm_generated": True
+            }
+        }
+
+    async def _handle_out_of_scope(
+        self,
+        user: User,
+        message: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """
+        Handle out-of-scope queries using LLM to generate natural responses
+
+        Out-of-scope queries are those outside the home services domain
+        (e.g., weather, news, sports, jokes, travel bookings, etc.)
+
+        Args:
+            user: User object
+            message: Original out-of-scope query
+
+        Returns:
+            Out-of-scope response dictionary
+        """
+        user_name = user.first_name or "there"
+
+        # Use LLM to generate a natural, context-aware response
+        from src.llm.gemini.prompts import get_system_prompt
+
+        prompt = f"""The user asked: "{message}"
+
+This query is outside the scope of home services. Generate a warm, friendly response that:
+1. Politely acknowledges their query
+2. Explains you focus on home services (AC repair, plumbing, cleaning, electrical, etc.)
+3. Offers to help with home services instead
+4. Keeps it natural and conversational (2-3 sentences)
+5. Uses the user's name: {user_name}
+
+Remember: Be friendly, not robotic. No emojis, no bullet points, no structured formatting."""
+
+        try:
+            response_text = await self.llm_client.generate(
+                prompt=prompt,
+                system_prompt=get_system_prompt("conversational_response"),
+                temperature=0.7
+            )
+
+            self.logger.info(f"Handled out-of-scope query for user {user.id}: {message[:50]}...")
+
+        except Exception as e:
+            self.logger.error(f"Error generating out-of-scope response: {e}")
+            # Fallback response (only used if LLM fails)
+            response_text = (
+                f"I appreciate you reaching out, {user_name}! I specialize in home services like "
+                f"AC repair, plumbing, and cleaning. Is there a home service I can help you with today?"
+            )
+
+        return {
+            "response": response_text,
+            "action_taken": "out_of_scope_handled",
+            "agent_used": "coordinator",
+            "metadata": {
+                "query": message,
+                "reason": "query_outside_home_services_scope"
+            }
+        }
+
+    async def _handle_unclear_intent(
+        self,
+        user: User,
+        message: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """
+        Handle unclear intents using LLM to generate natural clarification requests
+
+        Unclear intents are ambiguous queries where the user's intention is not clear.
+
+        Args:
+            user: User object
+            message: Original unclear message
+
+        Returns:
+            Clarification response dictionary
+        """
+        user_name = user.first_name or "there"
+
+        # Use LLM to generate a natural, context-aware clarification request
+        from src.llm.gemini.prompts import get_system_prompt
+
+        prompt = f"""The user said: "{message}"
+
+Their intent is unclear. Generate a warm, friendly response that:
+1. Acknowledges their message
+2. Asks for clarification in a natural way
+3. Optionally suggests what you can help with (booking services, checking prices, managing bookings, etc.)
+4. Keeps it conversational (2-3 sentences)
+5. Uses the user's name: {user_name}
+
+Remember: Be friendly and helpful, not robotic. No emojis, no bullet points, no structured formatting."""
+
+        try:
+            response_text = await self.llm_client.generate(
+                prompt=prompt,
+                system_prompt=get_system_prompt("conversational_response"),
+                temperature=0.7
+            )
+
+            self.logger.info(f"Handled unclear intent for user {user.id}: {message[:50]}...")
+
+        except Exception as e:
+            self.logger.error(f"Error generating unclear intent response: {e}")
+            # Fallback response (only used if LLM fails)
+            response_text = (
+                f"I want to help you, {user_name}, but I'm not quite sure what you need. "
+                f"Could you tell me a bit more? I can help with booking services, checking prices, "
+                f"or managing your bookings."
+            )
+
+        return {
+            "response": response_text,
+            "action_taken": "unclear_intent_handled",
+            "agent_used": "coordinator",
+            "metadata": {
+                "query": message,
+                "reason": "intent_unclear_needs_clarification"
             }
         }
 
@@ -584,7 +894,8 @@ class CoordinatorAgent:
             response = await self._route_to_agent(
                 intent_result=intent_result,
                 user=user,
-                session_id=session_id
+                session_id=session_id,
+                conversation_history=None  # No conversation history in timing wrapper
             )
 
             end_time = datetime.utcnow()
@@ -723,7 +1034,8 @@ class CoordinatorAgent:
                     intent_result=intent,
                     user=user,
                     session_id=session_id,
-                    message=message  # Pass original message
+                    message=message,  # Pass original message
+                    conversation_history=None  # No conversation history in fallback
                 )
                 responses.append(response["response"])
                 agents_used.append(response.get("agent_used", "unknown"))

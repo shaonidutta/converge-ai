@@ -99,6 +99,11 @@ class EntityType(str, Enum):
     # Info type entities
     INFO_TYPE = "info_type"  # details, duration, process, requirements
 
+    # Booking filter entities
+    STATUS_FILTER = "status_filter"  # pending, confirmed, completed, cancelled
+    SORT_BY = "sort_by"  # date, status, amount
+    LIMIT = "limit"  # number of results
+
 
 class IntentConfig(BaseModel):
     """Configuration for a specific intent"""
@@ -126,7 +131,10 @@ INTENT_CONFIGS: Dict[IntentType, IntentConfig] = {
             EntityType.ADDRESS_LINE1,
             EntityType.ADDRESS_LINE2,
             EntityType.CITY,
-            EntityType.STATE
+            EntityType.STATE,
+            EntityType.STATUS_FILTER,
+            EntityType.SORT_BY,
+            EntityType.LIMIT
         ],
         agent="BookingAgent",
         priority=10
@@ -149,7 +157,7 @@ INTENT_CONFIGS: Dict[IntentType, IntentConfig] = {
         intent=IntentType.SERVICE_INFORMATION,
         description="User wants information about services offered, service categories, what services are available, or help with services",
         optional_entities=[EntityType.SERVICE_TYPE, EntityType.INFO_TYPE],
-        agent="RAGAgent",
+        agent="ServiceAgent",  # Fixed: was "RAGAgent", should be "ServiceAgent"
         priority=7
     ),
     IntentType.COMPLAINT: IntentConfig(
@@ -271,6 +279,7 @@ ACTIONS: Dict[str, Set[str]] = {
     "cancel": {"cancel", "remove", "delete", "abort"},
     "reschedule": {"reschedule", "change", "move", "shift"},
     "modify": {"modify", "update", "edit", "change"},
+    "list": {"list", "show", "view", "display", "see", "get", "my bookings", "all bookings"},
     "check_status": {"status", "check", "track", "where", "when"}
 }
 
