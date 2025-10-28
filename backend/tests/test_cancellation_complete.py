@@ -42,10 +42,10 @@ def get_bookings(token):
     if bookings:
         print(f"✅ Found {len(bookings)} bookings:")
         for booking in bookings:
-            print(f"   - {booking['booking_number']}: {booking['status']} (ID: {booking['id']})")
+            print(f"   - {booking['order_id']}: {booking['status']} (ID: {booking['id']})")
     else:
         print("⚠️  No bookings found")
-    
+
     return bookings
 
 def create_test_booking(token):
@@ -89,18 +89,18 @@ def create_test_booking(token):
         
         # Extract booking number from response
         message = result['assistant_message']['message']
-        if "BK" in message:
-            # Try to extract booking number
+        if "ORD" in message:
+            # Try to extract order ID
             import re
-            match = re.search(r'BK[A-Z0-9]{8}', message)
+            match = re.search(r'ORD[A-Z0-9]{8}', message)
             if match:
-                booking_number = match.group(0)
-                print(f"✅ Booking created: {booking_number}")
-                return booking_number
-    
+                order_id = match.group(0)
+                print(f"✅ Booking created: {order_id}")
+                return order_id
+
     return None
 
-def test_cancellation(token, booking_number, test_message, test_name):
+def test_cancellation(token, order_id, test_message, test_name):
     """Test a cancellation scenario"""
     print(f"\n{'='*60}")
     print(f"🧪 TEST: {test_name}")
@@ -128,13 +128,13 @@ def test_cancellation(token, booking_number, test_message, test_name):
     print(f"🤖 Bot Response: {bot_message}")
     print(f"🎯 Intent: {intent} (Confidence: {confidence})")
     
-    # Check if booking ID was extracted
-    if booking_number in test_message:
-        if "provide" in bot_message.lower() and "booking" in bot_message.lower():
-            print("❌ FAIL: Booking ID not extracted (bot asking for it)")
+    # Check if order ID was extracted
+    if order_id in test_message:
+        if "provide" in bot_message.lower() and ("booking" in bot_message.lower() or "order" in bot_message.lower()):
+            print("❌ FAIL: Order ID not extracted (bot asking for it)")
             return False
         else:
-            print("✅ PASS: Booking ID extracted successfully")
+            print("✅ PASS: Order ID extracted successfully")
             return True
     else:
         print("ℹ️  No booking ID in message (expected to ask)")
@@ -155,31 +155,31 @@ def main():
         
         # Step 3: Use existing booking or create new one
         if bookings and bookings[0]['status'] in ['PENDING', 'CONFIRMED']:
-            booking_number = bookings[0]['booking_number']
-            print(f"\n✅ Using existing booking: {booking_number}")
+            order_id = bookings[0]['order_id']
+            print(f"\n✅ Using existing booking: {order_id}")
         else:
             print("\n⚠️  No active bookings found. Creating a test booking...")
-            booking_number = create_test_booking(token)
-            if not booking_number:
+            order_id = create_test_booking(token)
+            if not order_id:
                 print("❌ Failed to create test booking")
                 return
-        
+
         # Step 4: Run cancellation tests
         print(f"\n{'='*60}")
-        print(f"📋 RUNNING CANCELLATION TESTS WITH: {booking_number}")
+        print(f"📋 RUNNING CANCELLATION TESTS WITH: {order_id}")
         print(f"{'='*60}")
-        
+
         tests = [
-            (f"Cancel booking {booking_number}", "Direct cancellation with booking number"),
-            (f"I want to cancel {booking_number}", "Cancellation with 'I want to'"),
-            (f"Please cancel my booking number {booking_number}", "Polite cancellation request"),
+            (f"Cancel booking {order_id}", "Direct cancellation with order ID"),
+            (f"I want to cancel {order_id}", "Cancellation with 'I want to'"),
+            (f"Please cancel my order number {order_id}", "Polite cancellation request"),
             ("Cancel my AC service", "Cancel by service type (ambiguous)"),
             ("I need to cancel", "Cancel without details"),
         ]
-        
+
         results = []
         for test_message, test_name in tests:
-            result = test_cancellation(token, booking_number, test_message, test_name)
+            result = test_cancellation(token, order_id, test_message, test_name)
             results.append((test_name, result))
             time.sleep(2)  # Small delay between tests
         

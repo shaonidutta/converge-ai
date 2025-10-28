@@ -20,49 +20,85 @@ logger = logging.getLogger(__name__)
 def normalize_date(raw_value: str) -> Optional[str]:
     """
     Normalize date to ISO format (YYYY-MM-DD)
-    
+
     Handles:
     - Relative dates: "today", "tomorrow", "day after tomorrow", "next week"
     - ISO format: "2025-10-26"
     - DD/MM/YYYY format: "26/10/2025"
     - DD-MM-YYYY format: "26-10-2025"
-    
+    - Month names: "30 october", "October 30", "30th October 2025"
+
     Args:
         raw_value: Raw date string from user input or LLM
-        
+
     Returns:
         ISO format date string (YYYY-MM-DD) or None if cannot normalize
     """
     if not raw_value:
         return None
-    
+
     value_lower = str(raw_value).lower().strip()
     today = datetime.now().date()
-    
+
     # Relative dates
     if value_lower in ["today", "now"]:
         return today.isoformat()
-    
+
     if value_lower in ["tomorrow", "tmrw", "tmr"]:
         return (today + timedelta(days=1)).isoformat()
-    
+
     if "day after tomorrow" in value_lower:
         return (today + timedelta(days=2)).isoformat()
-    
+
     if "next week" in value_lower:
         return (today + timedelta(days=7)).isoformat()
-    
+
     # ISO format (YYYY-MM-DD) - already normalized
     iso_match = re.match(r'^(\d{4})-(\d{2})-(\d{2})$', str(raw_value))
     if iso_match:
         return raw_value
-    
+
     # DD/MM/YYYY or DD-MM-YYYY format
     date_match = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})', str(raw_value))
     if date_match:
         day, month, year = date_match.groups()
         return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
-    
+
+    # Month names: "30 october", "October 30", "30th October 2025"
+    # Try to parse using dateutil or datetime.strptime with various formats
+    month_formats = [
+        "%d %B",  # "30 October"
+        "%d %b",  # "30 Oct"
+        "%B %d",  # "October 30"
+        "%b %d",  # "Oct 30"
+        "%d %B %Y",  # "30 October 2025"
+        "%d %b %Y",  # "30 Oct 2025"
+        "%B %d %Y",  # "October 30 2025"
+        "%b %d %Y",  # "Oct 30 2025"
+        "%d%s %B",  # "30th October" (with ordinal suffix)
+        "%d%s %b",  # "30th Oct"
+        "%d%s %B %Y",  # "30th October 2025"
+        "%d%s %b %Y",  # "30th Oct 2025"
+    ]
+
+    # Remove ordinal suffixes (st, nd, rd, th)
+    value_cleaned = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', value_lower)
+
+    for fmt in month_formats:
+        try:
+            # Remove the %s placeholder for ordinal suffix
+            fmt_clean = fmt.replace('%s', '')
+            parsed_date = datetime.strptime(value_cleaned, fmt_clean)
+            # If year is not provided, assume current year
+            if parsed_date.year == 1900:  # Default year from strptime
+                parsed_date = parsed_date.replace(year=today.year)
+                # If the date is in the past, assume next year
+                if parsed_date.date() < today:
+                    parsed_date = parsed_date.replace(year=today.year + 1)
+            return parsed_date.date().isoformat()
+        except ValueError:
+            continue
+
     # Could not normalize
     logger.warning(f"[normalize_date] Could not normalize date: {raw_value}")
     return None
@@ -235,6 +271,7 @@ def normalize_action(raw_value: str) -> Optional[str]:
     
     # Map variations to standard actions
     action_mapping = {
+        "list": ["list", "listing", "show", "view", "display", "see", "get", "all", "my bookings", "check my"],
         "book": ["book", "booking", "schedule", "scheduling", "reserve", "reservation", "arrange", "set up"],
         "cancel": ["cancel", "cancellation", "remove", "delete"],
         "reschedule": ["reschedule", "rescheduling", "change date", "change time", "move"],
@@ -243,11 +280,19 @@ def normalize_action(raw_value: str) -> Optional[str]:
     }
     
     # Check if value matches any mapping
+    # IMPORTANT: Check for exact match first to avoid false matches
+    # (e.g., "reschedule" should not match "schedule" from "book" variations)
+    for standard_action, variations in action_mapping.items():
+        if value_lower in variations:
+            return standard_action
+
+    # If no exact match, check for substring match (for phrases like "my bookings")
     for standard_action, variations in action_mapping.items():
         for variation in variations:
-            if variation in value_lower:
+            # Skip single-word variations for substring matching to avoid false matches
+            if ' ' in variation and variation in value_lower:
                 return standard_action
-    
+
     # Return as-is if no mapping found
     return value_lower
 
@@ -309,6 +354,11 @@ def normalize_entities(entities: Dict[str, Any]) -> Dict[str, Any]:
     """
     if not entities:
         return {}
+
+    # Preprocess: Map order_id to booking_id (LLM sometimes extracts as order_id)
+    if "order_id" in entities and "booking_id" not in entities:
+        entities["booking_id"] = entities.pop("order_id")
+        logger.info(f"[normalize_entities] Mapped order_id to booking_id: {entities['booking_id']}")
 
     # Preprocess: Split combined date-time values
     # e.g., "tomorrow morning" → date: "tomorrow", time: "morning"

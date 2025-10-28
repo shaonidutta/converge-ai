@@ -192,14 +192,14 @@ const BookingDetailPage = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 bg-gradient-to-br from-primary-100 to-secondary-100 rounded-xl flex items-center justify-center">
-                      <span className="text-3xl">{booking.rate_card?.subcategory?.icon || '🛠️'}</span>
+                      <span className="text-3xl">{booking.items?.[0]?.rate_card?.subcategory?.image || '🛠️'}</span>
                     </div>
                     <div>
                       <h1 className="text-2xl font-bold text-slate-900">
-                        {booking.rate_card?.subcategory?.name || 'Service'}
+                        {booking.items?.[0]?.rate_card?.subcategory?.name || booking.items?.[0]?.service_name || 'Service'}
                       </h1>
                       <p className="text-slate-600">
-                        {booking.rate_card?.subcategory?.category?.name || 'Category'}
+                        {booking.items?.[0]?.rate_card?.subcategory?.category?.name || 'Category'}
                       </p>
                     </div>
                   </div>
@@ -227,7 +227,7 @@ const BookingDetailPage = () => {
                         <div>
                           <p className="text-sm text-slate-600">Date</p>
                           <p className="font-semibold text-slate-900">
-                            {formatDate(booking.scheduled_date)}
+                            {formatDate(booking.preferred_date)}
                           </p>
                         </div>
                       </div>
@@ -238,7 +238,7 @@ const BookingDetailPage = () => {
                         <div>
                           <p className="text-sm text-slate-600">Time</p>
                           <p className="font-semibold text-slate-900">
-                            {formatTime(booking.scheduled_time)}
+                            {formatTime(booking.preferred_time)}
                           </p>
                         </div>
                       </div>

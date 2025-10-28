@@ -28,10 +28,12 @@ class SubcategoryResponse(BaseModel):
     name: str
     slug: str
     description: Optional[str]
+    image: Optional[str] = None
     category_id: int
     category_name: str
     is_active: bool
     rate_card_count: int = 0
+    category: Optional['CategoryResponse'] = None  # Optional nested category
 
     class Config:
         from_attributes = True
@@ -175,15 +177,26 @@ class CreateBookingRequest(BaseModel):
         }
 
 
+class RateCardWithSubcategoryResponse(BaseModel):
+    """Rate card with subcategory and category info"""
+    id: int
+    name: str
+    subcategory: SubcategoryResponse
+
+    class Config:
+        from_attributes = True
+
+
 class BookingItemResponse(BaseModel):
     """Booking item response schema"""
     id: int
     service_name: str
     rate_card_name: str
+    rate_card: RateCardWithSubcategoryResponse
     quantity: int
     unit_price: Decimal
     total_price: Decimal
-    
+
     class Config:
         from_attributes = True
 
@@ -191,7 +204,7 @@ class BookingItemResponse(BaseModel):
 class BookingResponse(BaseModel):
     """Booking response schema"""
     id: int
-    booking_number: str
+    order_id: str
     status: str
     total_amount: Decimal
     preferred_date: str
@@ -200,7 +213,7 @@ class BookingResponse(BaseModel):
     items: List[BookingItemResponse]
     special_instructions: Optional[str]
     created_at: str
-    
+
     class Config:
         from_attributes = True
 

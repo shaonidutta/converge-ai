@@ -90,10 +90,10 @@ const RescheduleModal = ({ isOpen, onClose, onConfirm, booking, loading }) => {
               <div className="p-4 bg-slate-50 rounded-xl">
                 <p className="text-sm text-slate-600 mb-2">Current Booking</p>
                 <p className="font-semibold text-slate-900">
-                  {booking.rate_card?.subcategory?.name || 'Service'}
+                  {booking.items?.[0]?.rate_card?.subcategory?.name || booking.items?.[0]?.service_name || 'Service'}
                 </p>
                 <p className="text-sm text-slate-600">
-                  {booking.scheduled_date} at {booking.scheduled_time}
+                  {booking.preferred_date} at {booking.preferred_time}
                 </p>
               </div>
             )}

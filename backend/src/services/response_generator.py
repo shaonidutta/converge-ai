@@ -67,19 +67,19 @@ class ResponseGenerator:
     ) -> str:
         """
         Generate natural booking confirmation response
-        
+
         Args:
-            booking_data: Booking details (booking_number, total_amount, date, time)
+            booking_data: Booking details (order_id, total_amount, date, time)
             conversation_history: Previous conversation messages
             user_name: User's first name for personalization
-            
+
         Returns:
             Natural, conversational confirmation message
         """
         try:
             # Build context
             context = self._build_context(conversation_history, user_name)
-            
+
             # Build prompt
             prompt = f"""{LISA_PERSONALITY}
 
@@ -88,14 +88,14 @@ class ResponseGenerator:
 TASK: Generate a natural, conversational booking confirmation message.
 
 BOOKING DETAILS:
-- Booking Number: {booking_data.get('booking_number')}
+- Order ID: {booking_data.get('order_id')}
 - Total Amount: ₹{booking_data.get('total_amount')}
 - Date: {booking_data.get('date')}
 - Time: {booking_data.get('time')}
 
 INSTRUCTIONS:
 1. Confirm the booking naturally (don't just list details)
-2. Mention the booking number, amount, date, and time conversationally
+2. Mention the order ID, amount, date, and time conversationally
 3. Sound excited and helpful
 4. Keep it to 2-3 sentences
 5. NO emojis, NO bullet points, NO structured formatting
@@ -105,16 +105,16 @@ Generate the response:"""
             # Call LLM
             response = self.llm_client.generate(prompt)
             response_text = response.strip()
-            
+
             self.logger.info(f"[ResponseGenerator] Generated booking confirmation: {response_text[:100]}...")
             return response_text
-            
+
         except Exception as e:
             self.logger.error(f"[ResponseGenerator] Error generating booking confirmation: {e}")
             # Fallback to simple template
             return (
                 f"Great! Your booking is confirmed. "
-                f"Booking number {booking_data.get('booking_number')}, "
+                f"Order ID {booking_data.get('order_id')}, "
                 f"total amount ₹{booking_data.get('total_amount')}, "
                 f"scheduled for {booking_data.get('date')} at {booking_data.get('time')}."
             )

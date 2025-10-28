@@ -59,30 +59,136 @@ async def classify_intent_node(
     """
     try:
         logger.info(f"[classify_intent_node] Processing message: {state['current_message'][:50]}...")
-        
+
         # Get dialog state from DB
         dialog_state = await dialog_manager.get_active_state(state['session_id'])
-        
-        # Classify intent (context-aware)
-        intent_result, classification_method = await classifier.classify(
-            message=state['current_message'],
-            conversation_history=state.get('conversation_history'),
-            dialog_state=dialog_state
-        )
-        
-        # Get confidence from first intent
-        confidence = intent_result.intents[0].confidence if intent_result.intents else 0.0
 
-        logger.info(f"[classify_intent_node] Intent: {intent_result.primary_intent}, Confidence: {confidence}, Method: {classification_method}")
+        # CRITICAL FIX: When in slot-filling mode, check if user is asking a NEW question
+        # vs. providing a follow-up answer
+        if dialog_state:
+            logger.info(f"[classify_intent_node] Active dialog state detected: {dialog_state.intent}")
+
+            # First, check if this looks like a question (not a short answer)
+            message_lower = state['current_message'].lower().strip()
+
+            # Question indicators
+            question_words = ['what', 'how', 'why', 'when', 'where', 'which', 'who', 'can you', 'could you',
+                            'would you', 'do you', 'does', 'is there', 'are there', 'tell me', 'show me',
+                            'explain', 'list', 'give me']
+            has_question_mark = '?' in state['current_message']
+            starts_with_question = any(message_lower.startswith(qw) for qw in question_words)
+            is_likely_question = has_question_mark or starts_with_question
+
+            # Short answers (1-3 words) are likely follow-up responses, not questions
+            word_count = len(state['current_message'].split())
+            is_short_answer = word_count <= 3
+
+            # Only check for intent change if it looks like a question (not a short answer)
+            if is_likely_question and not is_short_answer:
+                logger.info(f"[classify_intent_node] Message looks like a question, classifying WITHOUT context to detect intent changes")
+
+                # Classify WITHOUT dialog_state context to get true intent
+                intent_result_no_context, classification_method_no_context = await classifier.classify(
+                    message=state['current_message'],
+                    conversation_history=None,  # No context
+                    dialog_state=None  # No dialog state
+                )
+
+                confidence_no_context = intent_result_no_context.intents[0].confidence if intent_result_no_context.intents else 0.0
+                logger.info(f"[classify_intent_node] No-context classification: {intent_result_no_context.primary_intent}, Confidence: {confidence_no_context}, Method: {classification_method_no_context}")
+
+                # Check if intent is different from dialog_state intent
+                if intent_result_no_context.primary_intent != dialog_state.intent:
+                    logger.info(f"[classify_intent_node] Intent changed from {dialog_state.intent} to {intent_result_no_context.primary_intent}")
+                    logger.info(f"[classify_intent_node] Exiting slot-filling to handle new intent")
+
+                    # Mark as intent changed and exit slot-filling
+                    return {
+                        "intent_result": intent_result_no_context.model_dump(),
+                        "primary_intent": intent_result_no_context.primary_intent,
+                        "intent_confidence": confidence_no_context,
+                        "classification_method": classification_method_no_context,
+                        "collected_entities": state.get('collected_entities', {}),
+                        "intent_changed": True,
+                        "original_intent": dialog_state.intent,
+                        "metadata": {
+                            **state.get("metadata", {}),
+                            "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["classify_intent_node"]
+                        }
+                    }
+                else:
+                    logger.info(f"[classify_intent_node] Question detected but intent unchanged ({dialog_state.intent}), continuing with slot-filling")
+                    # Use the no-context result since intent is the same
+                    intent_result = intent_result_no_context
+                    classification_method = classification_method_no_context
+                    confidence = confidence_no_context
+            else:
+                logger.info(f"[classify_intent_node] Message looks like a follow-up answer (short or not a question), continuing with slot-filling")
+                # For short answers, do context-aware classification to extract entities
+                intent_result, classification_method = await classifier.classify(
+                    message=state['current_message'],
+                    conversation_history=state.get('conversation_history'),
+                    dialog_state=dialog_state
+                )
+                confidence = intent_result.intents[0].confidence if intent_result.intents else 0.0
+
+            # Intent is the same, continue with slot-filling
+            logger.info(f"[classify_intent_node] Intent unchanged ({dialog_state.intent}), continuing with context-aware classification")
+            intent_changed = False
+        else:
+            # No dialog state, normal classification
+            intent_result, classification_method = await classifier.classify(
+                message=state['current_message'],
+                conversation_history=state.get('conversation_history'),
+                dialog_state=None
+            )
+
+            confidence = intent_result.intents[0].confidence if intent_result.intents else 0.0
+            logger.info(f"[classify_intent_node] Intent: {intent_result.primary_intent}, Confidence: {confidence}, Method: {classification_method}")
+            intent_changed = False
 
         # Extract entities from intent result
         intent_entities = intent_result.intents[0].entities if intent_result.intents else {}
 
-        # Merge with existing collected entities (preserve previous entities)
-        existing_entities = state.get('collected_entities', {})
-        merged_entities = {**existing_entities, **intent_entities}
+        # Normalize intent entities before merging
+        # This ensures entities like "30 october" are converted to "2025-10-30"
+        from src.utils.entity_normalizer import normalize_date, normalize_time
+        normalized_intent_entities = {}
+        for key, value in intent_entities.items():
+            if key == 'date':
+                normalized = normalize_date(value)
+                normalized_intent_entities[key] = normalized if normalized else value
+            elif key == 'time':
+                normalized = normalize_time(value)
+                normalized_intent_entities[key] = normalized if normalized else value
+            else:
+                normalized_intent_entities[key] = value
 
-        logger.info(f"[classify_intent_node] Existing entities: {existing_entities}, Intent entities: {intent_entities}, Merged: {merged_entities}")
+        if normalized_intent_entities != intent_entities:
+            logger.info(f"[classify_intent_node] Normalized entities: {intent_entities} → {normalized_intent_entities}")
+
+        # Merge with existing collected entities
+        # IMPORTANT: Preserve existing entities - don't overwrite with new intent entities
+        # This prevents losing validated entities when processing follow-up messages
+        existing_entities = state.get('collected_entities', {})
+        merged_entities = {**normalized_intent_entities, **existing_entities}  # existing_entities takes precedence
+
+        logger.info(f"[classify_intent_node] Existing entities: {existing_entities}, Intent entities: {normalized_intent_entities}, Merged: {merged_entities}")
+
+        # Save newly extracted entities to database
+        # This ensures entities extracted by pattern matching or LLM are persisted
+        if normalized_intent_entities and dialog_state:
+            try:
+                from src.schemas.dialog_state import DialogStateUpdate
+                await dialog_manager.update_state(
+                    session_id=state['session_id'],
+                    update_data=DialogStateUpdate(
+                        collected_entities=merged_entities
+                    )
+                )
+                logger.info(f"[classify_intent_node] ✅ Saved entities to database: {list(merged_entities.keys())}")
+            except Exception as e:
+                logger.warning(f"[classify_intent_node] Failed to save entities to database: {e}")
 
         # Update state
         return {
@@ -91,12 +197,14 @@ async def classify_intent_node(
             "intent_confidence": confidence,
             "classification_method": classification_method,
             "collected_entities": merged_entities,
+            "intent_changed": intent_changed,
+            "original_intent": dialog_state.intent if dialog_state else None,
             "metadata": {
                 **state.get("metadata", {}),
                 "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["classify_intent_node"]
             }
         }
-    
+
     except Exception as e:
         logger.error(f"[classify_intent_node] Error: {e}", exc_info=True)
         return {
@@ -363,26 +471,25 @@ async def update_dialog_state_node(
             # Add entity to collected entities
             entity_type = extracted['entity_type']
             entity_value = validation_result['normalized_value']
-            
-            await dialog_manager.add_entity(
-                session_id=state['session_id'],
-                entity_name=entity_type,
-                entity_value=entity_value
-            )
-            
-            # Remove from needed entities
-            await dialog_manager.remove_needed_entity(
-                session_id=state['session_id'],
-                entity_name=entity_type
-            )
-            
-            # Update state
+
+            # Update in-memory state first
             collected = state.get('collected_entities', {}).copy()
             collected[entity_type] = entity_value
-            
+
             needed = [e for e in state.get('needed_entities', []) if e != entity_type]
-            
-            logger.info(f"[update_dialog_state_node] Added {entity_type}={entity_value}, Remaining: {needed}")
+
+            # Save ALL collected entities to database (not just the new one)
+            # This ensures that entities from previous turns are not lost
+            from src.schemas.dialog_state import DialogStateUpdate
+            await dialog_manager.update_state(
+                session_id=state['session_id'],
+                update_data=DialogStateUpdate(
+                    collected_entities=collected,  # Save ALL entities
+                    needed_entities=needed
+                )
+            )
+
+            logger.info(f"[update_dialog_state_node] Added {entity_type}={entity_value}, All collected: {list(collected.keys())}, Remaining: {needed}")
             
             return {
                 "collected_entities": collected,
@@ -460,6 +567,9 @@ async def determine_needed_entities_node(
             elif action == "modify":
                 # For modification, we need: booking_id + field to modify
                 required_entities = ["booking_id"]
+            elif action == "list":
+                # For listing bookings, no additional entities needed
+                required_entities = []
 
         # Filter out already collected entities
         needed = [e for e in required_entities if e not in collected]
@@ -506,6 +616,7 @@ async def determine_needed_entities_node(
 
         return {
             "needed_entities": needed,
+            "collected_entities": collected,  # Return updated collected entities (includes auto-filled location)
             "metadata": {
                 **state.get("metadata", {}),
                 "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["determine_needed_entities_node"]
@@ -525,7 +636,8 @@ async def determine_needed_entities_node(
 
 async def generate_question_node(
     state: SlotFillingState,
-    question_generator: QuestionGenerator
+    question_generator: QuestionGenerator,
+    dialog_manager: DialogStateManager
 ) -> Dict[str, Any]:
     """
     Node: Generate question for next missing entity
@@ -533,6 +645,7 @@ async def generate_question_node(
     Args:
         state: Current conversation state
         question_generator: Question generator service
+        dialog_manager: Dialog state manager
 
     Returns:
         Updated state with generated question
@@ -552,6 +665,31 @@ async def generate_question_node(
                 intent=intent_enum,
                 collected_entities=state.get('collected_entities', {})
             )
+
+            # Save dialog state with awaiting_confirmation status
+            try:
+                from src.schemas.dialog_state import DialogStateUpdate
+                from src.core.models.dialog_state import DialogStateType
+
+                logger.info(f"[generate_question_node] 🔄 Updating dialog state to AWAITING_CONFIRMATION for session {state['session_id']}")
+
+                await dialog_manager.update_state(
+                    session_id=state['session_id'],
+                    update_data=DialogStateUpdate(
+                        state=DialogStateType.AWAITING_CONFIRMATION,
+                        context={"last_question": confirmation, "awaiting_confirmation": True}
+                    )
+                )
+
+                # Verify the update
+                updated_state = await dialog_manager.get_active_state(state['session_id'])
+                if updated_state:
+                    logger.info(f"[generate_question_node] ✅ Verified dialog state: state={updated_state.state.value}, context={updated_state.context}")
+                else:
+                    logger.error(f"[generate_question_node] ❌ Failed to verify dialog state - state not found!")
+
+            except Exception as e:
+                logger.error(f"[generate_question_node] ❌ Failed to save awaiting_confirmation state: {e}", exc_info=True)
 
             return {
                 "confirmation_message": confirmation,
@@ -596,6 +734,19 @@ async def generate_question_node(
             )
 
         logger.info(f"[generate_question_node] Question: {question[:100]}...")
+
+        # Save last_question_asked to dialog state context for follow-up detection
+        try:
+            from src.schemas.dialog_state import DialogStateUpdate
+            await dialog_manager.update_state(
+                session_id=state['session_id'],
+                update_data=DialogStateUpdate(
+                    context={"last_question": question, "expected_entity": next_entity}
+                )
+            )
+            logger.info(f"[generate_question_node] ✅ Saved last_question to dialog state context")
+        except Exception as e:
+            logger.warning(f"[generate_question_node] Failed to save last_question to dialog state: {e}")
 
         return {
             "current_question": question,
@@ -771,7 +922,7 @@ def create_slot_filling_graph(
         return await determine_needed_entities_node(state, db)
 
     async def _generate_question(state):
-        return await generate_question_node(state, question_generator)
+        return await generate_question_node(state, question_generator, dialog_manager)
 
     async def _handle_error(state):
         return await handle_error_node(state)
@@ -789,12 +940,25 @@ def create_slot_filling_graph(
     graph.set_entry_point("classify_intent")
 
     # Add edges
-    # classify_intent → check error → check_follow_up
+    # classify_intent → check error → check intent_changed → check_follow_up
+    def route_after_classify(state: SlotFillingState) -> str:
+        """Route after intent classification"""
+        if state.get('error'):
+            logger.info("[route_after_classify] Routing to: error")
+            return "error"
+        # CRITICAL: Check if intent changed BEFORE going to check_follow_up
+        if state.get('intent_changed', False):
+            logger.info("[route_after_classify] Intent changed detected, routing to: END")
+            return "intent_changed"
+        logger.info("[route_after_classify] Routing to: check_follow_up")
+        return "continue"
+
     graph.add_conditional_edges(
         "classify_intent",
-        should_route_to_error,
+        route_after_classify,
         {
             "error": "handle_error",
+            "intent_changed": END,  # Exit immediately if intent changed
             "continue": "check_follow_up"
         }
     )
@@ -802,10 +966,19 @@ def create_slot_filling_graph(
     # check_follow_up → route based on error or follow-up
     def route_after_follow_up_check(state: SlotFillingState) -> str:
         """Route after follow-up check"""
+        logger.info(f"[route_after_follow_up_check] Routing decision - intent_changed: {state.get('intent_changed', False)}, is_follow_up: {state.get('is_follow_up', False)}")
+
         if state.get('error'):
+            logger.info("[route_after_follow_up_check] Routing to: error")
             return "error"
         if state.get('is_follow_up', False) and state.get('follow_up_confidence', 0) > 0.6:
+            logger.info("[route_after_follow_up_check] Routing to: follow_up")
             return "follow_up"
+        # Check if intent has changed (user is asking a different question)
+        if state.get('intent_changed', False):
+            logger.info("[route_after_follow_up_check] Routing to: intent_changed (EXIT)")
+            return "intent_changed"
+        logger.info("[route_after_follow_up_check] Routing to: new_intent")
         return "new_intent"
 
     graph.add_conditional_edges(
@@ -814,6 +987,7 @@ def create_slot_filling_graph(
         {
             "error": "handle_error",
             "follow_up": "extract_entity",
+            "intent_changed": END,  # Exit slot-filling, let coordinator handle new intent
             "new_intent": "determine_needed_entities"
         }
     )

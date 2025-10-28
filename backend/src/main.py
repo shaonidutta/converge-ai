@@ -37,9 +37,9 @@ env_file = backend_dir / ".env"
 # Load .env file if it exists
 if env_file.exists():
     load_dotenv(dotenv_path=env_file)
-    print(f"✅ Loaded environment variables from: {env_file}")
+    print(f"[OK] Loaded environment variables from: {env_file}")
 else:
-    print(f"⚠️  .env file not found at: {env_file}")
+    print(f"[WARNING] .env file not found at: {env_file}")
 
 # =============================================
 # Configuration
@@ -92,14 +92,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
             await conn.execute(text("SELECT 1"))
         logger.info("✅ Database connection successful")
     except Exception as e:
-        logger.error(f"❌ Database connection failed: {e}")
+        logger.error(f"[ERROR] Database connection failed: {e}")
 
     # Test Redis connection
     try:
         await redis_client.ping()
-        logger.info("✅ Redis connection successful")
+        logger.info("[OK] Redis connection successful")
     except Exception as e:
-        logger.warning(f"⚠️  Redis connection failed: {e}")
+        logger.warning(f"[WARNING] Redis connection failed: {e}")
 
     logger.info("All services initialized successfully")
     yield
@@ -107,13 +107,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
     # Close database connections
     await engine.dispose()
-    logger.info("✅ Database connections closed")
+    logger.info("[OK] Database connections closed")
 
     # Close Redis connections (if method exists)
     try:
         if hasattr(redis_client, 'close'):
             await redis_client.close()
-        logger.info("✅ Redis connections closed")
+        logger.info("[OK] Redis connections closed")
     except Exception as e:
         logger.warning(f"Redis close warning: {e}")
 

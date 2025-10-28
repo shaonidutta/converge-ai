@@ -48,14 +48,14 @@ const BookingCard = ({ booking, onCancel, onReschedule }) => {
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-gradient-to-br from-primary-100 to-secondary-100 rounded-lg flex items-center justify-center">
-            <span className="text-2xl">{booking.rate_card?.subcategory?.icon || '🛠️'}</span>
+            <span className="text-2xl">{booking.items?.[0]?.rate_card?.subcategory?.image || '🛠️'}</span>
           </div>
           <div>
             <h3 className="font-semibold text-slate-900">
-              {booking.rate_card?.subcategory?.name || 'Service'}
+              {booking.items?.[0]?.rate_card?.subcategory?.name || booking.items?.[0]?.service_name || 'Service'}
             </h3>
             <p className="text-sm text-slate-600">
-              {booking.rate_card?.subcategory?.category?.name || 'Category'}
+              {booking.items?.[0]?.rate_card?.subcategory?.category?.name || 'Category'}
             </p>
           </div>
         </div>
@@ -66,11 +66,11 @@ const BookingCard = ({ booking, onCancel, onReschedule }) => {
       <div className="space-y-2 mb-4">
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <Calendar className="h-4 w-4" />
-          <span>{formatDate(booking.scheduled_date)}</span>
+          <span>{formatDate(booking.preferred_date)}</span>
         </div>
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <Clock className="h-4 w-4" />
-          <span>{formatTime(booking.scheduled_time)}</span>
+          <span>{formatTime(booking.preferred_time)}</span>
         </div>
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <MapPin className="h-4 w-4" />

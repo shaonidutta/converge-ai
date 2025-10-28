@@ -66,7 +66,13 @@ class ConversationState(TypedDict, total=False):
     
     classification_method: Optional[str]
     """Method used: 'pattern_match', 'llm', 'context_aware_llm', 'fallback'"""
-    
+
+    intent_changed: Optional[bool]
+    """Whether the user's intent changed during slot-filling (e.g., asking a clarification question)"""
+
+    original_intent: Optional[str]
+    """Original intent before intent change (e.g., 'booking_management' before asking 'what services do u give?')"""
+
     # ============================================================
     # DIALOG STATE (Slot-Filling)
     # ============================================================

@@ -18,7 +18,9 @@ class IntentPatterns:
         IntentType.BOOKING_MANAGEMENT: [
             "book", "schedule", "appointment", "reserve", "arrange",
             "cancel", "reschedule", "modify", "change booking",
-            "cancel booking", "cancel appointment", "cancel service"
+            "cancel booking", "cancel appointment", "cancel service",
+            "list bookings", "show bookings", "view bookings", "my bookings",
+            "all bookings", "check bookings", "see bookings"
         ],
         IntentType.PRICING_INQUIRY: [
             "price", "cost", "charge", "rate", "fee", "how much",
@@ -40,7 +42,10 @@ class IntentPatterns:
             "suggest", "recommend", "recommendation", "suggestions",
             "can you suggest", "can u suggest", "suggest me", "recommend me",
             "what do you recommend", "what would you suggest", "any suggestions",
-            "which service", "what should i", "help me choose"
+            "which service", "what should i", "help me choose",
+            "what services do you", "what services do u", "services do you give",
+            "services do u give", "what services you give", "what services u give",
+            "what do you offer", "what do u offer", "what can you do"
         ],
         IntentType.COMPLAINT: [
             "complaint", "complain", "issue", "problem", "not satisfied",
@@ -90,6 +95,16 @@ class IntentPatterns:
             r"\b(book|schedule|cancel|reschedule)\s+(a|an|my)?\s*(service|appointment|booking)",
             r"\b(want|need)\s+to\s+(book|cancel|reschedule)",
             r"\bcancel\s+my\s+(booking|appointment|service)",
+            r"\b(list|show|view|display|see|get|check)\s+(my|all)?\s*(bookings?|appointments?)",
+            r"\b(can|could)\s+(you|u)\s+(list|show|view|check)\s+(my)?\s*(bookings?|appointments?)",
+            r"\bmy\s+(bookings?|appointments?)",
+        ],
+        IntentType.SERVICE_INFORMATION: [
+            r"\bwhat\s+services\s+(do|does|can)\s+(you|u|ya)",
+            r"\bservices\s+(do|does)\s+(you|u)\s+(give|offer|provide|have)",
+            r"\bwhat\s+(do|can)\s+(you|u)\s+(offer|provide|do|help)",
+            r"\bwhat\s+services",
+            r"\btell\s+me\s+about\s+(your\s+)?services",
         ],
         IntentType.PRICING_INQUIRY: [
             r"\bhow\s+much\s+(does|is|for|to)",
@@ -105,6 +120,12 @@ class IntentPatterns:
             r"\b(complaint|complain|issue|problem)\s+(about|with)",
             r"\b(poor|bad|terrible)\s+service",
             r"\btechnician\s+(was|is)\s+(rude|late|unprofessional)",
+        ],
+        IntentType.POLICY_INQUIRY: [
+            r"\b(what|tell|explain)\s+(is|are|me|about)?\s*(your|the)?\s*(cancellation|refund|warranty|privacy|return)\s+policy",
+            r"\bpolicy\s+(on|for|about)\s+(cancellation|refund|warranty|returns)",
+            r"\b(cancellation|refund|warranty|privacy)\s+(policy|terms|conditions)",
+            r"\bterms\s+(and|&)?\s*conditions",
         ],
     }
     
@@ -212,6 +233,8 @@ class IntentPatterns:
                 raw_entities[EntityType.ACTION.value] = "book"
 
         # If not found, check action keywords
+        # IMPORTANT: Check specific action keywords FIRST (cancel, reschedule, modify, book)
+        # before checking "list" patterns to avoid false matches
         if EntityType.ACTION.value not in raw_entities:
             action_keywords = {
                 "cancel": ["cancel", "remove", "delete"],
@@ -228,6 +251,52 @@ class IntentPatterns:
                         break
                 if EntityType.ACTION.value in raw_entities:
                     break
+
+            # Only check for "list" action if no other action was found
+            # List patterns should ONLY match when there's an explicit list/show/view action word
+            if EntityType.ACTION.value not in raw_entities:
+                list_patterns = [
+                    r'\b(list|show|view|display)\s+(my|all|them)?\s*(bookings?|appointments?)?',  # "list my bookings", "show bookings"
+                    r'\b(check|see|get)\s+my\s+(bookings?|appointments?)',  # "check my bookings"
+                    r'(bookings?|appointments?).*\b(list|show|view|display)',  # "bookings and list them"
+                ]
+
+                for pattern in list_patterns:
+                    if re.search(pattern, message_lower):
+                        raw_entities[EntityType.ACTION.value] = "list"
+                        break
+
+        # Extract STATUS_FILTER (for list action)
+        # Check for status keywords in queries like "show my pending bookings"
+        if raw_entities.get(EntityType.ACTION.value) == "list":
+            status_keywords = {
+                "pending": ["pending", "upcoming", "scheduled", "active"],
+                "confirmed": ["confirmed", "approved"],
+                "completed": ["completed", "finished", "done", "past"],
+                "cancelled": ["cancelled", "canceled", "deleted", "removed"]
+            }
+
+            # Check for status keywords appearing before "bookings" or "appointments"
+            # Pattern: "show my [status] bookings"
+            status_pattern = r'\b(' + '|'.join([kw for keywords in status_keywords.values() for kw in keywords]) + r')\s+(bookings?|appointments?)'
+            status_match = re.search(status_pattern, message_lower)
+
+            if status_match:
+                status_word = status_match.group(1)
+                # Find which status this keyword belongs to
+                for status, keywords in status_keywords.items():
+                    if status_word in keywords:
+                        raw_entities[EntityType.STATUS_FILTER.value] = status
+                        break
+            else:
+                # Fallback: check for status keywords anywhere in the message
+                for status, keywords in status_keywords.items():
+                    for keyword in keywords:
+                        if keyword in message_lower:
+                            raw_entities[EntityType.STATUS_FILTER.value] = status
+                            break
+                    if EntityType.STATUS_FILTER.value in raw_entities:
+                        break
 
         # Extract DATE (raw extraction - will be normalized)
         if "today" in message_lower or " now" in message_lower:
@@ -325,21 +394,17 @@ class IntentPatterns:
             if EntityType.PAYMENT_TYPE.value in raw_entities:
                 break
 
-        # Extract booking ID (no normalization needed)
-        # Support multiple booking ID formats:
-        # - BK66A80A35 (BK + 8 alphanumeric characters) - ACTUAL FORMAT
-        # - BK123456, BK-123456, BK_123456 (BK + 6 digits)
-        # - BOOK12345, BOOK-12345, BOOK_12345
-        # - BKG12345, BKG-12345, BKG_12345
-        # - ORD12345, ORD-12345, ORD_12345
+        # Extract order ID (no normalization needed)
+        # Support order ID format:
+        # - ORD12345678 (ORD + 8 alphanumeric characters) - PRIMARY FORMAT
+        # - ORD123456, ORD-123456, ORD_123456 (ORD + 6+ digits)
+        # - ORDER12345, ORDER-12345, ORDER_12345
         # - #123456
         booking_id_patterns = [
-            r"\bBK[A-Z0-9]{8}\b",  # BK66A80A35 (BK + 8 alphanumeric) - PRIMARY FORMAT
-            r"\b(BK)[-_]?(\d{6})\b",  # BK123456, BK-123456, BK_123456
-            r"\b(BOOK)[-_]?([A-Z0-9]{4,8})\b",  # BOOK12345, BOOK-12345
-            r"\b(BKG)[-_]?([A-Z0-9]{4,8})\b",  # BKG12345, BKG-12345
-            r"\b(ORD)[-_]?([A-Z0-9]{4,8})\b",  # ORD12345, ORD-12345
-            r"#([A-Z0-9]{6,8})\b",  # #123456, #66A80A35
+            r"\bORD[A-Z0-9]{8}\b",  # ORD12345678 (ORD + 8 alphanumeric) - PRIMARY FORMAT
+            r"\b(ORD)[-_]?([A-Z0-9]{6,8})\b",  # ORD123456, ORD-123456, ORD_123456
+            r"\b(ORDER)[-_]?([A-Z0-9]{4,8})\b",  # ORDER12345, ORDER-12345
+            r"#([A-Z0-9]{6,8})\b",  # #123456, #12345678
         ]
 
         for pattern in booking_id_patterns:

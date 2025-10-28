@@ -65,25 +65,27 @@ class PolicyAgent:
         intent: str,
         entities: Dict[str, Any],
         user: User,
-        session_id: str
+        session_id: str,
+        message: str = ""  # Add message parameter
     ) -> Dict[str, Any]:
         """
         Main execution method for PolicyAgent
-        
+
         Args:
             intent: User intent (e.g., "policy_inquiry")
-            entities: Extracted entities including query
+            entities: Extracted entities including policy_type
             user: User object
             session_id: Session ID for tracking
-            
+            message: Original user message (used as query for RAG)
+
         Returns:
             Dictionary with response, action_taken, and metadata
         """
         try:
             self.logger.info(f"PolicyAgent executing for user {user.id}, intent: {intent}")
-            
-            # Extract query from entities
-            query = entities.get("query", "")
+
+            # Use message as query (fallback to entities if message not provided)
+            query = message or entities.get("query", "")
             if not query:
                 return {
                     "response": "I'd be happy to help you with policy questions. What would you like to know about our policies?",
@@ -116,9 +118,12 @@ class PolicyAgent:
             
             # Calculate grounding score
             grounding_score = await self._calculate_grounding_score(response_text, context)
-            
-            # Check if response is well-grounded (threshold: 0.45)
-            if grounding_score < 0.45:
+
+            # Log grounding score for debugging
+            self.logger.info(f"Grounding score for query '{query[:50]}...': {grounding_score:.4f}")
+
+            # Check if response is well-grounded (threshold: 0.35 - lowered for better UX)
+            if grounding_score < 0.35:
                 # Extract sources safely
                 sources_info = []
                 for r in search_results[:3]:

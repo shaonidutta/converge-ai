@@ -54,7 +54,6 @@ class Booking(Base, TimestampMixin):
 
     # Order
     order_id = Column(String(50), unique=True, nullable=False)
-    booking_number = Column(String(50), unique=True, nullable=False)
     invoice_number = Column(String(100), nullable=True)
     
     # Payment
@@ -114,7 +113,7 @@ class Booking(Base, TimestampMixin):
     __table_args__ = (
         Index('idx_user', 'user_id'),
         Index('idx_address', 'address_id'),
-        Index('idx_booking_number', 'booking_number', unique=True),
+        Index('idx_order_id', 'order_id', unique=True),
         Index('idx_status', 'status'),
         Index('idx_payment', 'payment_status'),
         Index('idx_settlement', 'is_settlement'),

@@ -94,20 +94,20 @@ def main():
     token = login()
     print("✅ Login successful")
     
-    print("\nFetching user bookings to get a valid booking ID...")
+    print("\nFetching user bookings to get a valid order ID...")
     booking_id = get_user_bookings(token)
     if booking_id:
         print(f"✅ Found booking: {booking_id}")
     else:
         print("⚠️  No confirmed bookings found. Some tests may fail.")
-        booking_id = "BK123456"  # Use dummy ID for testing
-    
-    # Test 1: Cancel by booking number (explicit)
+        booking_id = "ORD12345678"  # Use dummy ID for testing
+
+    # Test 1: Cancel by order ID (explicit)
     test_message(
         token,
         "cancel_test_1",
         f"Cancel booking {booking_id}",
-        "Test 1: Cancel by booking number (explicit)"
+        "Test 1: Cancel by order ID (explicit)"
     )
     time.sleep(2)
     

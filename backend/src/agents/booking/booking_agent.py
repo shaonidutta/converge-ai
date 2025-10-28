@@ -60,7 +60,7 @@ class BookingAgent:
             intent: Intent type (should be "booking_management")
             entities: Extracted entities from slot-filling
                 {
-                    "action": "book" | "cancel" | "reschedule" | "modify",
+                    "action": "book" | "cancel" | "reschedule" | "modify" | "list",
                     "service_type": "ac" (for book action),
                     "date": "2025-10-15" (for book/reschedule),
                     "time": "14:00" (for book/reschedule),
@@ -79,7 +79,7 @@ class BookingAgent:
             }
         """
         action = entities.get("action", "book")
-        
+
         if action == "book":
             return await self._create_booking(entities, user)
         elif action == "cancel":
@@ -88,9 +88,21 @@ class BookingAgent:
             return await self._reschedule_booking(entities, user)
         elif action == "modify":
             return await self._modify_booking(entities, user)
+        elif action == "list":
+            # Extract optional filtering and sorting parameters
+            status_filter = entities.get("status_filter")
+            sort_by = entities.get("sort_by", "date")
+            limit = entities.get("limit", 20)
+
+            return await self._list_bookings(
+                user=user,
+                status_filter=status_filter,
+                sort_by=sort_by,
+                limit=limit
+            )
         else:
             return {
-                "response": f"I'm not quite sure what you'd like to do with your booking. Could you let me know if you want to book, cancel, reschedule, or modify something?",
+                "response": f"I'm not quite sure what you'd like to do with your booking. Could you let me know if you want to book, cancel, reschedule, modify, or view your bookings?",
                 "action_taken": "error",
                 "metadata": {"error": "unknown_action", "action": action}
             }
@@ -283,7 +295,7 @@ class BookingAgent:
             # Step 7: Generate natural response using ResponseGenerator
             response_text = await self.response_generator.generate_booking_confirmation(
                 booking_data={
-                    "booking_number": booking_response.booking_number,
+                    "order_id": booking_response.order_id,
                     "total_amount": float(booking_response.total_amount),
                     "date": str(booking_response.preferred_date),
                     "time": str(booking_response.preferred_time)
@@ -298,7 +310,7 @@ class BookingAgent:
                 "action_taken": "booking_created",
                 "metadata": {
                     "booking_id": booking_response.id,
-                    "booking_number": booking_response.booking_number,
+                    "order_id": booking_response.order_id,
                     "total_amount": float(booking_response.total_amount),
                     "scheduled_date": str(booking_response.preferred_date),
                     "scheduled_time": str(booking_response.preferred_time),
@@ -416,7 +428,7 @@ class BookingAgent:
 
             if not booking_id:
                 return {
-                    "response": "I need the booking ID to cancel. Could you provide it?",
+                    "response": "I need the Order ID to cancel. Could you provide it? (e.g., ORDA5D9F532)",
                     "action_taken": "missing_entity",
                     "metadata": {"missing": "booking_id"}
                 }
@@ -510,12 +522,12 @@ class BookingAgent:
             )
 
             return {
-                "response": f"✅ Booking {result.booking_number} has been rescheduled to {new_date} at {new_time}. "
+                "response": f"✅ Booking {result.order_id} has been rescheduled to {new_date} at {new_time}. "
                            f"You will receive a confirmation shortly.",
                 "action_taken": "booking_rescheduled",
                 "metadata": {
                     "booking_id": result.id,
-                    "booking_number": result.booking_number,
+                    "order_id": result.order_id,
                     "new_date": new_date,
                     "new_time": new_time,
                     "status": result.status
@@ -601,12 +613,12 @@ class BookingAgent:
             await self.db.refresh(booking_record)
 
             return {
-                "response": f"✅ Booking {booking.booking_number} has been updated successfully. "
+                "response": f"✅ Booking {booking.order_id} has been updated successfully. "
                            f"Your special instructions have been noted.",
                 "action_taken": "booking_modified",
                 "metadata": {
                     "booking_id": booking.id,
-                    "booking_number": booking.booking_number,
+                    "order_id": booking.order_id,
                     "modifications": {
                         "special_instructions": special_instructions
                     }
@@ -623,6 +635,115 @@ class BookingAgent:
             logger.error(f"Error modifying booking: {str(e)}")
             return {
                 "response": f"❌ An unexpected error occurred: {str(e)}",
+                "action_taken": "error",
+                "metadata": {"error": str(e)}
+            }
+
+    async def _list_bookings(
+        self,
+        user: User,
+        status_filter: str = None,
+        sort_by: str = "date",
+        limit: int = 20
+    ) -> Dict[str, Any]:
+        """
+        List bookings for the user with optional filtering and sorting
+
+        Args:
+            user: User object
+            status_filter: Optional status filter (pending, confirmed, completed, cancelled)
+            sort_by: Sort field (date, status, amount)
+            limit: Maximum number of bookings to return
+
+        Returns:
+            Response dict with list of bookings
+        """
+        try:
+            # Fetch bookings using BookingService
+            bookings = await self.booking_service.list_bookings(
+                user=user,
+                status_filter=status_filter,
+                skip=0,
+                limit=limit
+            )
+
+            if not bookings:
+                return {
+                    "response": "You don't have any bookings yet. Would you like to book a service?",
+                    "action_taken": "no_bookings",
+                    "metadata": {"booking_count": 0}
+                }
+
+            # Build booking summary
+            booking_summaries = []
+            for b in bookings:
+                try:
+                    service_name = "Unknown"
+                    # BookingResponse has 'items' field, not 'booking_items'
+                    if b.items and len(b.items) > 0:
+                        item = b.items[0]
+                        if item.rate_card and item.rate_card.subcategory:
+                            service_name = item.rate_card.subcategory.name
+
+                    booking_summaries.append({
+                        'order_id': b.order_id,
+                        'service': service_name,
+                        'date': b.preferred_date,
+                        'time': b.preferred_time,
+                        'status': b.status,
+                        'total_amount': float(b.total_amount),
+                        'address': f"{b.address.city}, {b.address.state}" if b.address else "N/A"
+                    })
+                except Exception as e:
+                    logger.error(f"Error processing booking {b.id}: {str(e)}")
+                    continue
+
+            # Sort bookings
+            if sort_by == "date":
+                booking_summaries.sort(key=lambda x: (x['date'], x['time']), reverse=True)
+            elif sort_by == "status":
+                # Priority: pending > confirmed > completed > cancelled
+                status_priority = {"pending": 1, "confirmed": 2, "completed": 3, "cancelled": 4}
+                booking_summaries.sort(key=lambda x: status_priority.get(x['status'], 5))
+            elif sort_by == "amount":
+                booking_summaries.sort(key=lambda x: x['total_amount'], reverse=True)
+
+            # Build response text
+            filter_text = f" ({status_filter} only)" if status_filter else ""
+            response_lines = [f"Here are your bookings{filter_text}:"]
+
+            for idx, booking in enumerate(booking_summaries, 1):
+                response_lines.append(
+                    f"{idx}. Order {booking['order_id']} - {booking['service']} on {booking['date']} at {booking['time']} (Status: {booking['status']}, Amount: Rs. {booking['total_amount']})"
+                )
+
+            # Add helpful footer
+            if len(booking_summaries) >= limit:
+                response_lines.append(f"\nShowing {limit} bookings. Ask for more if needed.")
+
+            if not status_filter:
+                response_lines.append("\nYou can filter by status: pending, confirmed, completed, or cancelled.")
+
+            response_text = "\n".join(response_lines)
+
+            return {
+                "response": response_text,
+                "action_taken": "bookings_listed",
+                "metadata": {
+                    "booking_count": len(bookings),
+                    "bookings": booking_summaries,
+                    "status_filter": status_filter,
+                    "sort_by": sort_by
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Error listing bookings: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+            return {
+                "response": "I'm having trouble fetching your bookings right now. Please try again later or contact support.",
                 "action_taken": "error",
                 "metadata": {"error": str(e)}
             }

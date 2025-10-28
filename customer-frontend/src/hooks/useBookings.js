@@ -3,7 +3,7 @@
  * Custom hook for fetching and managing bookings
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   fetchBookings,
   fetchRecentBookings,
@@ -22,6 +22,10 @@ export const useBookings = (params = {}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Memoize params to create stable dependency
+  // Only changes when actual param values change, not object reference
+  const paramsKey = useMemo(() => JSON.stringify(params), [params]);
+
   const loadBookings = useCallback(async () => {
     try {
       setLoading(true);
@@ -34,7 +38,7 @@ export const useBookings = (params = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [params]);
+  }, [paramsKey]); // Depend on stringified params, not object reference
 
   useEffect(() => {
     loadBookings();

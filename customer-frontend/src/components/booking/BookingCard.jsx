@@ -132,16 +132,16 @@ const BookingCard = ({ booking, onReschedule, onCancel, index = 0 }) => {
           <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
             <Calendar className="h-4 w-4 text-primary-600" />
           </div>
-          <span>{formatDate(booking.scheduled_date)}</span>
+          <span>{formatDate(booking.preferred_date)}</span>
         </div>
 
         {/* Time */}
-        {booking.scheduled_time && (
+        {booking.preferred_time && (
           <div className="flex items-center gap-3 text-sm text-slate-600">
             <div className="w-8 h-8 rounded-lg bg-secondary-50 flex items-center justify-center">
               <Clock className="h-4 w-4 text-secondary-600" />
             </div>
-            <span>{formatTime(booking.scheduled_time)}</span>
+            <span>{formatTime(booking.preferred_time)}</span>
           </div>
         )}
 

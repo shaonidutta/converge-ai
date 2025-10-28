@@ -18,12 +18,12 @@ from sqlalchemy import select, delete
 import os
 from dotenv import load_dotenv
 
-from backend.src.agents.booking.booking_agent import BookingAgent
-from backend.src.core.models import (
+from src.agents.booking.booking_agent import BookingAgent
+from src.core.models import (
     User, Address, Cart, CartItem, RateCard, Category, Subcategory,
     Provider, Pincode, ProviderPincode, Booking, BookingItem
 )
-from backend.src.core.database.base import Base
+from src.core.database.base import Base
 
 # Load environment variables
 load_dotenv()
@@ -312,9 +312,9 @@ async def test_booking_creation_integration(db_session, test_data):
     # Assert - Check response
     assert result["action_taken"] == "booking_created", f"Expected booking_created, got {result['action_taken']}: {result.get('response')}"
     assert "booking_id" in result["metadata"]
-    assert "booking_number" in result["metadata"]
+    assert "order_id" in result["metadata"]
     assert result["metadata"]["total_amount"] > 0
-    
+
     booking_id = result["metadata"]["booking_id"]
     
     # Verify Booking record in database
@@ -330,7 +330,6 @@ async def test_booking_creation_integration(db_session, test_data):
     print(f"ID: {booking.id}")
     print(f"User ID: {booking.user_id}")
     print(f"Order ID: {booking.order_id}")
-    print(f"Booking Number: {booking.booking_number}")
     print(f"Payment Status: {booking.payment_status}")
     print(f"Payment Method: {booking.payment_method}")
     print(f"Subtotal: {booking.subtotal}")
@@ -338,10 +337,9 @@ async def test_booking_creation_integration(db_session, test_data):
     print(f"Status: {booking.status}")
     print(f"Preferred Date: {booking.preferred_date}")
     print(f"Preferred Time: {booking.preferred_time}")
-    
+
     assert booking.user_id == user.id
     assert booking.order_id is not None and booking.order_id != ""
-    assert booking.booking_number is not None and booking.booking_number != ""
     assert booking.payment_status is not None
     assert booking.payment_method is not None
     assert booking.subtotal > 0

@@ -100,8 +100,16 @@ class IntentClassifier:
                     has_multi_intent_signal = True
 
                 if not has_multi_intent_signal:
+                    # IMPORTANT: Pattern matching takes precedence even when dialog_state is present
+                    # This ensures that explicit questions like "what services do you give?" are
+                    # correctly classified even during slot-filling
                     logger.info(f"High-confidence single intent pattern match: {high_confidence_intents}")
                     result = self._build_result_from_patterns(message, high_confidence_intents)
+
+                    # If there's a dialog state and the matched intent is different, log it
+                    if dialog_state and dialog_state.intent != high_confidence_intents[0][0].value:
+                        logger.info(f"Pattern match overriding dialog state intent: {dialog_state.intent} → {high_confidence_intents[0][0].value}")
+
                     return result, "pattern_match"
                 else:
                     logger.info(f"Multi-intent signal detected, passing to LLM: {message[:50]}...")
@@ -273,15 +281,22 @@ class IntentClassifier:
             # Use centralized normalizer
             normalized_entities = normalize_entities(entities)
 
-            # Fallback: If action is missing for booking_management intent, try to extract it
-            if (intent_result.intent == "booking_management" and
-                "action" not in normalized_entities and
-                original_message):
+            # For booking_management intent, always check pattern-based action extraction
+            # This ensures we catch "list" actions that LLM might miss or misclassify
+            if intent_result.intent == "booking_management" and original_message:
+                pattern_action = self._extract_action_fallback(original_message)
 
-                action = self._extract_action_fallback(original_message)
-                if action:
-                    normalized_entities["action"] = action
-                    logger.info(f"[_normalize_llm_entities] Fallback extracted action: {action}")
+                # If pattern extraction found an action, use it
+                # Pattern extraction is more reliable for specific actions like "list"
+                if pattern_action:
+                    # If LLM extracted a different action, log it but prefer pattern match
+                    if "action" in normalized_entities and normalized_entities["action"] != pattern_action:
+                        logger.info(f"[_normalize_llm_entities] Overriding LLM action '{normalized_entities['action']}' with pattern-based action '{pattern_action}'")
+                    normalized_entities["action"] = pattern_action
+                    logger.info(f"[_normalize_llm_entities] Pattern extracted action: {pattern_action}")
+                # If pattern extraction found nothing and LLM also found nothing, that's fine
+                elif "action" not in normalized_entities:
+                    logger.info(f"[_normalize_llm_entities] No action found by pattern or LLM")
 
             # Update entities with normalized values
             if normalized_entities:
@@ -294,6 +309,13 @@ class IntentClassifier:
         """
         Fallback method to extract action from message using pattern matching
 
+        Priority order:
+        1. List bookings (highest priority when "bookings" or "appointments" mentioned)
+        2. Cancel
+        3. Reschedule
+        4. Modify
+        5. Book (lowest priority)
+
         Args:
             message: User message
 
@@ -301,6 +323,20 @@ class IntentClassifier:
             Extracted action or None
         """
         message_lower = message.lower()
+
+        # Check for "list" action first with specific patterns
+        # This has highest priority when "bookings" or "appointments" is mentioned
+        list_patterns = [
+            r'\b(list|show|view|display)\s+(my|all|them)?\s*(bookings?|appointments?)?',  # "list them", "show my bookings"
+            r'\b(check|see|get)\s+my\s+(bookings?|appointments?)',  # "check my bookings"
+            r'\bmy\s+(bookings?|appointments?)',  # "my bookings"
+            r'\ball\s+(bookings?|appointments?)',  # "all bookings"
+            r'(bookings?|appointments?).*\b(list|show|view|display)',  # "bookings and list them"
+        ]
+
+        for pattern in list_patterns:
+            if re.search(pattern, message_lower):
+                return "list"
 
         # Check for booking-related phrases
         if re.search(r'\b(i want to|i need to|i would like to|i\'d like to)\s+(book|schedule|arrange)', message_lower):

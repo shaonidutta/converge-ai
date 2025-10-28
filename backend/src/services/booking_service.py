@@ -5,6 +5,7 @@ Business logic for booking management
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload, joinedload
 from typing import List, Optional
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -13,7 +14,7 @@ import uuid
 
 from src.core.models import (
     User, Booking, BookingItem, Cart, CartItem, Address,
-    RateCard, Subcategory, BookingStatus, PaymentStatus, PaymentMethod,
+    RateCard, Subcategory, Category, BookingStatus, PaymentStatus, PaymentMethod,
     Provider, Pincode, ProviderPincode
 )
 from src.schemas.customer import (
@@ -22,6 +23,9 @@ from src.schemas.customer import (
     BookingItemResponse,
     AddressResponse,
     CancelBookingRequest,
+    RateCardWithSubcategoryResponse,
+    SubcategoryResponse,
+    CategoryResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -132,12 +136,10 @@ class BookingService:
             raise ValueError("Invalid date or time format")
         
         # Create booking
-        booking_number = f"BK{uuid.uuid4().hex[:8].upper()}"
         order_id = f"ORD{uuid.uuid4().hex[:8].upper()}"
-        
+
         booking = Booking(
             order_id=order_id,
-            booking_number=booking_number,
             user_id=user.id,
             address_id=request.address_id,
             subtotal=total_amount,
@@ -210,7 +212,7 @@ class BookingService:
         await self.db.refresh(booking)
         
         logger.info(
-            f"Booking created: id={booking.id}, number={booking_number}, "
+            f"Booking created: id={booking.id}, order_id={booking.order_id}, "
             f"user_id={user.id}"
         )
         
@@ -227,10 +229,43 @@ class BookingService:
         
         item_responses = []
         for booking_item, rate_card, subcategory in booking_items:
+            # Get category for the subcategory
+            category_result = await self.db.execute(
+                select(Category).where(Category.id == subcategory.category_id)
+            )
+            category = category_result.scalar_one()
+
+            # Build rate card with subcategory response
+            rate_card_response = RateCardWithSubcategoryResponse(
+                id=rate_card.id,
+                name=rate_card.name,
+                subcategory=SubcategoryResponse(
+                    id=subcategory.id,
+                    name=subcategory.name,
+                    slug=subcategory.slug,
+                    description=subcategory.description,
+                    image=subcategory.image,
+                    category_id=subcategory.category_id,
+                    category_name=category.name,
+                    is_active=subcategory.is_active,
+                    rate_card_count=0,  # Not needed for booking display
+                    category=CategoryResponse(
+                        id=category.id,
+                        name=category.name,
+                        slug=category.slug,
+                        description=category.description,
+                        image=category.image,
+                        is_active=category.is_active,
+                        subcategory_count=0  # Not needed for booking display
+                    )
+                )
+            )
+
             item_responses.append(BookingItemResponse(
                 id=booking_item.id,
                 service_name=booking_item.service_name,
                 rate_card_name=rate_card.name,
+                rate_card=rate_card_response,
                 quantity=booking_item.quantity,
                 unit_price=float(booking_item.price),
                 total_price=float(booking_item.final_amount)
@@ -238,7 +273,7 @@ class BookingService:
         
         return BookingResponse(
             id=booking.id,
-            booking_number=booking.booking_number,
+            order_id=booking.order_id,
             status=booking.status.value,
             total_amount=booking.total,
             preferred_date=booking.preferred_date.isoformat(),
@@ -258,22 +293,37 @@ class BookingService:
     ) -> List[BookingResponse]:
         """
         List user's bookings with optional status filter
-        
+
+        Optimized with eager loading to prevent N+1 queries:
+        - Uses selectinload to fetch related address and booking items in single queries
+        - Reduces database round trips from O(n*2) to O(1) where n = number of bookings
+
         Args:
             user: Current user
             status_filter: Optional status filter
             skip: Number of records to skip
             limit: Number of records to return
-            
+
         Returns:
             List of BookingResponse
-            
+
         Raises:
             ValueError: If status filter is invalid
         """
-        # Build query
-        query = select(Booking).where(Booking.user_id == user.id)
-        
+        # Build query with eager loading for related entities
+        # This prevents N+1 query problem by loading all related data in advance
+        query = (
+            select(Booking)
+            .where(Booking.user_id == user.id)
+            .options(
+                selectinload(Booking.address),  # Eager load address
+                selectinload(Booking.booking_items)
+                    .selectinload(BookingItem.rate_card)
+                    .selectinload(RateCard.subcategory)
+                    .selectinload(Subcategory.category)  # Eager load items + rate cards + subcategory + category
+            )
+        )
+
         # Apply status filter
         if status_filter:
             status_upper = status_filter.upper()
@@ -281,64 +331,124 @@ class BookingService:
                 query = query.where(Booking.status == BookingStatus[status_upper])
             else:
                 raise ValueError(f"Invalid status filter: {status_filter}")
-        
+
         # Order by created_at desc
         query = query.order_by(Booking.created_at.desc()).offset(skip).limit(limit)
-        
+
         result = await self.db.execute(query)
-        bookings = result.scalars().all()
-        
-        # Prepare response
+        bookings = result.scalars().unique().all()  # unique() needed when using selectinload
+
+        # Prepare response - now all data is already loaded, no additional queries
         response = []
         for booking in bookings:
-            booking_response = await self._build_booking_response(booking)
-            response.append(booking_response)
-        
+            # Build response using already-loaded relationships
+            address = booking.address
+
+            address_response = AddressResponse(
+                id=address.id,
+                address_line1=address.address_line1,
+                address_line2=address.address_line2,
+                city=address.city,
+                state=address.state,
+                pincode=address.pincode,
+                is_default=address.is_default
+            )
+
+            item_responses = []
+            for booking_item in booking.booking_items:
+                rate_card = booking_item.rate_card
+                subcategory = rate_card.subcategory
+                category = subcategory.category
+
+                # Build rate card with subcategory response
+                rate_card_response = RateCardWithSubcategoryResponse(
+                    id=rate_card.id,
+                    name=rate_card.name,
+                    subcategory=SubcategoryResponse(
+                        id=subcategory.id,
+                        name=subcategory.name,
+                        slug=subcategory.slug,
+                        description=subcategory.description,
+                        image=subcategory.image,
+                        category_id=subcategory.category_id,
+                        category_name=category.name,
+                        is_active=subcategory.is_active,
+                        rate_card_count=0,  # Not needed for booking display
+                        category=CategoryResponse(
+                            id=category.id,
+                            name=category.name,
+                            slug=category.slug,
+                            description=category.description,
+                            image=category.image,
+                            is_active=category.is_active,
+                            subcategory_count=0  # Not needed for booking display
+                        )
+                    )
+                )
+
+                item_responses.append(BookingItemResponse(
+                    id=booking_item.id,
+                    service_name=booking_item.service_name,
+                    rate_card_name=rate_card.name,
+                    rate_card=rate_card_response,
+                    quantity=booking_item.quantity,
+                    unit_price=float(booking_item.price),
+                    total_price=float(booking_item.final_amount)
+                ))
+
+            response.append(BookingResponse(
+                id=booking.id,
+                order_id=booking.order_id,
+                status=booking.status.value,
+                total_amount=booking.total,
+                preferred_date=booking.preferred_date.isoformat(),
+                preferred_time=booking.preferred_time.strftime("%H:%M"),
+                address=address_response,
+                items=item_responses,
+                special_instructions=booking.special_instructions,
+                created_at=booking.created_at.isoformat()
+            ))
+
         return response
     
     async def get_booking(self, booking_id: int, user: User) -> BookingResponse:
         """
         Get booking details by ID
-        
+
+        Optimized with eager loading to prevent N+1 queries
+
         Args:
             booking_id: Booking ID
             user: Current user
-            
+
         Returns:
             BookingResponse with booking details
-            
+
         Raises:
             ValueError: If booking not found
         """
-        # Get booking
+        # Get booking with eager loading
         result = await self.db.execute(
-            select(Booking).where(
+            select(Booking)
+            .where(
                 Booking.id == booking_id,
                 Booking.user_id == user.id
             )
+            .options(
+                selectinload(Booking.address),
+                selectinload(Booking.booking_items)
+                    .selectinload(BookingItem.rate_card)
+                    .selectinload(RateCard.subcategory)
+                    .selectinload(Subcategory.category)
+            )
         )
         booking = result.scalar_one_or_none()
-        
+
         if not booking:
             raise ValueError("Booking not found")
-        
-        return await self._build_booking_response(booking)
-    
-    async def _build_booking_response(self, booking: Booking) -> BookingResponse:
-        """Helper method to build booking response"""
-        # Get address
-        address_result = await self.db.execute(
-            select(Address).where(Address.id == booking.address_id)
-        )
-        address = address_result.scalar_one()
-        
-        # Get booking items
-        items_result = await self.db.execute(
-            select(BookingItem, RateCard)
-            .join(RateCard, BookingItem.rate_card_id == RateCard.id)
-            .where(BookingItem.booking_id == booking.id)
-        )
-        items = items_result.all()
+
+        # Build response using already-loaded relationships
+        address = booking.address
 
         address_response = AddressResponse(
             id=address.id,
@@ -350,21 +460,51 @@ class BookingService:
             is_default=address.is_default
         )
 
-        item_responses = [
-            BookingItemResponse(
-                id=item[0].id,
-                service_name=item[0].service_name,
-                rate_card_name=item[1].name,
-                quantity=item[0].quantity,
-                unit_price=float(item[0].price),
-                total_price=float(item[0].final_amount)
+        item_responses = []
+        for booking_item in booking.booking_items:
+            rate_card = booking_item.rate_card
+            subcategory = rate_card.subcategory
+            category = subcategory.category
+
+            # Build rate card with subcategory response
+            rate_card_response = RateCardWithSubcategoryResponse(
+                id=rate_card.id,
+                name=rate_card.name,
+                subcategory=SubcategoryResponse(
+                    id=subcategory.id,
+                    name=subcategory.name,
+                    slug=subcategory.slug,
+                    description=subcategory.description,
+                    image=subcategory.image,
+                    category_id=subcategory.category_id,
+                    category_name=category.name,
+                    is_active=subcategory.is_active,
+                    rate_card_count=0,  # Not needed for booking display
+                    category=CategoryResponse(
+                        id=category.id,
+                        name=category.name,
+                        slug=category.slug,
+                        description=category.description,
+                        image=category.image,
+                        is_active=category.is_active,
+                        subcategory_count=0  # Not needed for booking display
+                    )
+                )
             )
-            for item in items
-        ]
-        
+
+            item_responses.append(BookingItemResponse(
+                id=booking_item.id,
+                service_name=booking_item.service_name,
+                rate_card_name=rate_card.name,
+                rate_card=rate_card_response,
+                quantity=booking_item.quantity,
+                unit_price=float(booking_item.price),
+                total_price=float(booking_item.final_amount)
+            ))
+
         return BookingResponse(
             id=booking.id,
-            booking_number=booking.booking_number,
+            order_id=booking.order_id,
             status=booking.status.value,
             total_amount=booking.total,
             preferred_date=booking.preferred_date.isoformat(),
@@ -374,6 +514,9 @@ class BookingService:
             special_instructions=booking.special_instructions,
             created_at=booking.created_at.isoformat()
         )
+
+    # Note: _build_booking_response method removed - now using eager loading in list_bookings and get_booking
+    # This eliminates N+1 query problem and improves performance significantly
 
 
     async def reschedule_booking(
@@ -487,10 +630,48 @@ class BookingService:
 
         item_responses = []
         for booking_item, rate_card in items:
+            # Get subcategory and category for the rate card
+            subcategory_result = await self.db.execute(
+                select(Subcategory).where(Subcategory.id == rate_card.subcategory_id)
+            )
+            subcategory = subcategory_result.scalar_one()
+
+            category_result = await self.db.execute(
+                select(Category).where(Category.id == subcategory.category_id)
+            )
+            category = category_result.scalar_one()
+
+            # Build rate card with subcategory response
+            rate_card_response = RateCardWithSubcategoryResponse(
+                id=rate_card.id,
+                name=rate_card.name,
+                subcategory=SubcategoryResponse(
+                    id=subcategory.id,
+                    name=subcategory.name,
+                    slug=subcategory.slug,
+                    description=subcategory.description,
+                    image=subcategory.image,
+                    category_id=subcategory.category_id,
+                    category_name=category.name,
+                    is_active=subcategory.is_active,
+                    rate_card_count=0,  # Not needed for booking display
+                    category=CategoryResponse(
+                        id=category.id,
+                        name=category.name,
+                        slug=category.slug,
+                        description=category.description,
+                        image=category.image,
+                        is_active=category.is_active,
+                        subcategory_count=0  # Not needed for booking display
+                    )
+                )
+            )
+
             item_responses.append(BookingItemResponse(
                 id=booking_item.id,
                 service_name=booking_item.service_name,
                 rate_card_name=rate_card.name,
+                rate_card=rate_card_response,
                 quantity=booking_item.quantity,
                 unit_price=float(booking_item.price),
                 total_price=float(booking_item.final_amount)
@@ -498,7 +679,7 @@ class BookingService:
 
         return BookingResponse(
             id=booking.id,
-            booking_number=booking.booking_number,
+            order_id=booking.order_id,
             status=booking.status.value,
             total_amount=booking.total,
             preferred_date=booking.preferred_date.isoformat(),
@@ -509,16 +690,16 @@ class BookingService:
             created_at=booking.created_at.isoformat()
         )
 
-    async def get_booking_by_number(
+    async def get_booking_by_order_id(
         self,
-        booking_number: str,
+        order_id: str,
         user: User
     ) -> Optional[Booking]:
         """
-        Get booking by booking number
+        Get booking by order ID
 
         Args:
-            booking_number: Booking number (e.g., "BK123456")
+            order_id: Order ID (e.g., "ORD123456")
             user: Current user
 
         Returns:
@@ -526,7 +707,7 @@ class BookingService:
         """
         result = await self.db.execute(
             select(Booking).where(
-                Booking.booking_number == booking_number.upper(),
+                Booking.order_id == order_id.upper(),
                 Booking.user_id == user.id
             )
         )
@@ -561,17 +742,17 @@ class BookingService:
         if not booking:
             raise ValueError("Booking not found")
 
-    async def cancel_booking_by_number(
+    async def cancel_booking_by_order_id(
         self,
-        booking_number: str,
+        order_id: str,
         reason: str,
         user: User
     ) -> BookingResponse:
         """
-        Cancel a booking by booking number
+        Cancel a booking by order ID
 
         Args:
-            booking_number: Booking number (e.g., "BK123456")
+            order_id: Order ID (e.g., "ORD123456")
             reason: Cancellation reason
             user: Current user
 
@@ -581,11 +762,11 @@ class BookingService:
         Raises:
             ValueError: If booking cannot be cancelled
         """
-        # Get booking by booking number
-        booking = await self.get_booking_by_number(booking_number, user)
+        # Get booking by order ID
+        booking = await self.get_booking_by_order_id(order_id, user)
 
         if not booking:
-            raise ValueError(f"Booking {booking_number} not found")
+            raise ValueError(f"Booking {order_id} not found")
 
         # Check if booking can be cancelled
         if booking.status not in [BookingStatus.PENDING, BookingStatus.CONFIRMED]:
@@ -617,7 +798,7 @@ class BookingService:
         await self.db.refresh(booking)
 
         logger.info(
-            f"Booking cancelled: id={booking.id}, number={booking.booking_number}, user_id={user.id}, reason={reason}"
+            f"Booking cancelled: id={booking.id}, order_id={booking.order_id}, user_id={user.id}, reason={reason}"
         )
 
         # Return booking response

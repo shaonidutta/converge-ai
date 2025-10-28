@@ -107,10 +107,56 @@ class SlotFillingService:
             dialog_state = await self.dialog_manager.get_active_state(session_id)
             collected_entities = dialog_state.collected_entities if dialog_state else {}
             needed_entities = dialog_state.needed_entities if dialog_state else []
+            last_question = dialog_state.context.get('last_question') if dialog_state and dialog_state.context else None
 
-            logger.info(f"[SlotFillingService] Loaded dialog state: collected={collected_entities}, needed={needed_entities}")
+            # Import DialogStateType for comparison
+            from src.core.models.dialog_state import DialogStateType
+            is_awaiting_confirmation = (
+                dialog_state and
+                dialog_state.state == DialogStateType.AWAITING_CONFIRMATION
+            )
 
-            # 3. Create initial state with previously collected entities
+            logger.info(f"[SlotFillingService] Loaded dialog state: state={dialog_state.state.value if dialog_state else None}, collected={collected_entities}, needed={needed_entities}, last_question={last_question is not None}, awaiting_confirmation={is_awaiting_confirmation}")
+
+            # 3. Check if user is confirming (responding to confirmation prompt)
+            if is_awaiting_confirmation:
+                message_lower = message.lower().strip()
+                confirmation_keywords = ["yes", "yeah", "yep", "sure", "ok", "okay", "correct", "right", "confirm", "proceed"]
+                rejection_keywords = ["no", "nope", "cancel", "stop", "don't", "dont"]
+
+                if any(keyword == message_lower for keyword in confirmation_keywords):
+                    logger.info(f"[SlotFillingService] User confirmed, triggering agent execution")
+                    # User confirmed, return response that triggers agent
+                    return SlotFillingResponse(
+                        final_response="Confirmed",
+                        response_type="ready_for_agent",
+                        collected_entities=collected_entities,
+                        needed_entities=[],
+                        should_trigger_agent=True,
+                        metadata={
+                            "intent": dialog_state.intent,
+                            "intent_confidence": 0.95,
+                            "dialog_state_type": "awaiting_confirmation",
+                            "user_confirmed": True
+                        }
+                    )
+                elif any(keyword in message_lower for keyword in rejection_keywords):
+                    logger.info(f"[SlotFillingService] User rejected confirmation, clearing dialog state")
+                    # User rejected, clear dialog state
+                    await self.dialog_manager.clear_state(session_id)
+                    return SlotFillingResponse(
+                        final_response="Okay, I've cancelled that request. How else can I help you?",
+                        response_type="acknowledgment",
+                        collected_entities={},
+                        needed_entities=[],
+                        should_trigger_agent=False,
+                        metadata={
+                            "user_confirmed": False,
+                            "dialog_cleared": True
+                        }
+                    )
+
+            # 4. Create initial state with previously collected entities
             state = create_initial_state(
                 user_id=user.id,
                 session_id=session_id,
@@ -119,9 +165,11 @@ class SlotFillingService:
                 conversation_history=history
             )
 
-            # Populate with previously collected entities
+            # Populate with previously collected entities and last question
             state['collected_entities'] = collected_entities
             state['needed_entities'] = needed_entities
+            if last_question:
+                state['last_question_asked'] = last_question
 
             # 4. Run slot-filling graph
             logger.info("[SlotFillingService] Running slot-filling graph...")
@@ -137,7 +185,7 @@ class SlotFillingService:
             
             # 4. Build response
             response = self._build_response(final_state)
-            
+
             logger.info(f"[SlotFillingService] Response type: {response.response_type}")
             logger.info(f"[SlotFillingService] Should trigger agent: {response.should_trigger_agent}")
             
@@ -236,7 +284,9 @@ class SlotFillingService:
                 "dialog_state_type": final_state.get("dialog_state_type"),
                 "retry_count": final_state.get("retry_count", 0),
                 "timestamp": datetime.now().isoformat(),
-                "provenance": final_state.get("provenance")
+                "provenance": final_state.get("provenance"),
+                "intent_changed": final_state.get("intent_changed", False),
+                "original_intent": final_state.get("original_intent")
             }
         )
     

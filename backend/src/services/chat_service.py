@@ -138,16 +138,16 @@ class ChatService:
         logger.debug(f"[ChatService] Message: {user_message[:100]}...")
 
         try:
-            # Import CoordinatorAgent
-            from src.agents.coordinator.coordinator_agent import CoordinatorAgent
+            # Import cached coordinator getter
+            from src.core.services import get_coordinator_agent
 
             # 1. Get conversation history for context
             conversation_history = await self._get_conversation_history(user.id, session_id)
             logger.debug(f"[ChatService] Retrieved {len(conversation_history)} previous messages")
 
-            # 2. Initialize CoordinatorAgent
-            logger.debug("[ChatService] Initializing CoordinatorAgent...")
-            coordinator = CoordinatorAgent(db=self.db)
+            # 2. Get cached CoordinatorAgent (singleton)
+            logger.debug("[ChatService] Getting CoordinatorAgent from cache...")
+            coordinator = await get_coordinator_agent(db=self.db)
 
             # 3. Execute coordinator with message and context
             logger.debug("[ChatService] Executing CoordinatorAgent...")

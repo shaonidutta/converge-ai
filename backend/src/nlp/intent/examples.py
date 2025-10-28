@@ -26,7 +26,12 @@ INTENT_EXAMPLES: Dict[IntentType, List[str]] = {
         "Modify my service booking",
         "Update my appointment details",
         "What's the status of my booking?",
-        "Check my booking status"
+        "Check my booking status",
+        "Show me my bookings",
+        "List all my appointments",
+        "Can you check my bookings?",
+        "View my bookings",
+        "Display all my bookings"
     ],
     
     IntentType.PRICING_INQUIRY: [

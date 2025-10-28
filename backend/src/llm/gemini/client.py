@@ -135,6 +135,74 @@ class LLMClient:
             logger.error(f"Error invoking Gemini with messages: {e}")
             raise
 
+    async def generate(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        temperature: Optional[float] = None
+    ) -> str:
+        """
+        Generate text with optional system prompt and temperature override
+
+        This is an async wrapper around invoke_with_messages for convenience.
+
+        Args:
+            prompt: User prompt
+            system_prompt: Optional system instruction
+            temperature: Optional temperature override
+
+        Returns:
+            Generated text response
+        """
+        try:
+            # Build messages list
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+
+            # Create config with temperature override if provided
+            if temperature is not None:
+                config = types.GenerateContentConfig(
+                    temperature=temperature,
+                    max_output_tokens=self.max_tokens,
+                )
+            else:
+                config = types.GenerateContentConfig(
+                    temperature=self.temperature,
+                    max_output_tokens=self.max_tokens,
+                )
+
+            # Extract system instruction if present
+            system_instruction = None
+            contents = []
+
+            for msg in messages:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+
+                if role == "system":
+                    system_instruction = content
+                else:
+                    contents.append(content)
+
+            # Add system instruction to config if present
+            if system_instruction:
+                config.system_instruction = system_instruction
+
+            # Generate content
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=contents,
+                config=config
+            )
+
+            return response.text
+
+        except Exception as e:
+            logger.error(f"Error in generate method: {e}")
+            raise
+
     def with_structured_output(self, schema: BaseModel):
         """
         Get a version of the model that returns structured output

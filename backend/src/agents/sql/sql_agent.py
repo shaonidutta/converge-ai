@@ -67,9 +67,10 @@ class SQLAgent:
        - id, category_id, subcategory_id, provider_id, name, description, price, strike_price, is_active
     
     5. bookings (Customer bookings)
-       - id, user_id, order_id, booking_number, status, payment_status, payment_method
+       - id, user_id, order_id, status, payment_status, payment_method
        - subtotal, discount, tax, total, preferred_date, preferred_time, created_at
        - status: pending, confirmed, in_progress, completed, cancelled
+       - order_id is the customer-facing identifier (e.g., "ORD12345678")
     
     6. booking_items (Individual service items in bookings)
        - id, booking_id, user_id, rate_card_id, provider_id, service_name, quantity, price

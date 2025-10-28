@@ -3,7 +3,7 @@
  * Displays list of user's bookings with filters
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Search } from 'lucide-react';
 import { useBookings, useBookingActions } from '../hooks/useBookings';
@@ -22,21 +22,29 @@ const BookingsPage = () => {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
 
+  // Memoize filter params to prevent infinite loop
+  // Only recreate object when activeFilter actually changes
+  const filterParams = useMemo(() => {
+    return activeFilter === 'all' ? {} : { status: activeFilter };
+  }, [activeFilter]);
+
   // Fetch bookings with filter
-  const filterParams = activeFilter === 'all' ? {} : { status: activeFilter };
   const { bookings, loading, error, refetch } = useBookings(filterParams);
   const { cancelBooking, rescheduleBooking, loading: actionLoading } = useBookingActions();
 
-  // Filter bookings by search query
-  const filteredBookings = bookings.filter((booking) => {
-    if (!searchQuery) return true;
+  // Memoize filtered bookings to prevent unnecessary recalculations
+  const filteredBookings = useMemo(() => {
+    if (!searchQuery) return bookings;
+
     const query = searchQuery.toLowerCase();
-    return (
-      booking.rate_card?.subcategory?.name?.toLowerCase().includes(query) ||
-      booking.rate_card?.subcategory?.category?.name?.toLowerCase().includes(query) ||
-      booking.address?.city?.toLowerCase().includes(query)
-    );
-  });
+    return bookings.filter((booking) => {
+      return (
+        booking.rate_card?.subcategory?.name?.toLowerCase().includes(query) ||
+        booking.rate_card?.subcategory?.category?.name?.toLowerCase().includes(query) ||
+        booking.address?.city?.toLowerCase().includes(query)
+      );
+    });
+  }, [bookings, searchQuery]);
 
   const handleCancelClick = (booking) => {
     setSelectedBooking(booking);

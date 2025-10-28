@@ -74,9 +74,9 @@ ENTITY_QUESTION_TEMPLATES = {
     },
     EntityType.BOOKING_ID: {
         IntentType.BOOKING_MANAGEMENT: [
-            "What's your booking ID? (e.g., BOOK-12345)",
-            "Could you provide your booking reference number?",
-            "What's the booking ID you'd like to modify?"
+            "What's your Order ID? (e.g., ORDA5D9F532)",
+            "Could you provide your Order ID?",
+            "What's the Order ID you'd like to modify?"
         ],
     },
     EntityType.ISSUE_TYPE: {
@@ -95,7 +95,7 @@ ENTITY_QUESTION_TEMPLATES = {
     },
     EntityType.ACTION: {
         IntentType.BOOKING_MANAGEMENT: [
-            "What would you like to do? (book, cancel, reschedule, modify)",
+            "What would you like to do? (book, cancel, reschedule, modify, list)",
             "How can I help you with your booking?",
             "What action would you like to take?"
         ],
@@ -110,13 +110,13 @@ ENTITY_QUESTION_TEMPLATES = {
 CONFIRMATION_TEMPLATES = {
     "booking_management": {
         "book": "Let me confirm: You want to book {service_type} servicing on {date} at {time} in {location}. Should I proceed with this booking?",
-        "cancel": "You want to cancel booking {booking_id}. This action cannot be undone. Should I proceed with the cancellation?",
-        "reschedule": "You want to reschedule booking {booking_id} to {date} at {time}. Should I proceed with this change?",
-        "modify": "You want to modify booking {booking_id}. Should I proceed with this change?",
+        "cancel": "You want to cancel Order {booking_id}. This action cannot be undone. Should I proceed with the cancellation?",
+        "reschedule": "You want to reschedule Order {booking_id} to {date} at {time}. Should I proceed with this change?",
+        "modify": "You want to modify Order {booking_id}. Should I proceed with this change?",
     },
-    "complaint": "Let me confirm: You're filing a complaint about {issue_type} for booking {booking_id}. Should I proceed?",
+    "complaint": "Let me confirm: You're filing a complaint about {issue_type} for Order {booking_id}. Should I proceed?",
     "payment_issue": "You're reporting a {payment_type} issue. Should I create a support ticket for this?",
-    "refund_request": "You're requesting a refund for booking {booking_id}. Should I proceed with the refund request?",
+    "refund_request": "You're requesting a refund for Order {booking_id}. Should I proceed with the refund request?",
 }
 
 
@@ -205,7 +205,12 @@ class QuestionGenerator:
             context_str = f"\nAlready collected information: {', '.join(context_items)}"
 
         # Build prompt
-        entity_name = entity_type.value.replace('_', ' ')
+        # Special handling for booking_id: use "Order ID" instead of "booking id"
+        if entity_type == EntityType.BOOKING_ID:
+            entity_name = "Order ID"
+        else:
+            entity_name = entity_type.value.replace('_', ' ')
+
         intent_name = intent.value.replace('_', ' ')
 
         prompt = f"""You are Lisa, a friendly AI assistant helping users with home services.
@@ -220,16 +225,18 @@ Generate a natural, conversational question to ask the user for the {entity_name
 Requirements:
 1. Be friendly and conversational
 2. Keep it concise (1-2 sentences max)
-3. Include helpful examples if appropriate
+3. Include helpful examples if appropriate (e.g., for Order ID, use "ORDA5D9F532" as example)
 4. Reference already collected information if relevant
 5. If this is a retry (attempt > 0), rephrase differently
 6. Do not use emojis
 7. Do not add any extra text, just the question
+8. IMPORTANT: For Order ID, always use "Order ID" not "booking ID" or "booking reference"
 
 Examples of good questions:
 - "What's your location or pincode?"
 - "Which date works best for you? (e.g., today, tomorrow, or a specific date)"
 - "What time would you prefer? (e.g., 10 AM, 2 PM, evening)"
+- "What's your Order ID? (e.g., ORDA5D9F532)"
 
 Generate the question:"""
 

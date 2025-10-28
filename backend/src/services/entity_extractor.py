@@ -137,16 +137,45 @@ class EntityExtractor:
         if expected_entity == EntityType.PAYMENT_TYPE:
             return self._extract_payment_type(message_lower)
 
+        # Status filter patterns
+        if expected_entity == EntityType.STATUS_FILTER:
+            return self._extract_status_filter(message_lower)
+
+        # Sort by patterns
+        if expected_entity == EntityType.SORT_BY:
+            return self._extract_sort_by(message_lower)
+
         return None
     
     def _extract_action(self, message_lower: str) -> Optional[EntityExtractionResult]:
-        """Extract action (book, cancel, reschedule, modify, check_status)"""
+        """Extract action (book, cancel, reschedule, modify, list, check_status)"""
+        # Check for "list" action first with more specific patterns
+        list_patterns = [
+            r'\b(list|show|view|display)\s+(my|all|them)?\s*(bookings?|appointments?)?',  # "list them", "show my bookings"
+            r'\b(check|see|get)\s+my\s+(bookings?|appointments?)',  # "check my bookings"
+            r'\bmy\s+(bookings?|appointments?)',  # "my bookings"
+            r'\ball\s+(bookings?|appointments?)',  # "all bookings"
+            r'(bookings?|appointments?).*\b(list|show|view|display)',  # "bookings and list them"
+        ]
+
+        import re
+        for pattern in list_patterns:
+            if re.search(pattern, message_lower):
+                return EntityExtractionResult(
+                    entity_type=EntityType.ACTION.value,
+                    entity_value="list",
+                    confidence=0.95,
+                    normalized_value="list",
+                    extraction_method="pattern"
+                )
+
+        # Then check other actions
         action_keywords = {
             "book": ["book", "schedule", "reserve", "appointment"],
             "cancel": ["cancel", "delete", "remove"],
             "reschedule": ["reschedule", "change date", "change time", "move"],
             "modify": ["modify", "update", "change", "edit"],
-            "check_status": ["status", "check", "track", "where is"]
+            "check_status": ["status", "track", "where is"]
         }
 
         for action, keywords in action_keywords.items():
@@ -161,7 +190,50 @@ class EntityExtractor:
                     )
 
         return None
-    
+
+    def _extract_status_filter(self, message_lower: str) -> Optional[EntityExtractionResult]:
+        """Extract booking status filter (pending, confirmed, completed, cancelled)"""
+        status_keywords = {
+            "pending": ["pending", "upcoming", "scheduled", "active"],
+            "confirmed": ["confirmed", "approved"],
+            "completed": ["completed", "finished", "done", "past"],
+            "cancelled": ["cancelled", "canceled", "deleted", "removed"]
+        }
+
+        for status, keywords in status_keywords.items():
+            for keyword in keywords:
+                if keyword in message_lower:
+                    return EntityExtractionResult(
+                        entity_type=EntityType.STATUS_FILTER.value,
+                        entity_value=status,
+                        confidence=0.9,
+                        normalized_value=status,
+                        extraction_method="pattern"
+                    )
+
+        return None
+
+    def _extract_sort_by(self, message_lower: str) -> Optional[EntityExtractionResult]:
+        """Extract sort preference (date, status, amount)"""
+        sort_keywords = {
+            "date": ["date", "time", "when", "chronological", "recent", "latest"],
+            "status": ["status", "state"],
+            "amount": ["amount", "price", "cost", "expensive", "cheap"]
+        }
+
+        for sort_field, keywords in sort_keywords.items():
+            for keyword in keywords:
+                if f"sort by {keyword}" in message_lower or f"order by {keyword}" in message_lower:
+                    return EntityExtractionResult(
+                        entity_type=EntityType.SORT_BY.value,
+                        entity_value=sort_field,
+                        confidence=0.9,
+                        normalized_value=sort_field,
+                        extraction_method="pattern"
+                    )
+
+        return None
+
     def _extract_date(self, message: str, message_lower: str) -> Optional[EntityExtractionResult]:
         """Extract date using centralized normalizer"""
         from src.utils.entity_normalizer import normalize_date
@@ -343,8 +415,28 @@ class EntityExtractor:
         return None
 
     def _extract_booking_id(self, message: str) -> Optional[EntityExtractionResult]:
-        """Extract booking ID"""
-        # Pattern: BOOK-12345, BKG-12345, ORD-12345
+        """
+        Extract booking ID (Order ID)
+
+        Supports formats:
+        - ORD followed by 8 alphanumeric characters: ORDA5D9F532
+        - Legacy formats with hyphens: BOOK-12345, BKG-12345, ORD-12345
+        - Just numbers: 12345
+        """
+        # Pattern 1: ORD followed by 8 alphanumeric characters (current format)
+        # Example: ORDA5D9F532, ORD4E33BB94
+        order_id_match = re.search(r'\b(ORD[A-Z0-9]{8})\b', message, re.IGNORECASE)
+        if order_id_match:
+            order_id = order_id_match.group(1).upper()
+            return EntityExtractionResult(
+                entity_type=EntityType.BOOKING_ID.value,
+                entity_value=order_id_match.group(1),
+                confidence=0.98,
+                normalized_value=order_id,
+                extraction_method="pattern"
+            )
+
+        # Pattern 2: Legacy formats with hyphens (BOOK-12345, BKG-12345, ORD-12345)
         booking_match = re.search(r'\b(BOOK|BKG|ORD)[-_]?(\d{4,6})\b', message, re.IGNORECASE)
         if booking_match:
             booking_id = booking_match.group(0).upper()
@@ -356,7 +448,7 @@ class EntityExtractor:
                 extraction_method="pattern"
             )
 
-        # Just numbers (4-6 digits) - lower confidence
+        # Pattern 3: Just numbers (4-6 digits) - lower confidence
         number_match = re.search(r'\b(\d{4,6})\b', message)
         if number_match:
             return EntityExtractionResult(

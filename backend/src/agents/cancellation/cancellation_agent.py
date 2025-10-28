@@ -77,32 +77,32 @@ class CancellationAgent:
             
             if not booking_id:
                 return {
-                    "response": "I need the booking ID to process the cancellation. Could you provide your booking number?",
+                    "response": "I need the Order ID to process the cancellation. Could you provide your Order ID? (e.g., ORDA5D9F532)",
                     "action_taken": "missing_entity",
                     "metadata": {"missing": "booking_id"}
                 }
-            
+
             # Get booking details
-            # booking_id can be either the internal ID (int) or booking_number (string like "BK123456")
+            # booking_id can be either the internal ID (int) or order_id (string like "ORD123456")
             booking = await self._get_booking(booking_id, user)
 
             if not booking:
                 return {
-                    "response": f"❌ Booking {booking_id} not found. Please check the booking number and try again.",
+                    "response": f"Order {booking_id} not found. Please check the Order ID and try again.",
                     "action_taken": "booking_not_found",
                     "metadata": {"booking_id": booking_id}
                 }
-            
+
             # Check if booking can be cancelled
             can_cancel, cancel_message = await self._can_cancel_booking(booking)
-            
+
             if not can_cancel:
                 return {
-                    "response": f"❌ {cancel_message}",
+                    "response": f"{cancel_message}",
                     "action_taken": "cancellation_not_allowed",
                     "metadata": {
                         "booking_id": booking.id,
-                        "booking_number": booking.booking_number,
+                        "order_id": booking.order_id,
                         "status": booking.status.value,
                         "reason": cancel_message
                     }
@@ -119,30 +119,30 @@ class CancellationAgent:
         except ValueError as e:
             self.logger.error(f"Cancellation validation error: {e}")
             return {
-                "response": f"❌ Cancellation failed: {str(e)}",
+                "response": f"Cancellation failed: {str(e)}",
                 "action_taken": "cancellation_failed",
                 "metadata": {"error": str(e)}
             }
         except Exception as e:
             self.logger.error(f"Cancellation error: {e}", exc_info=True)
             return {
-                "response": "❌ An unexpected error occurred while processing your cancellation. Please contact support.",
+                "response": "An unexpected error occurred while processing your cancellation. Please contact support.",
                 "action_taken": "error",
                 "metadata": {"error": str(e)}
             }
     
     async def _get_booking(self, booking_identifier: str | int, user: User) -> Booking:
         """
-        Get booking by ID or booking number for the current user
+        Get booking by ID or order ID for the current user
 
         Args:
-            booking_identifier: Booking ID (int) or booking number (str like "BK123456")
+            booking_identifier: Booking ID (int) or order ID (str like "ORD123456")
             user: Current user
 
         Returns:
             Booking object or None
         """
-        # Try to determine if it's an ID (int) or booking number (string)
+        # Try to determine if it's an ID (int) or order ID (string)
         if isinstance(booking_identifier, int):
             # Query by internal ID
             result = await self.db.execute(
@@ -152,10 +152,10 @@ class CancellationAgent:
                 )
             )
         else:
-            # Query by booking number (string like "BK123456")
+            # Query by order ID (string like "ORD123456")
             result = await self.db.execute(
                 select(Booking).where(
-                    Booking.booking_number == str(booking_identifier).upper(),
+                    Booking.order_id == str(booking_identifier).upper(),
                     Booking.user_id == user.id
                 )
             )
@@ -288,7 +288,7 @@ class CancellationAgent:
                 booking.payment_status = PaymentStatus.REFUNDED
                 refund_processed = True
                 refund_method = "wallet"
-                self.logger.info(f"Refunded ₹{refund_info['refund_amount']} to wallet for booking {booking.id}")
+                self.logger.info(f"Refunded Rs. {refund_info['refund_amount']} to wallet for booking {booking.id}")
             elif booking.payment_status == PaymentStatus.PAID:
                 # Mark for refund (will be processed by payment gateway)
                 booking.payment_status = PaymentStatus.REFUNDED
@@ -300,25 +300,25 @@ class CancellationAgent:
         
         # Build response message
         response_parts = [
-            f"✅ Booking {booking.booking_number} has been cancelled successfully.",
-            f"\n📋 Cancellation Details:",
-            f"   • Booking ID: {booking.booking_number}",
-            f"   • Total Amount: ₹{refund_info['total_amount']:.2f}",
-            f"   • Refund Amount: ₹{refund_info['refund_amount']:.2f} ({refund_info['refund_percentage']}%)",
+            f"Booking {booking.order_id} has been cancelled successfully.",
+            f"\nCancellation Details:",
+            f"   - Order ID: {booking.order_id}",
+            f"   - Total Amount: Rs. {refund_info['total_amount']:.2f}",
+            f"   - Refund Amount: Rs. {refund_info['refund_amount']:.2f} ({refund_info['refund_percentage']}%)",
         ]
-        
+
         if refund_info['cancellation_fee'] > 0:
-            response_parts.append(f"   • Cancellation Fee: ₹{refund_info['cancellation_fee']:.2f}")
-        
-        response_parts.append(f"   • Policy: {refund_info['policy_message']}")
-        
+            response_parts.append(f"   - Cancellation Fee: Rs. {refund_info['cancellation_fee']:.2f}")
+
+        response_parts.append(f"   - Policy: {refund_info['policy_message']}")
+
         if refund_processed and refund_info['refund_amount'] > 0:
             if refund_method == "wallet":
-                response_parts.append(f"\n💰 Refund of ₹{refund_info['refund_amount']:.2f} has been credited to your wallet.")
+                response_parts.append(f"\nRefund of Rs. {refund_info['refund_amount']:.2f} has been credited to your wallet.")
             else:
-                response_parts.append(f"\n💰 Refund of ₹{refund_info['refund_amount']:.2f} will be processed to your {refund_method} within 5-7 business days.")
+                response_parts.append(f"\nRefund of Rs. {refund_info['refund_amount']:.2f} will be processed to your {refund_method} within 5-7 business days.")
         elif refund_info['refund_amount'] == 0:
-            response_parts.append(f"\n⚠️ No refund applicable as per cancellation policy.")
+            response_parts.append(f"\nNote: No refund applicable as per cancellation policy.")
         
         response = "\n".join(response_parts)
         
@@ -327,7 +327,7 @@ class CancellationAgent:
             "action_taken": "booking_cancelled",
             "metadata": {
                 "booking_id": booking.id,
-                "booking_number": booking.booking_number,
+                "order_id": booking.order_id,
                 "status": booking.status.value,
                 "cancelled_at": booking.cancelled_at.isoformat(),
                 "refund_info": refund_info,
