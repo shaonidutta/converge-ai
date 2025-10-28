@@ -10,8 +10,7 @@ import json
 from typing import Optional, Dict, Any, List
 import logging
 
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -56,8 +55,9 @@ class LLMClient:
 
         # Initialize the client
         try:
-            self.client = genai.Client(api_key=api_key)
-            self.generation_config = types.GenerateContentConfig(
+            genai.configure(api_key=api_key)
+            self.client = genai.GenerativeModel(model_name=self.model_name)
+            self.generation_config = genai.GenerationConfig(
                 temperature=self.temperature,
                 max_output_tokens=self.max_tokens,
             )
@@ -80,10 +80,9 @@ class LLMClient:
             Generated text response
         """
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
+            response = self.client.generate_content(
                 contents=prompt,
-                config=self.generation_config
+                generation_config=self.generation_config
             )
             return response.text
         except Exception as e:
@@ -116,18 +115,24 @@ class LLMClient:
                     contents.append(content)
 
             # Create config with system instruction if present
-            config = types.GenerateContentConfig(
+            config = genai.GenerationConfig(
                 temperature=self.temperature,
                 max_output_tokens=self.max_tokens,
             )
+
+            # Handle system instruction by creating a new model instance
             if system_instruction:
-                config.system_instruction = system_instruction
+                client = genai.GenerativeModel(
+                    model_name=self.model_name,
+                    system_instruction=system_instruction
+                )
+            else:
+                client = self.client
 
             # Generate content
-            response = self.client.models.generate_content(
-                model=self.model_name,
+            response = client.generate_content(
                 contents=contents,
-                config=config
+                generation_config=config
             )
 
             return response.text
@@ -163,12 +168,12 @@ class LLMClient:
 
             # Create config with temperature override if provided
             if temperature is not None:
-                config = types.GenerateContentConfig(
+                config = genai.GenerationConfig(
                     temperature=temperature,
                     max_output_tokens=self.max_tokens,
                 )
             else:
-                config = types.GenerateContentConfig(
+                config = genai.GenerationConfig(
                     temperature=self.temperature,
                     max_output_tokens=self.max_tokens,
                 )
@@ -186,15 +191,19 @@ class LLMClient:
                 else:
                     contents.append(content)
 
-            # Add system instruction to config if present
+            # Handle system instruction by creating a new model instance
             if system_instruction:
-                config.system_instruction = system_instruction
+                client = genai.GenerativeModel(
+                    model_name=self.model_name,
+                    system_instruction=system_instruction
+                )
+            else:
+                client = self.client
 
             # Generate content
-            response = self.client.models.generate_content(
-                model=self.model_name,
+            response = client.generate_content(
                 contents=contents,
-                config=config
+                generation_config=config
             )
 
             return response.text
@@ -265,7 +274,7 @@ class StructuredOutputModel:
     Wrapper for Gemini client that returns structured output matching a Pydantic schema.
     """
 
-    def __init__(self, client: genai.Client, schema: BaseModel, model_name: str, generation_config: types.GenerateContentConfig):
+    def __init__(self, client: genai.GenerativeModel, schema: BaseModel, model_name: str, generation_config: genai.GenerationConfig):
         """
         Initialize structured output model
 
@@ -296,7 +305,7 @@ class StructuredOutputModel:
             schema_dict = self._remove_additional_properties(schema_dict)
 
             # Create config with JSON response schema
-            config = types.GenerateContentConfig(
+            config = genai.GenerationConfig(
                 temperature=self.generation_config.temperature,
                 max_output_tokens=self.generation_config.max_output_tokens,
                 response_mime_type='application/json',
@@ -304,15 +313,14 @@ class StructuredOutputModel:
             )
 
             # Generate response
-            response = self.client.models.generate_content(
-                model=self.model_name,
+            response = self.client.generate_content(
                 contents=prompt,
-                config=config
+                generation_config=config
             )
 
             # Parse JSON and validate with Pydantic
             response_data = json.loads(response.text)
-            return self.schema(**response_data)
+            return self.schema.model_validate(response_data)
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON from Gemini response: {e}")
