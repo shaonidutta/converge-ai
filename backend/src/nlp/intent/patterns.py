@@ -207,6 +207,12 @@ class IntentPatterns:
             "painting": ["painting", "paint", "painter"],
             "appliance_repair": ["washing machine", "refrigerator", "fridge", "appliance"],
             "pest_control": ["pest control", "pest", "pest service", "general pest control", "pest control service", "exterminator", "fumigation"],
+            "carpentry": ["carpentry", "carpenter", "furniture", "wood work", "cabinet", "door repair"],
+            "water_purifier": ["water purifier", "ro", "water filter", "purifier", "water treatment"],
+            "car_care": ["car care", "car wash", "car cleaning", "car service", "vehicle cleaning"],
+            "salon_for_women": ["salon", "beauty salon", "women salon", "ladies salon", "beauty parlor"],
+            "salon_for_men": ["men salon", "barber", "gents salon", "male grooming"],
+            "packers_and_movers": ["packers", "movers", "packing", "moving", "relocation", "shifting"]
         }
 
         for service_type, keywords in service_keywords.items():
@@ -230,7 +236,12 @@ class IntentPatterns:
                 ["electrical", "electrician"],
                 ["painting", "paint"],
                 ["appliance", "washing machine", "refrigerator"],
-                ["pest control", "pest", "pest service", "exterminator"]
+                ["pest control", "pest", "pest service", "exterminator"],
+                ["carpentry", "carpenter", "furniture"],
+                ["water purifier", "ro", "water filter"],
+                ["car care", "car wash", "car cleaning"],
+                ["salon", "beauty salon", "barber"],
+                ["packers", "movers", "packing", "moving", "relocation"]
             ] for keyword in keywords):
                 raw_entities[EntityType.ACTION.value] = "book"
 
@@ -240,7 +251,7 @@ class IntentPatterns:
         if EntityType.ACTION.value not in raw_entities:
             action_keywords = {
                 "cancel": ["cancel", "remove", "delete"],
-                "reschedule": ["reschedule", "change date", "move"],
+                "reschedule": ["reschedule", "change date", "move booking", "move appointment"],
                 "modify": ["modify", "update", "edit"],
                 "book": ["book", "schedule", "arrange", "set up"],
             }

@@ -349,6 +349,9 @@ class CoordinatorAgent:
                 if intent_result.primary_intent == "booking_management":
                     action = collected_entities.get("action", "book")
 
+                    self.logger.info(f"[COORDINATOR] booking_management detected, action={action}")
+                    self.logger.info(f"[COORDINATOR] collected_entities={collected_entities}")
+
                     # Determine actual required entities based on action
                     # Order matters: location first (to check availability), then date/time
                     if action == "book":
@@ -360,7 +363,7 @@ class CoordinatorAgent:
                     elif action == "modify":
                         required_entities = ["booking_id"]
 
-                    self.logger.info(f"booking_management action={action}, required_entities={required_entities}")
+                    self.logger.info(f"[COORDINATOR] booking_management action={action}, required_entities={required_entities}")
 
                 missing_entities = [e for e in required_entities if e not in collected_entities]
 
@@ -369,24 +372,98 @@ class CoordinatorAgent:
                 needs_subcategory_validation = False
                 if "service_type" in collected_entities and action == "book":
                     service_type = collected_entities.get("service_type", "").lower()
+                    self.logger.info(f"[COORDINATOR] Checking service_type='{service_type}' for subcategory validation")
 
-                    # Normalize service variations
+                    # Normalize service variations to match services_requiring_subcategory keys
                     service_normalizations = {
-                        "pest": "pest_control",
-                        "general pest control": "pest_control",
-                        "pest control service": "pest_control",
+                        # Home Cleaning variations
+                        "cleaning": "home_cleaning",
+                        "house cleaning": "home_cleaning",
+                        "home cleaning": "home_cleaning",
+                        "cleaning service": "home_cleaning",
+
+                        # Appliance Repair variations
+                        "appliance": "appliance_repair",
+                        "appliance repair": "appliance_repair",
+                        "appliance service": "appliance_repair",
+
+                        # Plumbing variations
+                        "plumbing": "plumbing",
+                        "plumbing service": "plumbing",
+                        "plumber": "plumbing",
+
+                        # Electrical variations
+                        "electrical": "electrical",
+                        "electrical service": "electrical",
+                        "electrician": "electrical",
+
+                        # Carpentry variations
+                        "carpentry": "carpentry",
+                        "carpentry service": "carpentry",
+                        "carpenter": "carpentry",
+                        "furniture": "carpentry",
+
+                        # Painting variations
+                        "painting": "painting",
+                        "painting service": "painting",
                         "paint": "painting",
                         "painter": "painting",
-                        "wall painting": "painting"
+                        "interior painting": "painting",
+                        "exterior painting": "painting",
+                        "wall painting": "painting",
+
+                        # Pest Control variations
+                        "pest": "pest_control",
+                        "pest control": "pest_control",
+                        "pest control service": "pest_control",
+                        "general pest control": "pest_control",
+
+                        # Water Purifier variations
+                        "water purifier": "water_purifier",
+                        "water purifier service": "water_purifier",
+                        "ro": "water_purifier",
+                        "ro service": "water_purifier",
+
+                        # Car Care variations
+                        "car": "car_care",
+                        "car care": "car_care",
+                        "car service": "car_care",
+                        "car wash": "car_care",
+                        "car cleaning": "car_care",
+
+                        # Salon variations
+                        "salon": "salon_for_women",  # Default to women
+                        "salon for women": "salon_for_women",
+                        "women salon": "salon_for_women",
+                        "salon for men": "salon_for_men",
+                        "men salon": "salon_for_men",
+                        "beauty": "salon_for_women",
+                        "grooming": "salon_for_men",
+
+                        # Packers and Movers variations
+                        "packers": "packers_and_movers",
+                        "movers": "packers_and_movers",
+                        "packers and movers": "packers_and_movers",
+                        "packing": "packers_and_movers",
+                        "moving": "packers_and_movers",
+                        "relocation": "packers_and_movers"
                     }
                     normalized_service = service_normalizations.get(service_type, service_type)
+                    self.logger.info(f"[COORDINATOR] Normalized service: '{service_type}' -> '{normalized_service}'")
 
-                    # Services that require subcategory selection
-                    services_requiring_subcategory = {"painting", "pest_control"}
+                    # Services that require subcategory selection (all multi-option services)
+                    # Use normalized service names only
+                    services_requiring_subcategory = {
+                        "home_cleaning", "appliance_repair", "plumbing", "electrical",
+                        "carpentry", "painting", "pest_control", "water_purifier",
+                        "car_care", "salon_for_women", "salon_for_men", "packers_and_movers"
+                    }
 
                     if normalized_service in services_requiring_subcategory:
                         needs_subcategory_validation = True
-                        self.logger.info(f"Service '{service_type}' (normalized: '{normalized_service}') requires subcategory selection")
+                        self.logger.info(f"[COORDINATOR] ✅ Service '{service_type}' (normalized: '{normalized_service}') requires subcategory selection")
+                    else:
+                        self.logger.info(f"[COORDINATOR] ❌ Service '{service_type}' (normalized: '{normalized_service}') does NOT require subcategory selection")
 
                 if missing_entities or needs_subcategory_validation:
                     if missing_entities:

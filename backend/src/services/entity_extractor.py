@@ -592,6 +592,12 @@ class EntityExtractor:
             "painting": ["painting", "paint", "painter", "wall painting"],
             "appliance_repair": ["washing machine", "refrigerator", "fridge", "appliance", "microwave"],
             "pest_control": ["pest control", "pest", "pest service", "general pest control", "pest control service", "exterminator", "fumigation"],
+            "carpentry": ["carpentry", "carpenter", "furniture", "wood work", "cabinet", "door repair", "furniture repair"],
+            "water_purifier": ["water purifier", "ro", "water filter", "purifier", "water treatment", "ro service"],
+            "car_care": ["car care", "car wash", "car cleaning", "car service", "vehicle cleaning", "auto detailing"],
+            "salon_for_women": ["salon", "beauty salon", "women salon", "ladies salon", "beauty parlor", "hair salon"],
+            "salon_for_men": ["men salon", "barber", "gents salon", "male grooming", "men's salon"],
+            "packers_and_movers": ["packers", "movers", "packing", "moving", "relocation", "shifting", "packers and movers"]
         }
 
         for service_type, keywords in service_keywords.items():

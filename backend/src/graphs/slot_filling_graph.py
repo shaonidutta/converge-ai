@@ -430,12 +430,12 @@ async def validate_entity_node(
     entity_validator: EntityValidator
 ) -> Dict[str, Any]:
     """
-    Node: Validate extracted entity value
-    
+    Node: Validate extracted entity value OR collected entity that needs validation
+
     Args:
         state: Current conversation state
         entity_validator: Entity validator service
-        
+
     Returns:
         Updated state with validation result
     """
@@ -443,14 +443,33 @@ async def validate_entity_node(
         logger.info(f"[validate_entity_node] Validating entity...")
 
         extracted = state.get('extracted_entity', {})
+        collected_entities = state.get('collected_entities', {})
 
-        # Check if extraction was successful
-        if not extracted or 'entity_type' not in extracted:
-            logger.warning(f"[validate_entity_node] No entity extracted, skipping validation")
+        # Check if we have an extracted entity (normal flow)
+        if extracted and 'entity_type' in extracted:
+            logger.info(f"[validate_entity_node] Validating extracted entity: {extracted['entity_type']}={extracted.get('entity_value')}")
+            entity_type = extracted['entity_type']
+            entity_value = extracted.get('normalized_value') or extracted['entity_value']
+
+        # NEW: Check if we need to validate a collected service_type (subcategory validation flow)
+        elif 'service_type' in collected_entities:
+            logger.info(f"[validate_entity_node] Validating collected service_type: {collected_entities['service_type']}")
+            entity_type = 'service_type'
+            entity_value = collected_entities['service_type']
+
+            # Create a mock extracted entity for consistency
+            extracted = {
+                'entity_type': 'service_type',
+                'entity_value': entity_value,
+                'normalized_value': entity_value
+            }
+
+        else:
+            logger.warning(f"[validate_entity_node] No entity to validate, skipping validation")
             return {
                 "validation_result": {
                     "is_valid": False,
-                    "error_message": "Could not extract entity from message"
+                    "error_message": "Could not find entity to validate"
                 },
                 "metadata": {
                     **state.get("metadata", {}),
@@ -460,24 +479,54 @@ async def validate_entity_node(
 
         # Validate entity
         validation_result = await entity_validator.validate(
-            entity_type=EntityType(extracted['entity_type']),
-            value=extracted.get('normalized_value') or extracted['entity_value'],
+            entity_type=EntityType(entity_type),
+            value=entity_value,
             context={
                 "user_id": state['user_id'],
-                "collected_entities": state.get('collected_entities', {})
+                "collected_entities": collected_entities
             }
         )
-        
+
         logger.info(f"[validate_entity_node] Valid: {validation_result.is_valid}")
-        
-        return {
+
+        # Handle subcategory validation failure
+        result = {
             "validation_result": validation_result.model_dump(),
+            "extracted_entity": extracted,  # Ensure extracted_entity is available for downstream nodes
             "metadata": {
                 **state.get("metadata", {}),
                 "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["validate_entity_node"]
             }
         }
-    
+
+        # If service_type validation failed due to subcategory requirement
+        if not validation_result.is_valid and entity_type == 'service_type':
+            metadata = validation_result.metadata or {}
+            if metadata.get('requires_subcategory_selection', False):
+                logger.info(f"[validate_entity_node] Service requires subcategory selection, updating needed entities")
+
+                # Add service_subcategory to needed entities (at the beginning)
+                current_needed = state.get('needed_entities', [])
+                if 'service_subcategory' not in current_needed:
+                    updated_needed = ['service_subcategory'] + current_needed
+                    result['needed_entities'] = updated_needed
+                    logger.info(f"[validate_entity_node] Updated needed_entities: {updated_needed}")
+
+                # Add validation error for question generation
+                error_message = validation_result.error_message or "Please specify the service type"
+                result['validation_errors'] = state.get('validation_errors', []) + [error_message]
+
+                # Add subcategory metadata for question generation
+                result['metadata'].update({
+                    'available_subcategories': metadata.get('available_subcategories', []),
+                    'service_type': entity_value,
+                    'requires_subcategory_selection': True
+                })
+
+                logger.info(f"[validate_entity_node] Added subcategory metadata: available={metadata.get('available_subcategories', [])}")
+
+        return result
+
     except Exception as e:
         logger.error(f"[validate_entity_node] Error: {e}", exc_info=True)
         return {
@@ -1111,6 +1160,31 @@ def create_slot_filling_graph(
         if state.get('intent_changed', False):
             logger.info("[route_after_follow_up_check] Routing to: intent_changed (EXIT)")
             return "intent_changed"
+
+        # NEW LOGIC: For new intents, check if we have entities that need validation
+        collected_entities = state.get('collected_entities', {})
+        logger.info(f"[route_after_follow_up_check] New intent - collected entities: {list(collected_entities.keys())}")
+
+        # Check if we have service_type that might need subcategory validation
+        if 'service_type' in collected_entities:
+            service_type = collected_entities['service_type']
+            logger.info(f"[route_after_follow_up_check] Found service_type='{service_type}', checking if validation needed")
+
+            # Services that require subcategory selection (all multi-option services)
+            # Include all possible service name variations for compatibility
+            services_requiring_validation = [
+                # Cleaning variations
+                'cleaning', 'home_cleaning', 'house_cleaning', 'clean',
+                # Other services
+                'appliance_repair', 'appliance', 'plumbing', 'electrical',
+                'carpentry', 'painting', 'pest_control', 'pest', 'water_purifier',
+                'car_care', 'car', 'salon_for_women', 'salon_for_men', 'salon',
+                'packers_and_movers', 'packers', 'movers'
+            ]
+            if service_type in services_requiring_validation:
+                logger.info(f"[route_after_follow_up_check] Service '{service_type}' requires validation, routing to: validate_collected_entities")
+                return "validate_collected_entities"
+
         logger.info("[route_after_follow_up_check] Routing to: new_intent")
         return "new_intent"
 
@@ -1121,6 +1195,7 @@ def create_slot_filling_graph(
             "error": "handle_error",
             "follow_up": "extract_entity",
             "intent_changed": END,  # Exit slot-filling, let coordinator handle new intent
+            "validate_collected_entities": "validate_entity",  # NEW: Validate collected entities that need subcategory selection
             "new_intent": "determine_needed_entities"
         }
     )

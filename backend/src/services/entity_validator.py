@@ -60,6 +60,7 @@ class ValidationResult(BaseModel):
     normalized_value: Optional[Any] = None
     error_message: Optional[str] = None
     suggestions: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class EntityValidator:
@@ -151,9 +152,8 @@ class EntityValidator:
                 )
             
             # Check if date is within booking window
-            min_date = today + timedelta(days=config["min_days_ahead"])
             max_date = today + timedelta(days=config["max_days_ahead"])
-            
+
             if parsed_date > max_date:
                 return ValidationResult(
                     is_valid=False,
@@ -238,7 +238,7 @@ class EntityValidator:
                         )
                         pincode_obj = result.scalar_one_or_none()
 
-                        if pincode_obj and pincode_obj.is_serviceable:
+                        if pincode_obj is not None and bool(pincode_obj.is_serviceable):
                             logger.info(f"[EntityValidator] Full address validated: {value_str} (pincode {pincode} is serviceable)")
                             return ValidationResult(
                                 is_valid=True,
@@ -290,7 +290,7 @@ class EntityValidator:
                     )
                     pincode_obj = result.scalar_one_or_none()
 
-                    if pincode_obj and pincode_obj.is_serviceable:
+                    if pincode_obj is not None and bool(pincode_obj.is_serviceable):
                         logger.info(f"[EntityValidator] Pincode {value_str} validated and is serviceable")
                         return ValidationResult(
                             is_valid=True,
@@ -333,53 +333,243 @@ class EntityValidator:
     
     async def _validate_service_type(self, value: Any) -> ValidationResult:
         """Validate service type using ServiceCategoryValidator with fallback"""
-        logger.info(f"Service type validation: {value}")
+        logger.info(f"[ENTITY_VALIDATOR] 🔍 SERVICE_TYPE VALIDATION CALLED!")
+        logger.info(f"[ENTITY_VALIDATOR] Input value: '{value}' (type: {type(value)})")
 
         normalized_value = str(value).lower().strip()
+        logger.info(f"[ENTITY_VALIDATOR] Normalized value: '{normalized_value}'")
 
-        # Normalize common service variations
+        # Normalize common service variations to match services_with_subcategories keys
         service_normalizations = {
-            "pest": "pest_control",
-            "general pest control": "pest_control",
-            "pest control service": "pest_control",
-            "ac service": "ac",
-            "ac repair": "ac",
-            "air conditioning": "ac",
-            "house cleaning": "cleaning",
-            "home cleaning": "cleaning",
+            # Home Cleaning variations
+            "cleaning": "home_cleaning",
+            "house cleaning": "home_cleaning",
+            "home cleaning": "home_cleaning",
+            "cleaning service": "home_cleaning",
+
+            # Appliance Repair variations
+            "appliance": "appliance_repair",
+            "appliance repair": "appliance_repair",
+            "appliance service": "appliance_repair",
+
+            # Plumbing variations
+            "plumbing": "plumbing",
+            "plumbing service": "plumbing",
+            "plumber": "plumbing",
+
+            # Electrical variations
+            "electrical": "electrical",
+            "electrical service": "electrical",
+            "electrician": "electrical",
+
+            # Carpentry variations
+            "carpentry": "carpentry",
+            "carpentry service": "carpentry",
+            "carpenter": "carpentry",
+            "furniture": "carpentry",
+
+            # Painting variations
+            "painting": "painting",
+            "painting service": "painting",
+            "paint": "painting",
             "interior painting": "painting",
             "exterior painting": "painting",
-            "wall painting": "painting"
+            "wall painting": "painting",
+
+            # Pest Control variations
+            "pest": "pest_control",
+            "pest control": "pest_control",
+            "pest control service": "pest_control",
+            "general pest control": "pest_control",
+
+            # Water Purifier variations
+            "water purifier": "water_purifier",
+            "water purifier service": "water_purifier",
+            "ro": "water_purifier",
+            "ro service": "water_purifier",
+
+            # Car Care variations
+            "car": "car_care",
+            "car care": "car_care",
+            "car service": "car_care",
+            "car wash": "car_care",
+            "car cleaning": "car_care",
+
+            # Salon variations
+            "salon": "salon_for_women",  # Default to women
+            "salon for women": "salon_for_women",
+            "women salon": "salon_for_women",
+            "salon for men": "salon_for_men",
+            "men salon": "salon_for_men",
+            "beauty": "salon_for_women",
+            "grooming": "salon_for_men",
+
+            # Packers and Movers variations
+            "packers": "packers_and_movers",
+            "movers": "packers_and_movers",
+            "packers and movers": "packers_and_movers",
+            "packing": "packers_and_movers",
+            "moving": "packers_and_movers",
+            "relocation": "packers_and_movers",
+
+            # AC Service (single-option) - keep as is for now
+            "ac": "ac",
+            "ac service": "ac",
+            "ac repair": "ac",
+            "air conditioning": "ac"
         }
 
         # Apply normalization
         normalized_service = service_normalizations.get(normalized_value, normalized_value)
 
-        # Define services that require subcategory selection with hardcoded data
+        # Define services that require subcategory selection with database-accurate data
         services_with_subcategories = {
+            "home_cleaning": {
+                "subcategories": [
+                    {"id": 1, "name": "Deep Cleaning"},
+                    {"id": 2, "name": "Regular Cleaning"},
+                    {"id": 3, "name": "Kitchen Cleaning"},
+                    {"id": 4, "name": "Bathroom Cleaning"},
+                    {"id": 5, "name": "Sofa Cleaning"},
+                    {"id": 6, "name": "Carpet Cleaning"},
+                    {"id": 7, "name": "Window Cleaning"},
+                    {"id": 8, "name": "Move-in/Move-out Cleaning"}
+                ],
+                "suggestions": ["deep cleaning", "regular cleaning", "kitchen cleaning", "bathroom cleaning", "sofa cleaning", "carpet cleaning", "window cleaning", "move-in move-out cleaning"]
+            },
+            "appliance_repair": {
+                "subcategories": [
+                    {"id": 9, "name": "AC Repair"},
+                    {"id": 10, "name": "AC Installation"},
+                    {"id": 11, "name": "AC Gas Refilling"},
+                    {"id": 12, "name": "Refrigerator Repair"},
+                    {"id": 13, "name": "Washing Machine Repair"},
+                    {"id": 14, "name": "Microwave Repair"},
+                    {"id": 15, "name": "TV Repair"},
+                    {"id": 16, "name": "Geyser Repair"}
+                ],
+                "suggestions": ["ac repair", "ac installation", "ac gas refilling", "refrigerator repair", "washing machine repair", "microwave repair", "tv repair", "geyser repair"]
+            },
+            "plumbing": {
+                "subcategories": [
+                    {"id": 17, "name": "Tap Repair"},
+                    {"id": 18, "name": "Pipe Repair"},
+                    {"id": 19, "name": "Toilet Repair"},
+                    {"id": 20, "name": "Drain Cleaning"},
+                    {"id": 21, "name": "Water Tank Cleaning"},
+                    {"id": 22, "name": "Bathroom Fitting"},
+                    {"id": 23, "name": "Kitchen Sink Installation"}
+                ],
+                "suggestions": ["tap repair", "pipe repair", "toilet repair", "drain cleaning", "water tank cleaning", "bathroom fitting", "kitchen sink installation"]
+            },
+            "electrical": {
+                "subcategories": [
+                    {"id": 24, "name": "Switch/Socket Repair"},
+                    {"id": 25, "name": "Fan Installation"},
+                    {"id": 26, "name": "Light Fitting"},
+                    {"id": 27, "name": "Wiring"},
+                    {"id": 28, "name": "MCB/Fuse Repair"},
+                    {"id": 29, "name": "Inverter Installation"},
+                    {"id": 30, "name": "Doorbell Installation"}
+                ],
+                "suggestions": ["switch socket repair", "fan installation", "light fitting", "wiring", "mcb fuse repair", "inverter installation", "doorbell installation"]
+            },
+            "carpentry": {
+                "subcategories": [
+                    {"id": 31, "name": "Furniture Assembly"},
+                    {"id": 32, "name": "Furniture Repair"},
+                    {"id": 33, "name": "Door Repair"},
+                    {"id": 34, "name": "Window Repair"},
+                    {"id": 35, "name": "Cabinet Installation"},
+                    {"id": 36, "name": "Bed Repair"},
+                    {"id": 37, "name": "Custom Furniture"}
+                ],
+                "suggestions": ["furniture assembly", "furniture repair", "door repair", "window repair", "cabinet installation", "bed repair", "custom furniture"]
+            },
             "painting": {
                 "subcategories": [
-                    {"id": 31, "name": "Interior Painting", "rate_cards": [{"id": 60, "name": "Interior Painting - Basic", "price": 1699.81}]},
-                    {"id": 32, "name": "Exterior Painting", "rate_cards": [{"id": 61, "name": "Exterior Painting - Basic", "price": 2199.99}]},
-                    {"id": 33, "name": "Waterproofing", "rate_cards": [{"id": 62, "name": "Waterproofing - Basic", "price": 2499.99}]}
+                    {"id": 38, "name": "Interior Painting"},
+                    {"id": 39, "name": "Exterior Painting"},
+                    {"id": 40, "name": "Waterproofing"},
+                    {"id": 41, "name": "Texture Painting"},
+                    {"id": 42, "name": "Wood Polishing"}
                 ],
-                "suggestions": ["interior painting", "exterior painting", "waterproofing"]
+                "suggestions": ["interior painting", "exterior painting", "waterproofing", "texture painting", "wood polishing"]
             },
             "pest_control": {
                 "subcategories": [
-                    {"id": 34, "name": "General Pest Control", "rate_cards": [
-                        {"id": 63, "name": "General Pest Control - Basic", "price": 2054.35},
-                        {"id": 64, "name": "General Pest Control - Standard", "price": 3815.94}
-                    ]}
+                    {"id": 43, "name": "General Pest Control"},
+                    {"id": 44, "name": "Cockroach Control"},
+                    {"id": 45, "name": "Termite Control"},
+                    {"id": 46, "name": "Bed Bug Control"},
+                    {"id": 47, "name": "Mosquito Control"},
+                    {"id": 48, "name": "Rodent Control"}
                 ],
-                "suggestions": ["general pest control basic", "general pest control standard"]
+                "suggestions": ["general pest control", "cockroach control", "termite control", "bed bug control", "mosquito control", "rodent control"]
+            },
+            "water_purifier": {
+                "subcategories": [
+                    {"id": 49, "name": "RO Installation"},
+                    {"id": 50, "name": "RO Repair"},
+                    {"id": 51, "name": "Filter Replacement"},
+                    {"id": 52, "name": "RO Service"}
+                ],
+                "suggestions": ["ro installation", "ro repair", "filter replacement", "ro service"]
+            },
+            "car_care": {
+                "subcategories": [
+                    {"id": 53, "name": "Car Washing"},
+                    {"id": 54, "name": "Car Detailing"},
+                    {"id": 55, "name": "Car Interior Cleaning"},
+                    {"id": 56, "name": "Car Polish"},
+                    {"id": 57, "name": "Bike Washing"}
+                ],
+                "suggestions": ["car washing", "car detailing", "car interior cleaning", "car polish", "bike washing"]
+            },
+            "salon_for_women": {
+                "subcategories": [
+                    {"id": 58, "name": "Hair Cut"},
+                    {"id": 59, "name": "Hair Color"},
+                    {"id": 60, "name": "Facial"},
+                    {"id": 61, "name": "Waxing"},
+                    {"id": 62, "name": "Manicure"},
+                    {"id": 63, "name": "Pedicure"},
+                    {"id": 64, "name": "Makeup"},
+                    {"id": 65, "name": "Hair Spa"}
+                ],
+                "suggestions": ["hair cut", "hair color", "facial", "waxing", "manicure", "pedicure", "makeup", "hair spa"]
+            },
+            "salon_for_men": {
+                "subcategories": [
+                    {"id": 66, "name": "Hair Cut"},
+                    {"id": 67, "name": "Shaving"},
+                    {"id": 68, "name": "Beard Trimming"},
+                    {"id": 69, "name": "Facial"},
+                    {"id": 70, "name": "Hair Color"},
+                    {"id": 71, "name": "Massage"}
+                ],
+                "suggestions": ["hair cut", "shaving", "beard trimming", "facial", "hair color", "massage"]
+            },
+            "packers_and_movers": {
+                "subcategories": [
+                    {"id": 72, "name": "Local Shifting"},
+                    {"id": 73, "name": "Intercity Moving"},
+                    {"id": 74, "name": "Office Relocation"},
+                    {"id": 75, "name": "Vehicle Transportation"},
+                    {"id": 76, "name": "Packing Services"}
+                ],
+                "suggestions": ["local shifting", "intercity moving", "office relocation", "vehicle transportation", "packing services"]
             }
         }
 
         # Check if service requires subcategory selection
+        logger.info(f"[ENTITY_VALIDATOR] Checking if '{normalized_service}' requires subcategory selection...")
+        logger.info(f"[ENTITY_VALIDATOR] Services with subcategories: {list(services_with_subcategories.keys())}")
+
         if normalized_service in services_with_subcategories:
             service_data = services_with_subcategories[normalized_service]
-            logger.info(f"Service '{normalized_service}' requires subcategory selection")
+            logger.info(f"[ENTITY_VALIDATOR] ✅ Service '{normalized_service}' requires subcategory selection")
+            logger.info(f"[ENTITY_VALIDATOR] Available suggestions: {service_data['suggestions']}")
             return ValidationResult(
                 is_valid=False,
                 error_message=f"Please specify which type of {value} service you need",
@@ -390,12 +580,13 @@ class EntityValidator:
                     "available_subcategories": service_data["subcategories"]
                 }
             )
+        else:
+            logger.info(f"[ENTITY_VALIDATOR] ❌ Service '{normalized_service}' does NOT require subcategory selection")
 
         # For services that don't require subcategory selection, validate against known services
+        # Currently only "ac" (Test AC Services) is single-option
         known_services = [
-            "ac", "ac_repair", "ac_installation", "ac_gas",
-            "refrigerator", "washing_machine", "plumbing",
-            "electrical", "cleaning", "painting", "pest_control"
+            "ac"  # Test AC Services - single subcategory, direct booking
         ]
 
         if normalized_service in known_services:
