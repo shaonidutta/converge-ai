@@ -3,19 +3,31 @@
  * Displays booking information in a card format
  */
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Calendar, Clock, MapPin, IndianRupee, Eye, XCircle, RefreshCw } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
-import BookingStatusBadge from './BookingStatusBadge';
+import React from "react";
+import { motion } from "framer-motion";
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  IndianRupee,
+  Eye,
+  XCircle,
+  RefreshCw,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
+import BookingStatusBadge from "./BookingStatusBadge";
+import {
+  validateBookingCancellation,
+  validateBookingReschedule,
+} from "../../utils/bookingValidation";
 
 const BookingCard = ({ booking, onCancel, onReschedule }) => {
   const navigate = useNavigate();
 
   const formatDate = (dateString) => {
     try {
-      return format(new Date(dateString), 'MMM d, yyyy');
+      return format(new Date(dateString), "MMM d, yyyy");
     } catch {
       return dateString;
     }
@@ -23,9 +35,9 @@ const BookingCard = ({ booking, onCancel, onReschedule }) => {
 
   const formatTime = (timeString) => {
     try {
-      const [hours] = timeString.split(':');
+      const [hours] = timeString.split(":");
       const hour = parseInt(hours);
-      const period = hour >= 12 ? 'PM' : 'AM';
+      const period = hour >= 12 ? "PM" : "AM";
       const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
       return `${displayHour}:00 ${period}`;
     } catch {
@@ -33,8 +45,9 @@ const BookingCard = ({ booking, onCancel, onReschedule }) => {
     }
   };
 
-  const canCancel = ['pending', 'confirmed'].includes(booking.status?.toLowerCase());
-  const canReschedule = ['pending', 'confirmed'].includes(booking.status?.toLowerCase());
+  // Validate cancellation and rescheduling with proper date checks
+  const { canCancel } = validateBookingCancellation(booking);
+  const { canReschedule } = validateBookingReschedule(booking);
 
   return (
     <motion.div
@@ -48,14 +61,19 @@ const BookingCard = ({ booking, onCancel, onReschedule }) => {
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-gradient-to-br from-primary-100 to-secondary-100 rounded-lg flex items-center justify-center">
-            <span className="text-2xl">{booking.items?.[0]?.rate_card?.subcategory?.image || '🛠️'}</span>
+            <span className="text-2xl">
+              {booking.items?.[0]?.rate_card?.subcategory?.image || "🛠️"}
+            </span>
           </div>
           <div>
             <h3 className="font-semibold text-slate-900">
-              {booking.items?.[0]?.rate_card?.subcategory?.name || booking.items?.[0]?.service_name || 'Service'}
+              {booking.items?.[0]?.rate_card?.subcategory?.name ||
+                booking.items?.[0]?.service_name ||
+                "Service"}
             </h3>
             <p className="text-sm text-slate-600">
-              {booking.items?.[0]?.rate_card?.subcategory?.category?.name || 'Category'}
+              {booking.items?.[0]?.rate_card?.subcategory?.category?.name ||
+                "Category"}
             </p>
           </div>
         </div>
@@ -75,7 +93,7 @@ const BookingCard = ({ booking, onCancel, onReschedule }) => {
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <MapPin className="h-4 w-4" />
           <span className="truncate">
-            {booking.address?.city || 'Address not available'}
+            {booking.address?.city || "Address not available"}
           </span>
         </div>
       </div>
@@ -84,7 +102,11 @@ const BookingCard = ({ booking, onCancel, onReschedule }) => {
       <div className="flex items-center justify-between pt-4 border-t border-slate-200">
         <div className="flex items-center gap-1 text-lg font-bold text-slate-900">
           <IndianRupee className="h-5 w-5" />
-          <span>{booking.total_amount ? parseFloat(booking.total_amount).toFixed(2) : '0.00'}</span>
+          <span>
+            {booking.total_amount
+              ? parseFloat(booking.total_amount).toFixed(2)
+              : "0.00"}
+          </span>
         </div>
 
         {/* Quick Actions */}
@@ -138,4 +160,3 @@ const BookingCard = ({ booking, onCancel, onReschedule }) => {
 };
 
 export default BookingCard;
-

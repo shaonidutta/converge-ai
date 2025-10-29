@@ -10,17 +10,24 @@
  * - Loading and error states
  */
 
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Home, ChevronRight, Wrench, AlertCircle, RefreshCw, ShoppingCart } from 'lucide-react';
-import { useRateCards } from '../hooks/useRateCards';
-import { useSubcategories } from '../hooks/useSubcategories';
-import { useCart } from '../hooks/useCart';
-import RateCardItem from '../components/services/RateCardItem';
-import Navbar from '../components/common/Navbar';
-import Footer from '../components/common/Footer';
-import { ServiceGridSkeleton } from '../components/common/LoadingSkeleton';
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  Home,
+  ChevronRight,
+  Wrench,
+  AlertCircle,
+  RefreshCw,
+  ShoppingCart,
+} from "lucide-react";
+import { useRateCards } from "../hooks/useRateCards";
+import { useSubcategories } from "../hooks/useSubcategories";
+import { useCart } from "../hooks/useCart";
+import RateCardItem from "../components/services/RateCardItem";
+import Navbar from "../components/common/Navbar";
+import Footer from "../components/common/Footer";
+import { ServiceGridSkeleton } from "../components/common/LoadingSkeleton";
 
 const RateCardsPage = () => {
   const { categoryId, subcategoryId } = useParams();
@@ -32,12 +39,16 @@ const RateCardsPage = () => {
   const [subcategory, setSubcategory] = useState(null);
 
   // Fetch rate cards
-  const { rateCards, loading, error, refetch } = useRateCards(parseInt(subcategoryId));
+  const { rateCards, loading, error, refetch } = useRateCards(
+    parseInt(subcategoryId)
+  );
 
   // Find subcategory from list
   useEffect(() => {
     if (subcategories && subcategories.length > 0) {
-      const found = subcategories.find(sub => sub.id === parseInt(subcategoryId));
+      const found = subcategories.find(
+        (sub) => sub.id === parseInt(subcategoryId)
+      );
       setSubcategory(found);
     }
   }, [subcategories, subcategoryId]);
@@ -49,14 +60,21 @@ const RateCardsPage = () => {
 
   // Check authentication
   useEffect(() => {
-    const user = localStorage.getItem('user');
+    const user = localStorage.getItem("user");
     if (!user) {
-      navigate('/login');
+      navigate("/login");
     }
   }, [navigate]);
 
   const handleAddToCart = async (rateCard, quantity) => {
-    addToCart(rateCard, quantity);
+    // Get category name from subcategory data
+    const categoryName = subcategory?.category?.name || "Category";
+    const subcategoryName = subcategory?.name || "Service";
+
+    addToCart(rateCard, quantity, {
+      categoryName,
+      subcategoryName,
+    });
   };
 
   return (
@@ -72,23 +90,29 @@ const RateCardsPage = () => {
             animate={{ opacity: 1, y: 0 }}
             className="flex items-center gap-2 text-sm text-slate-600 mb-8 flex-wrap"
           >
-            <Link to="/home" className="hover:text-primary-600 transition-colors duration-200">
+            <Link
+              to="/home"
+              className="hover:text-primary-600 transition-colors duration-200"
+            >
               <Home className="h-4 w-4" />
             </Link>
             <ChevronRight className="h-4 w-4" />
-            <Link to="/home" className="hover:text-primary-600 transition-colors duration-200">
+            <Link
+              to="/home"
+              className="hover:text-primary-600 transition-colors duration-200"
+            >
               Services
             </Link>
             <ChevronRight className="h-4 w-4" />
-            <Link 
-              to={`/services/${categoryId}`} 
+            <Link
+              to={`/services/${categoryId}`}
               className="hover:text-primary-600 transition-colors duration-200"
             >
-              {subcategory?.category_name || 'Category'}
+              {subcategory?.category_name || "Category"}
             </Link>
             <ChevronRight className="h-4 w-4" />
             <span className="text-slate-800 font-medium">
-              {subcategory?.name || 'Loading...'}
+              {subcategory?.name || "Loading..."}
             </span>
           </motion.nav>
 
@@ -125,7 +149,8 @@ const RateCardsPage = () => {
                   </p>
                   <div className="flex items-center justify-center md:justify-start gap-4">
                     <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-primary-50 text-primary-700">
-                      {rateCards.length} {rateCards.length === 1 ? 'Option' : 'Options'} Available
+                      {rateCards.length}{" "}
+                      {rateCards.length === 1 ? "Option" : "Options"} Available
                     </span>
                   </div>
                 </div>
@@ -184,7 +209,8 @@ const RateCardsPage = () => {
                   No Packages Available
                 </h3>
                 <p className="text-slate-600 text-center max-w-md">
-                  There are no packages available for this service at the moment.
+                  There are no packages available for this service at the
+                  moment.
                 </p>
               </div>
             ) : (
@@ -211,14 +237,14 @@ const RateCardsPage = () => {
               <div className="flex items-center justify-between max-w-7xl mx-auto">
                 <div>
                   <p className="text-sm text-slate-600">
-                    {totalItems} {totalItems === 1 ? 'item' : 'items'} in cart
+                    {totalItems} {totalItems === 1 ? "item" : "items"} in cart
                   </p>
                   <p className="text-xl font-bold text-slate-800">
                     ₹{totalPrice.toFixed(2)}
                   </p>
                 </div>
                 <button
-                  onClick={() => navigate('/cart')}
+                  onClick={() => navigate("/cart")}
                   className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-lg font-medium hover:shadow-[0_4px_12px_rgba(108,99,255,0.3)] transition-all duration-300"
                 >
                   <ShoppingCart className="h-5 w-5" />
@@ -236,4 +262,3 @@ const RateCardsPage = () => {
 };
 
 export default RateCardsPage;
-

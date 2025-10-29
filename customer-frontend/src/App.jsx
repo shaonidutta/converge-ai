@@ -13,6 +13,7 @@ import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
 import MyReviewsPage from "./pages/MyReviewsPage";
 import SearchResultsPage from "./pages/SearchResultsPage";
+import ProtectedRoute from "./components/ProtectedRoute";
 import LisaChatBubble from "./components/chat/LisaChatBubble";
 import LisaChatWindow from "./components/chat/LisaChatWindow";
 
@@ -27,17 +28,76 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
-        <Route path="/home" element={<Home />} />
+        <Route
+          path="/home"
+          element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/search" element={<SearchResultsPage />} />
         <Route path="/services/:categoryId" element={<ServiceDetailPage />} />
-        <Route path="/services/:categoryId/:subcategoryId" element={<RateCardsPage />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/bookings" element={<BookingsPage />} />
-        <Route path="/bookings/:id" element={<BookingDetailPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/reviews" element={<MyReviewsPage />} />
+        <Route
+          path="/services/:categoryId/:subcategoryId"
+          element={<RateCardsPage />}
+        />
+        <Route
+          path="/cart"
+          element={
+            <ProtectedRoute>
+              <CartPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/checkout"
+          element={
+            <ProtectedRoute>
+              <CheckoutPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bookings"
+          element={
+            <ProtectedRoute>
+              <BookingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bookings/:id"
+          element={
+            <ProtectedRoute>
+              <BookingDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reviews"
+          element={
+            <ProtectedRoute>
+              <MyReviewsPage />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
 
       {/* Global Chat Components */}

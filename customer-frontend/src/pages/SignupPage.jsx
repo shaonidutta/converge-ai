@@ -20,8 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
-import api from "../api";
-import { storeAuthData } from "../api/axiosConfig";
+import { useAuth } from "../context/AuthContext";
 import { handleAPIError, extractValidationErrors } from "../api/errorHandler";
 
 /**
@@ -37,6 +36,7 @@ import { handleAPIError, extractValidationErrors } from "../api/errorHandler";
  */
 const SignupPage = () => {
   const navigate = useNavigate();
+  const { register, loading: authLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -153,8 +153,8 @@ const SignupPage = () => {
     setLoading(true);
 
     try {
-      // Call register API with correct format
-      const response = await api.auth.register({
+      // Call register using AuthContext
+      await register({
         email: formData.email,
         mobile: formData.mobile,
         password: formData.password,
@@ -163,10 +163,7 @@ const SignupPage = () => {
         referral_code: formData.referral_code || undefined,
       });
 
-      // Store authentication data (tokens and user info)
-      storeAuthData(response);
-
-      // Navigate to home
+      // Navigate to home (AuthContext handles auth state)
       navigate("/home");
     } catch (err) {
       console.error("Registration error:", err);
@@ -343,7 +340,9 @@ const SignupPage = () => {
                   required
                 />
                 {fieldErrors.email && (
-                  <p className="text-xs text-error-600 animate-fade-in">{fieldErrors.email}</p>
+                  <p className="text-xs text-error-600 animate-fade-in">
+                    {fieldErrors.email}
+                  </p>
                 )}
               </div>
 
@@ -367,7 +366,9 @@ const SignupPage = () => {
                   required
                 />
                 {fieldErrors.mobile && (
-                  <p className="text-xs text-error-600 animate-fade-in">{fieldErrors.mobile}</p>
+                  <p className="text-xs text-error-600 animate-fade-in">
+                    {fieldErrors.mobile}
+                  </p>
                 )}
               </div>
 
@@ -427,7 +428,9 @@ const SignupPage = () => {
                 )}
 
                 {fieldErrors.password && (
-                  <p className="text-xs text-error-600 animate-fade-in">{fieldErrors.password}</p>
+                  <p className="text-xs text-error-600 animate-fade-in">
+                    {fieldErrors.password}
+                  </p>
                 )}
               </div>
 
@@ -486,9 +489,9 @@ const SignupPage = () => {
               <Button
                 type="submit"
                 className="w-full h-11 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-primary-600 hover:to-secondary-600 text-white font-medium rounded-xl shadow-[0_4px_20px_rgba(108,99,255,0.3)] hover:shadow-[0_6px_24px_rgba(108,99,255,0.4)] hover:scale-[1.02] transition-all duration-300 ease-in-out"
-                disabled={loading}
+                disabled={loading || authLoading}
               >
-                {loading ? (
+                {loading || authLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating account...

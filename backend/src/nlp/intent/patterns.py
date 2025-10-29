@@ -45,7 +45,11 @@ class IntentPatterns:
             "which service", "what should i", "help me choose",
             "what services do you", "what services do u", "services do you give",
             "services do u give", "what services you give", "what services u give",
-            "what do you offer", "what do u offer", "what can you do"
+            "what do you offer", "what do u offer", "what can you do",
+            # Subcategory-specific patterns
+            "subcategories", "sub-categories", "subcategories for", "sub-categories for",
+            "types of", "options for", "what types", "show me options",
+            "categories", "service categories", "all categories"
         ],
         IntentType.COMPLAINT: [
             "complaint", "complain", "issue", "problem", "not satisfied",
@@ -105,6 +109,16 @@ class IntentPatterns:
             r"\bwhat\s+(do|can)\s+(you|u)\s+(offer|provide|do|help)",
             r"\bwhat\s+services",
             r"\btell\s+me\s+about\s+(your\s+)?services",
+            # Subcategory-specific regex patterns
+            r"\b(subcategories|sub-categories)\s+for\s+[\w\s]+",
+            r"\bwhat\s+[\w\s]+\s+(services|options)\s+do\s+you\s+have",
+            r"\bshow\s+me\s+[\w\s]+\s+(services|options|subcategories)",
+            r"\btypes?\s+of\s+[\w\s]+\s+services?",
+            r"\blist\s+[\w\s]+\s+(services|options)",
+            r"\b[\w\s]+\s+(subcategories|sub-categories)",
+            r"\bwhat\s+categories\s+do\s+you\s+have",
+            r"\bshow\s+me\s+all\s+(service\s+)?categories",
+            r"\blist\s+all\s+categories"
         ],
         IntentType.PRICING_INQUIRY: [
             r"\bhow\s+much\s+(does|is|for|to)",

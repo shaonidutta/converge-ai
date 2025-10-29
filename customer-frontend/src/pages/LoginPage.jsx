@@ -11,8 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
-import api from "../api";
-import { storeAuthData } from "../api/axiosConfig";
+import { useAuth } from "../context/AuthContext";
 import { handleAPIError } from "../api/errorHandler";
 
 /**
@@ -27,8 +26,8 @@ import { handleAPIError } from "../api/errorHandler";
  */
 const LoginPage = () => {
   const navigate = useNavigate();
+  const { login, loading: authLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const [formData, setFormData] = useState({
@@ -55,24 +54,19 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    setLoading(true);
 
     try {
       // Validate inputs
       if (!formData.identifier || !formData.password) {
         setError("Please fill in all fields");
-        setLoading(false);
         return;
       }
 
-      // Call login API with correct format
-      const response = await api.auth.login({
+      // Use auth context login method
+      await login({
         identifier: formData.identifier,
         password: formData.password,
       });
-
-      // Store authentication data (tokens and user info)
-      storeAuthData(response);
 
       // Navigate to home
       navigate("/home");
@@ -84,8 +78,6 @@ const LoginPage = () => {
         "Invalid credentials. Please try again."
       );
       setError(errorMessage);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -174,7 +166,7 @@ const LoginPage = () => {
                   value={formData.identifier}
                   onChange={handleChange}
                   className="h-11 rounded-xl border-slate-200 focus:border-primary-400 focus:ring-primary-400/20 transition-all duration-300"
-                  disabled={loading}
+                  disabled={authLoading}
                   required
                 />
               </div>
@@ -204,14 +196,14 @@ const LoginPage = () => {
                     value={formData.password}
                     onChange={handleChange}
                     className="h-11 pr-10 rounded-xl border-slate-200 focus:border-primary-400 focus:ring-primary-400/20 transition-all duration-300"
-                    disabled={loading}
+                    disabled={authLoading}
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-all duration-200"
-                    disabled={loading}
+                    disabled={authLoading}
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4" />
@@ -226,9 +218,9 @@ const LoginPage = () => {
               <Button
                 type="submit"
                 className="w-full h-11 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-primary-600 hover:to-secondary-600 text-white font-medium rounded-xl shadow-[0_4px_20px_rgba(108,99,255,0.3)] hover:shadow-[0_6px_24px_rgba(108,99,255,0.4)] hover:scale-[1.02] transition-all duration-300 ease-in-out"
-                disabled={loading}
+                disabled={authLoading}
               >
-                {loading ? (
+                {authLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Signing in...
@@ -245,7 +237,9 @@ const LoginPage = () => {
                 <span className="w-full border-t border-slate-200" />
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-white px-3 text-slate-500 font-medium">or continue with</span>
+                <span className="bg-white px-3 text-slate-500 font-medium">
+                  or continue with
+                </span>
               </div>
             </div>
 
@@ -254,7 +248,7 @@ const LoginPage = () => {
               <Button
                 variant="outline"
                 type="button"
-                disabled={loading}
+                disabled={authLoading}
                 className="h-11 bg-white hover:bg-slate-50 hover:border-primary-300 border-slate-200 rounded-xl transition-all duration-300 ease-in-out hover:scale-[1.02]"
               >
                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
@@ -280,7 +274,7 @@ const LoginPage = () => {
               <Button
                 variant="outline"
                 type="button"
-                disabled={loading}
+                disabled={authLoading}
                 className="h-11 bg-white hover:bg-slate-50 hover:border-primary-300 border-slate-200 rounded-xl transition-all duration-300 ease-in-out hover:scale-[1.02]"
               >
                 <svg

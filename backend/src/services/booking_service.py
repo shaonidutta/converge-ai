@@ -730,6 +730,8 @@ class BookingService:
         Raises:
             ValueError: If booking cannot be cancelled
         """
+        logger.info(f"Cancelling booking: booking_id={booking_id}, user_id={user.id}")
+
         # Get booking
         result = await self.db.execute(
             select(Booking).where(
@@ -740,7 +742,44 @@ class BookingService:
         booking = result.scalar_one_or_none()
 
         if not booking:
+            logger.warning(f"Booking not found: booking_id={booking_id}")
             raise ValueError("Booking not found")
+
+        # Check if booking can be cancelled
+        if booking.status not in [BookingStatus.PENDING, BookingStatus.CONFIRMED]:
+            logger.warning(f"Cannot cancel booking with status: {booking.status.value}")
+            raise ValueError(
+                f"Cannot cancel booking with status: {booking.status.value}"
+            )
+
+        # Update booking status
+        booking.status = BookingStatus.CANCELLED
+        booking.cancellation_reason = request.reason
+        booking.cancelled_at = datetime.now(timezone.utc)
+
+        # Update booking items status
+        items_result = await self.db.execute(
+            select(BookingItem).where(BookingItem.booking_id == booking.id)
+        )
+        items = items_result.scalars().all()
+
+        for item in items:
+            item.status = BookingStatus.CANCELLED
+
+        # Refund to wallet if paid via wallet
+        if (booking.payment_method == PaymentMethod.WALLET and
+            booking.payment_status == PaymentStatus.PAID):
+            user.wallet_balance += booking.total
+            booking.payment_status = PaymentStatus.REFUNDED
+            logger.info(f"Refunded {booking.total} to wallet for user_id={user.id}")
+
+        await self.db.commit()
+        await self.db.refresh(booking)
+
+        logger.info(
+            f"Booking cancelled successfully: booking_id={booking_id}, "
+            f"order_id={booking.order_id}, reason={request.reason}"
+        )
 
     async def cancel_booking_by_order_id(
         self,
