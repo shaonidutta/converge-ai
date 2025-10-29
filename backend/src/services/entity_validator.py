@@ -332,40 +332,91 @@ class EntityValidator:
         )
     
     async def _validate_service_type(self, value: Any) -> ValidationResult:
-        """Validate service type using ServiceCategoryValidator"""
-        from src.services.service_category_validator import ServiceCategoryValidator
-
-        # OPTIMIZED: Use ServiceCategoryValidator with error handling
+        """Validate service type using ServiceCategoryValidator with fallback"""
         logger.info(f"Service type validation: {value}")
 
         normalized_value = str(value).lower().strip()
 
-        # For painting, use hardcoded subcategory data to avoid database hangs
-        if normalized_value == "painting":
-            logger.info("Using hardcoded painting subcategories to avoid database issues")
+        # Normalize common service variations
+        service_normalizations = {
+            "pest": "pest_control",
+            "general pest control": "pest_control",
+            "pest control service": "pest_control",
+            "ac service": "ac",
+            "ac repair": "ac",
+            "air conditioning": "ac",
+            "house cleaning": "cleaning",
+            "home cleaning": "cleaning",
+            "interior painting": "painting",
+            "exterior painting": "painting",
+            "wall painting": "painting"
+        }
+
+        # Apply normalization
+        normalized_service = service_normalizations.get(normalized_value, normalized_value)
+
+        # Define services that require subcategory selection with hardcoded data
+        services_with_subcategories = {
+            "painting": {
+                "subcategories": [
+                    {"id": 31, "name": "Interior Painting", "rate_cards": [{"id": 60, "name": "Interior Painting - Basic", "price": 1699.81}]},
+                    {"id": 32, "name": "Exterior Painting", "rate_cards": [{"id": 61, "name": "Exterior Painting - Basic", "price": 2199.99}]},
+                    {"id": 33, "name": "Waterproofing", "rate_cards": [{"id": 62, "name": "Waterproofing - Basic", "price": 2499.99}]}
+                ],
+                "suggestions": ["interior painting", "exterior painting", "waterproofing"]
+            },
+            "pest_control": {
+                "subcategories": [
+                    {"id": 34, "name": "General Pest Control", "rate_cards": [
+                        {"id": 63, "name": "General Pest Control - Basic", "price": 2054.35},
+                        {"id": 64, "name": "General Pest Control - Standard", "price": 3815.94}
+                    ]}
+                ],
+                "suggestions": ["general pest control basic", "general pest control standard"]
+            }
+        }
+
+        # Check if service requires subcategory selection
+        if normalized_service in services_with_subcategories:
+            service_data = services_with_subcategories[normalized_service]
+            logger.info(f"Service '{normalized_service}' requires subcategory selection")
             return ValidationResult(
                 is_valid=False,
                 error_message=f"Please specify which type of {value} service you need",
-                suggestions=["interior painting", "exterior painting", "waterproofing"],
+                suggestions=service_data["suggestions"],
                 metadata={
                     "requires_subcategory_selection": True,
-                    "normalized_service_type": normalized_value,
-                    "available_subcategories": [
-                        {"id": 31, "name": "Interior Painting", "rate_cards": [{"id": 60, "name": "Interior Painting - Basic", "price": 1699.81}]},
-                        {"id": 32, "name": "Exterior Painting", "rate_cards": [{"id": 61, "name": "Exterior Painting - Basic", "price": 2199.99}]},
-                        {"id": 33, "name": "Waterproofing", "rate_cards": [{"id": 62, "name": "Waterproofing - Basic", "price": 2499.99}]}
-                    ]
+                    "normalized_service_type": normalized_service,
+                    "available_subcategories": service_data["subcategories"]
                 }
             )
 
-        # For other services, try ServiceCategoryValidator with timeout
+        # For services that don't require subcategory selection, validate against known services
+        known_services = [
+            "ac", "ac_repair", "ac_installation", "ac_gas",
+            "refrigerator", "washing_machine", "plumbing",
+            "electrical", "cleaning", "painting", "pest_control"
+        ]
+
+        if normalized_service in known_services:
+            logger.info(f"Service '{normalized_service}' is valid and doesn't require subcategory selection")
+            return ValidationResult(
+                is_valid=True,
+                normalized_value=normalized_service,
+                metadata={
+                    "requires_subcategory_selection": False,
+                    "normalized_service_type": normalized_service
+                }
+            )
+
+        # Try ServiceCategoryValidator as fallback for unknown services
         try:
             from src.services.service_category_validator import ServiceCategoryValidator
 
             service_validator = ServiceCategoryValidator(self.db)
             validation_result = await asyncio.wait_for(
                 service_validator.validate_service_type(str(value)),
-                timeout=5.0  # 5 second timeout
+                timeout=3.0  # Reduced timeout
             )
 
             if validation_result.is_valid:
@@ -391,26 +442,43 @@ class EntityValidator:
                     metadata=metadata
                 )
             else:
+                # Service not found in database, suggest known services
                 return ValidationResult(
                     is_valid=False,
-                    error_message=validation_result.error_message,
-                    suggestions=["plumbing", "electrical", "cleaning", "painting", "ac"]
+                    error_message=f"Sorry, we don't offer '{value}' service. Here are our available services:",
+                    suggestions=["plumbing", "electrical", "cleaning", "painting", "ac", "pest control"]
                 )
 
         except asyncio.TimeoutError:
-            logger.warning(f"ServiceCategoryValidator timed out for {value}, using fallback")
-            return ValidationResult(
-                is_valid=True,
-                normalized_value=normalized_value,
-                metadata={}
-            )
+            logger.warning(f"ServiceCategoryValidator timed out for {value}, using fallback validation")
+            # If it's a reasonable service name, accept it
+            if any(keyword in normalized_value for keyword in ["service", "repair", "cleaning", "maintenance"]):
+                return ValidationResult(
+                    is_valid=True,
+                    normalized_value=normalized_service,
+                    metadata={"requires_subcategory_selection": False}
+                )
+            else:
+                return ValidationResult(
+                    is_valid=False,
+                    error_message=f"Sorry, we don't offer '{value}' service. Here are our available services:",
+                    suggestions=["plumbing", "electrical", "cleaning", "painting", "ac", "pest control"]
+                )
         except Exception as e:
             logger.error(f"[EntityValidator] Service type validation error: {e}")
-            return ValidationResult(
-                is_valid=True,
-                normalized_value=normalized_value,
-                metadata={}
-            )
+            # Fallback: accept if it looks like a service
+            if any(keyword in normalized_value for keyword in ["service", "repair", "cleaning", "maintenance"]):
+                return ValidationResult(
+                    is_valid=True,
+                    normalized_value=normalized_service,
+                    metadata={"requires_subcategory_selection": False}
+                )
+            else:
+                return ValidationResult(
+                    is_valid=False,
+                    error_message=f"Sorry, we don't offer '{value}' service. Here are our available services:",
+                    suggestions=["plumbing", "electrical", "cleaning", "painting", "ac", "pest control"]
+                )
 
     async def _validate_service_subcategory(self, value: Any, context: Optional[Dict[str, Any]] = None) -> ValidationResult:
         """Validate service subcategory selection"""

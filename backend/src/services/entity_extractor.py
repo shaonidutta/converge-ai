@@ -591,6 +591,7 @@ class EntityExtractor:
             "electrical": ["electrical", "electrician", "wiring", "switch", "light", "power"],
             "painting": ["painting", "paint", "painter", "wall painting"],
             "appliance_repair": ["washing machine", "refrigerator", "fridge", "appliance", "microwave"],
+            "pest_control": ["pest control", "pest", "pest service", "general pest control", "pest control service", "exterminator", "fumigation"],
         }
 
         for service_type, keywords in service_keywords.items():

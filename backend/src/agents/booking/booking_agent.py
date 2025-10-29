@@ -253,6 +253,9 @@ class BookingAgent:
                     "electrical": {"subcategory_id": 24, "rate_card_id": 48},
                     "cleaning": {"subcategory_id": 1, "rate_card_id": 1},
                     "painting": {"subcategory_id": 31, "rate_card_id": 60},  # Added painting
+                    "pest": {"subcategory_id": 34, "rate_card_id": 63},  # General Pest Control - Basic
+                    "pest_control": {"subcategory_id": 34, "rate_card_id": 63},  # General Pest Control - Basic
+                    "general_pest_control": {"subcategory_id": 34, "rate_card_id": 63},  # General Pest Control - Basic
                 }
 
                 # Get rate card for the service type

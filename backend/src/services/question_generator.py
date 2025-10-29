@@ -215,27 +215,37 @@ class QuestionGenerator:
             context_items = [f"{k}: {v}" for k, v in collected_entities.items()]
             context_str = f"\nAlready collected information: {', '.join(context_items)}"
 
-        # Special handling for service subcategory questions
+        # Special handling for service subcategory questions - use LLM for conversational response
         if entity_type == EntityType.SERVICE_SUBCATEGORY and context:
             available_subcategories = context.get('available_subcategories', [])
             service_type = context.get('service_type', 'service')
 
             if available_subcategories:
-                # Format subcategories with prices
-                options_text = "\n\nAvailable options:\n"
+                # Format subcategories with prices for LLM context
+                options_list = []
                 for i, subcategory in enumerate(available_subcategories[:5], 1):  # Limit to 5 options
                     name = subcategory.get('name', 'Unknown')
                     rate_cards = subcategory.get('rate_cards', [])
                     if rate_cards:
-                        # Show the cheapest option
-                        cheapest = min(rate_cards, key=lambda x: x.get('price', 0))
-                        price = cheapest.get('price', 0)
-                        options_text += f"{i}. {name} - Starting from ₹{price:.0f}\n"
+                        # Show all options for pest control, cheapest for others
+                        if service_type.lower() in ['pest_control', 'pest']:
+                            # For pest control, show all rate card options
+                            price_info = []
+                            for card in rate_cards:
+                                card_name = card.get('name', name)
+                                price = card.get('price', 0)
+                                price_info.append(f"{card_name} - ₹{price:.2f}")
+                            options_list.append(f"{name}: {', '.join(price_info)}")
+                        else:
+                            # For other services, show starting price
+                            cheapest = min(rate_cards, key=lambda x: x.get('price', 0))
+                            price = cheapest.get('price', 0)
+                            options_list.append(f"{name} - Starting from ₹{price:.0f}")
                     else:
-                        options_text += f"{i}. {name}\n"
+                        options_list.append(name)
 
-                # Generate a conversational question with options
-                return f"Which type of {service_type} service would you like?{options_text}\nJust tell me the name or number of your choice."
+                # Use LLM to generate conversational subcategory selection question
+                return self._generate_llm_subcategory_question(service_type, options_list, context_str)
 
         # Build prompt
         # Special handling for booking_id: use "Order ID" instead of "booking id"
@@ -475,4 +485,38 @@ Generate the question:"""
             "2. Skip this for now and continue\n"
             "3. Speak with a human agent"
         )
+
+    def _generate_llm_subcategory_question(self, service_type: str, options_list: List[str], context_str: str = "") -> str:
+        """Generate conversational subcategory selection question using LLM"""
+        try:
+            # Create a conversational prompt for subcategory selection
+            prompt = f"""You are a friendly customer service assistant helping a customer choose a specific type of {service_type} service.
+
+Available options:
+{chr(10).join(f"• {option}" for option in options_list)}
+
+Generate a natural, conversational question asking the customer to choose from these options.
+Be friendly and helpful. Don't use robotic language like "Found X services matching".
+Instead, use natural language like "I can help you with several types of {service_type} services" or "We offer these {service_type} options".
+
+Keep it concise but warm and professional. End with asking them to let you know which one they'd prefer.
+
+{context_str}"""
+
+            response = self.llm_client.generate_response(
+                prompt=prompt,
+                max_tokens=150,
+                temperature=0.7
+            )
+
+            # Add the options list in a clean format
+            formatted_options = "\n\n" + "\n".join(f"{i}. {option}" for i, option in enumerate(options_list, 1))
+
+            return response.strip() + formatted_options
+
+        except Exception as e:
+            logger.error(f"Error generating LLM subcategory question: {e}")
+            # Fallback to template-based question
+            formatted_options = "\n".join(f"{i}. {option}" for i, option in enumerate(options_list, 1))
+            return f"I can help you with these {service_type} services:\n\n{formatted_options}\n\nWhich one would you like to book?"
 

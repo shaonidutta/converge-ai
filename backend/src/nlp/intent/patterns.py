@@ -206,6 +206,7 @@ class IntentPatterns:
             "electrical": ["electrical", "electrician", "wiring", "switch", "light"],
             "painting": ["painting", "paint", "painter"],
             "appliance_repair": ["washing machine", "refrigerator", "fridge", "appliance"],
+            "pest_control": ["pest control", "pest", "pest service", "general pest control", "pest control service", "exterminator", "fumigation"],
         }
 
         for service_type, keywords in service_keywords.items():
@@ -228,7 +229,8 @@ class IntentPatterns:
                 ["cleaning", "clean"],
                 ["electrical", "electrician"],
                 ["painting", "paint"],
-                ["appliance", "washing machine", "refrigerator"]
+                ["appliance", "washing machine", "refrigerator"],
+                ["pest control", "pest", "pest service", "exterminator"]
             ] for keyword in keywords):
                 raw_entities[EntityType.ACTION.value] = "book"
 
