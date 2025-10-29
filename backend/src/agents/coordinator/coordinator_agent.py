@@ -364,8 +364,35 @@ class CoordinatorAgent:
 
                 missing_entities = [e for e in required_entities if e not in collected_entities]
 
-                if missing_entities:
-                    self.logger.info(f"Missing entities: {missing_entities}, starting slot-filling")
+                # Special check: if service_type is present, check if it requires subcategory selection
+                # This ensures we start slot-filling even when all entities are present
+                needs_subcategory_validation = False
+                if "service_type" in collected_entities and action == "book":
+                    service_type = collected_entities.get("service_type", "").lower()
+
+                    # Normalize service variations
+                    service_normalizations = {
+                        "pest": "pest_control",
+                        "general pest control": "pest_control",
+                        "pest control service": "pest_control",
+                        "paint": "painting",
+                        "painter": "painting",
+                        "wall painting": "painting"
+                    }
+                    normalized_service = service_normalizations.get(service_type, service_type)
+
+                    # Services that require subcategory selection
+                    services_requiring_subcategory = {"painting", "pest_control"}
+
+                    if normalized_service in services_requiring_subcategory:
+                        needs_subcategory_validation = True
+                        self.logger.info(f"Service '{service_type}' (normalized: '{normalized_service}') requires subcategory selection")
+
+                if missing_entities or needs_subcategory_validation:
+                    if missing_entities:
+                        self.logger.info(f"Missing entities: {missing_entities}, starting slot-filling")
+                    if needs_subcategory_validation:
+                        self.logger.info(f"Service requires subcategory selection, starting slot-filling")
 
                     # Create dialog state for this session
                     from src.schemas.dialog_state import DialogStateCreate

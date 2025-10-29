@@ -1148,9 +1148,27 @@ def create_slot_filling_graph(
     def route_after_validation(state: SlotFillingState) -> str:
         """Route after validation"""
         if state.get('error'):
+            logger.info(f"[route_after_validation] Routing to error due to error: {state.get('error')}")
             return "error"
         validation_result = state.get('validation_result', {})
-        if validation_result.get('is_valid', False):
+        is_valid = validation_result.get('is_valid', False)
+
+        # Debug logging
+        logger.info(f"[route_after_validation] Validation result: is_valid={is_valid}")
+        if not is_valid:
+            error_msg = validation_result.get('error_message', 'Unknown error')
+            metadata = validation_result.get('metadata', {})
+            requires_subcategory = metadata.get('requires_subcategory_selection', False)
+            logger.info(f"[route_after_validation] Validation failed: {error_msg}")
+            logger.info(f"[route_after_validation] Requires subcategory selection: {requires_subcategory}")
+            if requires_subcategory:
+                logger.info(f"[route_after_validation] Routing to generate_question for subcategory selection")
+            else:
+                logger.info(f"[route_after_validation] Routing to generate_question for re-asking")
+        else:
+            logger.info(f"[route_after_validation] Routing to update_dialog_state (valid)")
+
+        if is_valid:
             return "valid"
         return "invalid"
 
