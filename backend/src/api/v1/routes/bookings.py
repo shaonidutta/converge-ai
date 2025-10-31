@@ -75,6 +75,10 @@ async def list_bookings(
     limit: int = Query(20, ge=1, le=100)
 ):
     """List user's bookings with optional status filter"""
+    import logging
+    import traceback
+    logger = logging.getLogger(__name__)
+
     try:
         booking_service = BookingService(db)
         return await booking_service.list_bookings(
@@ -89,9 +93,11 @@ async def list_bookings(
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"List bookings error: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch bookings"
+            detail=f"Failed to fetch bookings: {str(e)}"
         )
 
 

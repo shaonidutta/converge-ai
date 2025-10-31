@@ -8,45 +8,55 @@ from typing import TypedDict, Optional, List, Dict, Any
 from datetime import datetime
 
 
-class ConversationState(TypedDict, total=False):
+class ConversationStateRequired(TypedDict):
+    """Required fields for ConversationState"""
+    # User context (required)
+    user_id: int
+    session_id: str
+    channel: str
+
+    # Current message (required)
+    current_message: str
+    message_timestamp: str
+    conversation_history: List[Dict[str, str]]
+
+    # Initialize with defaults (required)
+    collected_entities: Dict[str, Any]
+    needed_entities: List[str]
+    validation_errors: List[str]
+    metadata: Dict[str, Any]
+
+    # Multi-agent execution (required)
+    independent_intents: List[Dict[str, Any]]
+    dependent_intents: List[Dict[str, Any]]
+    parallel_responses: List[Dict[str, Any]]
+    sequential_responses: List[Dict[str, Any]]
+    agent_timeout: int
+    agents_used: List[str]
+
+    # Counters (required)
+    question_attempt_count: int
+    retry_count: int
+    max_retries: int
+
+    # Control flags (required)
+    should_end: bool
+
+    # Response (required)
+    final_response: str
+
+
+class ConversationState(ConversationStateRequired, total=False):
     """
     Shared state for all conversation graphs
-    
+
     This state is passed between nodes and graphs.
     Each node can read from and write to this state.
-    
+
     Design Principles:
     - Immutable updates (nodes return new state, don't modify in place)
     - Context-aware (contains all info needed for stateless nodes)
     - Serializable (can be stored/retrieved from DB)
-    """
-    
-    # ============================================================
-    # USER CONTEXT
-    # ============================================================
-    user_id: int
-    """User ID from authentication"""
-    
-    session_id: str
-    """Conversation session ID"""
-    
-    channel: str
-    """Communication channel (web, mobile, whatsapp)"""
-    
-    # ============================================================
-    # CURRENT MESSAGE
-    # ============================================================
-    current_message: str
-    """Current user message being processed"""
-    
-    message_timestamp: str
-    """ISO timestamp of current message"""
-    
-    conversation_history: List[Dict[str, str]]
-    """
-    Previous messages in conversation
-    Format: [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
-    Limited to last 10 messages for context
     """
     
     # ============================================================

@@ -19,6 +19,14 @@ class IntentPatterns:
             "book", "schedule", "appointment", "reserve", "arrange",
             "cancel", "reschedule", "modify", "change booking",
             "cancel booking", "cancel appointment", "cancel service",
+            "cancel my booking", "cancel my latest booking", "cancel my recent booking",
+            "cancel my last booking", "cancel my tv repair booking", "cancel my ac repair booking",
+            "cancel my bathroom fitting booking", "cancel latest booking", "cancel recent booking",
+            "reschedule booking", "reschedule appointment", "reschedule service",
+            "reschedule my booking", "reschedule my latest booking", "reschedule my recent booking",
+            "reschedule my last booking", "reschedule my tv repair", "reschedule my ac repair",
+            "change appointment time", "change booking time", "change date", "change time",
+            "move my booking", "move my appointment", "postpone booking", "prepone booking",
             "list bookings", "show bookings", "view bookings", "my bookings",
             "all bookings", "check bookings", "see bookings"
         ],
@@ -96,9 +104,22 @@ class IntentPatterns:
     # Regex patterns for specific intents
     REGEX_PATTERNS: Dict[IntentType, List[str]] = {
         IntentType.BOOKING_MANAGEMENT: [
+            # Cancel/reschedule with Order ID (highest priority) - case insensitive
+            r"\b(cancel|reschedule|change|modify)\s+(order|booking|appointment)?\s*ord[a-z0-9]{8}\b",
+            r"\b(cancel|reschedule|change|modify)\s+my\s+(order|booking|appointment)?\s*ord[a-z0-9]{8}\b",
+            # General booking management patterns
             r"\b(book|schedule|cancel|reschedule)\s+(a|an|my)?\s*(service|appointment|booking)",
             r"\b(want|need)\s+to\s+(book|cancel|reschedule)",
             r"\bcancel\s+my\s+(booking|appointment|service)",
+            r"\bcancel\s+my\s+(latest|recent|last|most recent)\s+(booking|appointment|service)",
+            r"\bcancel\s+my\s+\w+\s+(repair|fitting|cleaning|installation)\s+(booking|appointment|service)",
+            r"\bcancel\s+(latest|recent|last)\s+(booking|appointment)",
+            r"\breschedule\s+my\s+(booking|appointment|service)",
+            r"\breschedule\s+my\s+(latest|recent|last|most recent)\s+(booking|appointment|service)",
+            r"\breschedule\s+my\s+\w+\s+(repair|fitting|cleaning|installation)\s+(booking|appointment|service)",
+            r"\breschedule\s+(latest|recent|last)\s+(booking|appointment)",
+            r"\b(change|modify|move|postpone|prepone)\s+(my)?\s*(booking|appointment|service)",
+            r"\bchange\s+(appointment|booking)\s+(time|date)",
             r"\b(list|show|view|display|see|get|check)\s+(my|all)?\s*(bookings?|appointments?)",
             r"\b(can|could)\s+(you|u)\s+(list|show|view|check)\s+(my)?\s*(bookings?|appointments?)",
             r"\bmy\s+(bookings?|appointments?)",
@@ -178,7 +199,8 @@ class IntentPatterns:
         # 2. Regex matching (higher confidence)
         for intent, patterns in cls.REGEX_PATTERNS.items():
             for pattern in patterns:
-                if re.search(pattern, message_lower):
+                match = re.search(pattern, message_lower)
+                if match:
                     # Regex match gets higher confidence
                     current_score = intent_scores.get(intent, 0.0)
                     intent_scores[intent] = max(current_score, 0.95)
@@ -213,7 +235,15 @@ class IntentPatterns:
         raw_entities: Dict[str, str] = {}
 
         # Extract service types (raw extraction)
+        # NOTE: More specific patterns should come first (e.g., "tv repair" before "appliance")
         service_keywords = {
+            # Specific appliance repairs (check these first)
+            "tv_repair": ["tv repair", "television repair", "tv service", "television service"],
+            "ac_repair": ["ac repair", "air conditioning repair", "hvac repair", "air conditioner repair"],
+            "microwave_repair": ["microwave repair", "microwave service"],
+            "geyser_repair": ["geyser repair", "water heater repair", "geyser service"],
+
+            # General services
             "ac": ["ac", "air conditioning", "hvac", "air conditioner"],
             "plumbing": ["plumbing", "plumber", "pipe", "leak", "tap", "faucet"],
             "cleaning": ["cleaning", "clean", "house cleaning", "deep cleaning"],
@@ -335,14 +365,31 @@ class IntentPatterns:
         elif "next week" in message_lower:
             raw_entities[EntityType.DATE.value] = "next week"
         else:
-            # ISO or DD/MM/YYYY format
-            date_match = re.search(r'(\d{4})-(\d{2})-(\d{2})', message)
-            if date_match:
-                raw_entities[EntityType.DATE.value] = date_match.group(0)
-            else:
-                date_match = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})', message)
+            # Natural date formats like "31st October", "October 31st", "31 Oct", "November 5th"
+            natural_date_patterns = [
+                r'(\d{1,2})(st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)',
+                r'(\d{1,2})(st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)',
+                r'(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(st|nd|rd|th)?',
+                r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})(st|nd|rd|th)?'
+            ]
+
+            date_found = False
+            for pattern in natural_date_patterns:
+                date_match = re.search(pattern, message_lower)
                 if date_match:
                     raw_entities[EntityType.DATE.value] = date_match.group(0)
+                    date_found = True
+                    break
+
+            if not date_found:
+                # ISO or DD/MM/YYYY format
+                date_match = re.search(r'(\d{4})-(\d{2})-(\d{2})', message)
+                if date_match:
+                    raw_entities[EntityType.DATE.value] = date_match.group(0)
+                else:
+                    date_match = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})', message)
+                    if date_match:
+                        raw_entities[EntityType.DATE.value] = date_match.group(0)
 
         # Extract TIME (raw extraction - will be normalized)
         time_match = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)', message_lower)
@@ -437,7 +484,24 @@ class IntentPatterns:
         for pattern in booking_id_patterns:
             booking_match = re.search(pattern, message, re.IGNORECASE)
             if booking_match:
-                raw_entities[EntityType.BOOKING_ID.value] = booking_match.group(0).upper()
+                extracted_id = booking_match.group(0).upper()
+                raw_entities[EntityType.BOOKING_ID.value] = extracted_id
+                break
+
+        # Extract booking filter (latest, recent, last)
+        # Pattern format: (filter_word, context) - we want the filter_word
+        booking_filter_patterns = [
+            (r"\b(my|the)\s+(latest|recent|last|most recent)\s+(booking|appointment)", 2),  # group 2 is the filter word
+            (r"\b(latest|recent|last|most recent)\s+(booking|appointment|order)", 1),  # group 1 is the filter word
+            (r"\bcancel\s+(my\s+)?(latest|recent|last)\b", 2)  # group 2 is the filter word
+        ]
+
+        for pattern, filter_group_index in booking_filter_patterns:
+            filter_match = re.search(pattern, message, re.IGNORECASE)
+            if filter_match:
+                # Extract the filter word using the specified group index
+                filter_word = filter_match.group(filter_group_index)
+                raw_entities["booking_filter"] = filter_word.lower()
                 break
 
         # Normalize all extracted entities using centralized normalizer

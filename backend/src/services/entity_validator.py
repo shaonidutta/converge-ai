@@ -621,7 +621,7 @@ class EntityValidator:
                     return ValidationResult(
                         is_valid=False,
                         error_message=f"Please specify which type of {value} service you need",
-                        suggestions=[sub["name"] for sub in validation_result.available_subcategories[:5]],
+                        suggestions=[sub["name"] for sub in validation_result.available_subcategories],
                         metadata=metadata
                     )
                 elif validation_result.default_rate_card_id:

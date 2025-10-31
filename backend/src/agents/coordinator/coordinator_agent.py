@@ -23,6 +23,7 @@ from src.agents.policy.policy_agent import PolicyAgent
 from src.agents.service.service_agent import ServiceAgent
 from src.agents.booking.booking_agent import BookingAgent
 from src.agents.cancellation.cancellation_agent import CancellationAgent
+from src.agents.reschedule.reschedule_agent import RescheduleAgent
 from src.agents.complaint.complaint_agent import ComplaintAgent
 from src.agents.sql.sql_agent import SQLAgent
 
@@ -50,7 +51,7 @@ class CoordinatorAgent:
         "booking_create": "booking",
         "booking_management": "booking",  # General booking intent
         "booking_modify": "booking",
-        "booking_reschedule": "booking",
+        "booking_reschedule": "reschedule",  # Route to dedicated RescheduleAgent
         "booking_cancel": "cancellation",  # Route to dedicated CancellationAgent
         "booking_status": "booking",
         "complaint": "complaint",  # Route to ComplaintAgent
@@ -80,6 +81,7 @@ class CoordinatorAgent:
             self._service_agent = None
             self._booking_agent = None
             self._cancellation_agent = None
+            self._reschedule_agent = None
             self._complaint_agent = None
             self._sql_agent = None
 
@@ -119,6 +121,14 @@ class CoordinatorAgent:
             self.logger.info("Initializing CancellationAgent (lazy)")
             self._cancellation_agent = CancellationAgent(db=self.db)
         return self._cancellation_agent
+
+    @property
+    def reschedule_agent(self):
+        """Lazy initialization of RescheduleAgent"""
+        if self._reschedule_agent is None:
+            self.logger.info("Initializing RescheduleAgent (lazy)")
+            self._reschedule_agent = RescheduleAgent(db=self.db)
+        return self._reschedule_agent
 
     @property
     def complaint_agent(self):
@@ -164,14 +174,136 @@ class CoordinatorAgent:
             self.logger.info(f"CoordinatorAgent executing for user {user_id}, session: {session_id}")
             self.logger.info(f"Message: {message[:100]}...")
 
-            # Check if there's an active dialog state (ongoing slot-filling)
+            # Check if there's an active dialog state (ongoing slot-filling or awaiting confirmation)
             from src.services.dialog_state_manager import DialogStateManager
+            from src.core.models.dialog_state import DialogStateType
             dialog_manager = DialogStateManager(self.db)
             dialog_state = await dialog_manager.get_active_state(session_id)
 
-            # If there's an active dialog state, use slot-filling service
-            if dialog_state:
-                self.logger.info(f"Active dialog state found: {dialog_state.intent}, state: {dialog_state.state}")
+            self.logger.info(f"[COORDINATOR] Dialog state: {dialog_state.state if dialog_state else 'None'}, Intent: {dialog_state.intent if dialog_state else 'None'}")
+
+            # Handle confirmation responses (yes/no) for pending actions
+            # Use an explicit None check and getattr to avoid evaluating SQLAlchemy ColumnElement truthiness
+            if dialog_state is not None and getattr(dialog_state, "state", None) == DialogStateType.AWAITING_CONFIRMATION:
+                self.logger.info(f"Handling confirmation response for pending action: {dialog_state.intent}")
+
+                # Check if user confirmed or declined
+                message_lower = message.lower().strip()
+                confirmation_keywords = ['yes', 'yeah', 'yep', 'sure', 'ok', 'okay', 'correct', 'right', 'confirm']
+                decline_keywords = ['no', 'nope', 'nah', 'not', 'cancel', 'wrong', 'dont']
+
+                is_confirmed = any(keyword in message_lower for keyword in confirmation_keywords)
+                is_declined = any(keyword in message_lower for keyword in decline_keywords)
+
+                if is_confirmed:
+                    # User confirmed - execute the pending action
+                    pending_action = await dialog_manager.get_pending_action(session_id)
+
+                    if pending_action:
+                        action_type = pending_action.get("action_type")
+
+                        if action_type == "cancel_booking":
+                            # Execute confirmed cancellation
+                            response = await self.cancellation_agent.execute_confirmed_cancellation(
+                                pending_action=pending_action,
+                                user=user,
+                                session_id=session_id
+                            )
+                            response["agent_used"] = "cancellation"
+
+                        elif action_type == "reschedule_booking":
+                            # Execute confirmed reschedule
+                            response = await self.reschedule_agent.execute_confirmed_reschedule(
+                                pending_action=pending_action,
+                                user=user,
+                                session_id=session_id
+                            )
+                            response["agent_used"] = "reschedule"
+                        else:
+                            # Unknown action type
+                            response = {
+                                "response": "I'm sorry, I couldn't process your confirmation. Please try again.",
+                                "action_taken": "unknown_action_type",
+                                "agent_used": "coordinator"
+                            }
+                    else:
+                        # No pending action found
+                        response = {
+                            "response": "I'm sorry, I couldn't find the action you're confirming. Please try again.",
+                            "action_taken": "no_pending_action",
+                            "agent_used": "coordinator"
+                        }
+
+                    # Store conversation
+                    await self._store_conversation(
+                        user_id=user_id,
+                        session_id=session_id,
+                        user_message=message,
+                        assistant_response=response["response"],
+                        intent=dialog_state.intent,
+                        agent_used=response.get("agent_used", "unknown")
+                    )
+
+                    return {
+                        "response": response["response"],
+                        "intent": dialog_state.intent,
+                        "confidence": 1.0,
+                        "agent_used": response.get("agent_used", "unknown"),
+                        "classification_method": "confirmation_handling",
+                        "metadata": response.get("metadata", {})
+                    }
+
+                elif is_declined:
+                    # User declined - clear pending action
+                    await dialog_manager.clear_pending_action(session_id)
+
+                    response_text = "Okay, I've cancelled that action. Is there anything else I can help you with?"
+
+                    # Store conversation
+                    await self._store_conversation(
+                        user_id=user_id,
+                        session_id=session_id,
+                        user_message=message,
+                        assistant_response=response_text,
+                        intent=dialog_state.intent,
+                        agent_used="coordinator"
+                    )
+
+                    return {
+                        "response": response_text,
+                        "intent": dialog_state.intent,
+                        "confidence": 1.0,
+                        "agent_used": "coordinator",
+                        "classification_method": "confirmation_handling",
+                        "metadata": {"action": "declined"}
+                    }
+                else:
+                    # Unclear response - ask for clarification
+                    response_text = "I didn't understand your response. Please reply with 'yes' to confirm or 'no' to cancel."
+
+                    # Store conversation
+                    await self._store_conversation(
+                        user_id=user_id,
+                        session_id=session_id,
+                        user_message=message,
+                        assistant_response=response_text,
+                        intent=dialog_state.intent,
+                        agent_used="coordinator"
+                    )
+
+                    return {
+                        "response": response_text,
+                        "intent": dialog_state.intent,
+                        "confidence": 1.0,
+                        "agent_used": "coordinator",
+                        "classification_method": "confirmation_handling",
+                        "metadata": {"action": "clarification_needed"}
+                    }
+
+            # If there's an active dialog state for slot-filling, use slot-filling service
+            # Use explicit None check and getattr to avoid evaluating SQLAlchemy ColumnElement in boolean context
+            if dialog_state is not None and getattr(dialog_state, "state", None) == DialogStateType.COLLECTING_INFO:
+                self.logger.info(f"Active dialog state found: {getattr(dialog_state, 'intent', None)}, state: {getattr(dialog_state, 'state', None)}")
                 from src.services.slot_filling_service import SlotFillingService
                 from src.services.question_generator import QuestionGenerator
                 from src.services.entity_extractor import EntityExtractor
@@ -251,12 +383,47 @@ class CoordinatorAgent:
                         mapped_entities['location'] = mapped_entities.pop('zip_code')
                         self.logger.info(f"Mapped 'zip_code' to 'location': {mapped_entities.get('location')}")
 
-                    # Add dialog state metadata to entities for agent use
+                    # Add dialog state context to entities for agent use
                     # This includes rate_card_id from service subcategory validation
-                    if dialog_state.metadata:
-                        for key, value in dialog_state.metadata.items():
-                            if key not in mapped_entities:  # Don't override existing entities
-                                mapped_entities[f"_metadata_{key}"] = value
+                    # Note: DialogState model uses 'context' field, not 'metadata'
+                    if dialog_state.context:
+                        try:
+                            # Handle both dict and JSON string
+                            if isinstance(dialog_state.context, dict):
+                                context_dict = dialog_state.context
+                            else:
+                                # If it's a string (JSON), parse it
+                                import json
+                                context_dict = json.loads(str(dialog_state.context))
+
+                            # Add context items to entities with _metadata_ prefix
+                            for key, value in context_dict.items():
+                                # Skip non-metadata fields like available_subcategories
+                                if key in ['available_subcategories', 'service_type']:
+                                    continue
+                                if key not in mapped_entities:  # Don't override existing entities
+                                    mapped_entities[f"_metadata_{key}"] = value
+                                    self.logger.info(f"Added context to entities: _metadata_{key} = {value}")
+                        except Exception as e:
+                            self.logger.warning(f"Could not process dialog state context: {e}")
+                            # Continue without context
+
+                    # Also check collected_entities for metadata fields (stored during validation)
+                    if dialog_state.collected_entities:
+                        try:
+                            if isinstance(dialog_state.collected_entities, dict):
+                                collected_dict = dialog_state.collected_entities
+                            else:
+                                import json
+                                collected_dict = json.loads(str(dialog_state.collected_entities))
+
+                            # Copy metadata fields from collected_entities
+                            for key, value in collected_dict.items():
+                                if key.startswith('_metadata_'):
+                                    mapped_entities[key] = value
+                                    self.logger.info(f"Added metadata from collected_entities: {key} = {value}")
+                        except Exception as e:
+                            self.logger.warning(f"Could not process collected_entities for metadata: {e}")
 
                     # Create IntentResult with collected entities
                     from src.schemas.intent import IntentResult as IntentResultClass
@@ -275,8 +442,13 @@ class CoordinatorAgent:
                         conversation_history=conversation_history
                     )
 
-                    # Clear the dialog state
-                    await dialog_manager.clear_state(session_id)
+                    # Clear the dialog state ONLY if the agent response doesn't require confirmation
+                    # If requires_confirmation is True, the dialog state should be kept for confirmation handling
+                    if not agent_response.get("requires_confirmation", False):
+                        await dialog_manager.clear_state(session_id)
+                        self.logger.info(f"[COORDINATOR] Cleared dialog state after agent execution (no confirmation required)")
+                    else:
+                        self.logger.info(f"[COORDINATOR] Keeping dialog state for confirmation (requires_confirmation=True)")
 
                     # Store conversation
                     await self._store_conversation(
@@ -357,11 +529,24 @@ class CoordinatorAgent:
                     if action == "book":
                         required_entities = ["service_type", "location", "date", "time"]
                     elif action == "cancel":
-                        required_entities = ["booking_id"]
+                        # For cancel: either booking_id OR booking_filter (latest/recent/last) is required
+                        # If booking_filter is present, we don't need booking_id
+                        if "booking_filter" in collected_entities or "service_type" in collected_entities:
+                            required_entities = []  # booking_filter or service_type is enough to identify booking
+                        else:
+                            required_entities = ["booking_id"]
                     elif action == "reschedule":
-                        required_entities = ["booking_id", "date", "time"]
+                        # For reschedule: either booking_id OR booking_filter is required, plus new date/time
+                        if "booking_filter" in collected_entities or "service_type" in collected_entities:
+                            required_entities = ["new_date", "new_time"]  # booking_filter or service_type is enough
+                        else:
+                            required_entities = ["booking_id", "new_date", "new_time"]
                     elif action == "modify":
-                        required_entities = ["booking_id"]
+                        # For modify: either booking_id OR booking_filter is required
+                        if "booking_filter" in collected_entities or "service_type" in collected_entities:
+                            required_entities = []  # booking_filter or service_type is enough
+                        else:
+                            required_entities = ["booking_id"]
 
                     self.logger.info(f"[COORDINATOR] booking_management action={action}, required_entities={required_entities}")
 
@@ -695,7 +880,21 @@ class CoordinatorAgent:
         # Determine which agent to use
         agent_type = self.INTENT_AGENT_MAP.get(intent, "policy")
 
-        self.logger.info(f"Routing intent '{intent}' to {agent_type} agent")
+        # Special handling for booking_management: route based on action
+        if intent == "booking_management":
+            action = entities.get("action", "book")
+            if action == "cancel":
+                agent_type = "cancellation"
+                self.logger.info(f"Routing booking_management with action=cancel to cancellation agent")
+            elif action == "reschedule":
+                agent_type = "reschedule"
+                self.logger.info(f"Routing booking_management with action=reschedule to reschedule agent")
+            else:
+                # book, modify, list, etc. go to booking agent
+                agent_type = "booking"
+                self.logger.info(f"Routing booking_management with action={action} to booking agent")
+        else:
+            self.logger.info(f"Routing intent '{intent}' to {agent_type} agent")
 
         try:
             # Handle coordinator-level intents (greetings, general queries, out-of-scope, unclear)
@@ -744,12 +943,21 @@ class CoordinatorAgent:
 
             elif agent_type == "cancellation":
                 response = await self.cancellation_agent.execute(
-                    message="",  # Message not needed for cancellation
+                    message=message,  # Pass message for fallback entity extraction
                     user=user,
                     session_id=session_id,
                     entities=entities
                 )
                 response["agent_used"] = "cancellation"
+
+            elif agent_type == "reschedule":
+                response = await self.reschedule_agent.execute(
+                    message=message,  # Pass message for fallback entity extraction
+                    user=user,
+                    session_id=session_id,
+                    entities=entities
+                )
+                response["agent_used"] = "reschedule"
 
             elif agent_type == "complaint":
                 response = await self.complaint_agent.execute(

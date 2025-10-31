@@ -73,18 +73,56 @@ class ServiceCategoryValidator:
                 )
             
             logger.info(f"[ServiceCategoryValidator] Normalized service type: '{normalized}'")
-            
-            # Find category by name (case-insensitive)
+
+            # Convert underscores to spaces for database matching
+            # e.g., "appliance_repair" → "appliance repair", "tv_repair" → "tv repair"
+            search_term = normalized.replace('_', ' ')
+
+            # First, check if this is a specific subcategory (e.g., "tv repair", "ac repair")
+            subcategory_result = await self.db.execute(
+                select(Subcategory)
+                .where(
+                    func.lower(Subcategory.name).like(f"%{search_term}%"),
+                    Subcategory.is_active == True
+                )
+                .options(selectinload(Subcategory.category))
+            )
+            subcategory = subcategory_result.scalar_one_or_none()
+
+            if subcategory:
+                # Found a specific subcategory - check if it has rate cards
+                rate_cards_result = await self.db.execute(
+                    select(RateCard)
+                    .where(
+                        RateCard.subcategory_id == subcategory.id,
+                        RateCard.is_active == True
+                    )
+                    .order_by(RateCard.price)
+                )
+                rate_cards = rate_cards_result.scalars().all()
+
+                if rate_cards:
+                    logger.info(f"[ServiceCategoryValidator] Found specific subcategory: {subcategory.name} with {len(rate_cards)} rate cards")
+                    # Return the default (cheapest) rate card
+                    default_rate_card = rate_cards[0]
+                    return ServiceCategoryValidationResult(
+                        is_valid=True,
+                        requires_subcategory_selection=False,
+                        normalized_service_type=normalized,
+                        default_rate_card_id=default_rate_card.id
+                    )
+
+            # Not a specific subcategory, search for category
             category_result = await self.db.execute(
                 select(Category)
                 .where(
-                    func.lower(Category.name).like(f"%{normalized}%"),
+                    func.lower(Category.name).like(f"%{search_term}%"),
                     Category.is_active == True
                 )
                 .options(selectinload(Category.subcategories))
             )
             category = category_result.scalar_one_or_none()
-            
+
             if not category:
                 return ServiceCategoryValidationResult(
                     is_valid=False,

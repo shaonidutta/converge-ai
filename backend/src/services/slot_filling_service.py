@@ -171,6 +171,32 @@ class SlotFillingService:
             if last_question:
                 state['last_question_asked'] = last_question
 
+            # Load metadata from dialog state context (includes available_subcategories, service_type, needed_entities, etc.)
+            if dialog_state and dialog_state.context:
+                try:
+                    # Context is a JSON field, should be a dict
+                    context_data = dialog_state.context if isinstance(dialog_state.context, dict) else {}
+
+                    # Extract metadata-like fields from context
+                    if 'available_subcategories' in context_data:
+                        state['metadata'] = {**state.get('metadata', {}), 'available_subcategories': context_data['available_subcategories']}
+                        logger.info(f"[SlotFillingService] Loaded {len(context_data['available_subcategories'])} available_subcategories from dialog state context")
+
+                    # Also load service_type if present
+                    if 'service_type' in context_data:
+                        state['metadata'] = {**state.get('metadata', {}), 'service_type': context_data['service_type']}
+                        logger.info(f"[SlotFillingService] Loaded service_type from dialog state context: {context_data['service_type']}")
+
+                    # Load needed_entities from context (overrides the one from dialog_state.needed_entities)
+                    # This is important because needed_entities can be updated during validation
+                    if 'needed_entities' in context_data:
+                        state['needed_entities'] = context_data['needed_entities']
+                        logger.info(f"[SlotFillingService] Loaded needed_entities from dialog state context: {context_data['needed_entities']}")
+
+                except Exception as e:
+                    logger.warning(f"[SlotFillingService] Could not load dialog state context: {e}")
+                    # Continue without metadata
+
             # 4. Run slot-filling graph
             logger.info("[SlotFillingService] Running slot-filling graph...")
             final_state = await run_slot_filling_graph(

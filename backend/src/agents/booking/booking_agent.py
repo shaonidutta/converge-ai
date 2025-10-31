@@ -231,11 +231,18 @@ class BookingAgent:
             # Try to get rate_card_id from service subcategory validation metadata
             rate_card_id = entities.get("_metadata_rate_card_id")
 
-            logger.info(f"Checking for rate_card_id in entities: {list(entities.keys())}")
+            print(f"\n\n{'='*80}")
+            print(f"[BookingAgent] ALL ENTITIES: {entities}")
+            print(f"[BookingAgent] Entity keys: {list(entities.keys())}")
+            print(f"[BookingAgent] rate_card_id: {rate_card_id}")
+            print(f"{'='*80}\n\n")
+
+            logger.info(f"[BookingAgent] ALL ENTITIES: {entities}")
+            logger.info(f"[BookingAgent] Checking for rate_card_id in entities: {list(entities.keys())}")
             if rate_card_id:
-                logger.info(f"Found rate_card_id from metadata: {rate_card_id}")
+                logger.info(f"[BookingAgent] Found rate_card_id from metadata: {rate_card_id}")
             else:
-                logger.info("No rate_card_id found in metadata, will use fallback mapping")
+                logger.info(f"[BookingAgent] No rate_card_id found in metadata, will use fallback mapping")
 
             # If no rate_card_id from metadata, fall back to hardcoded mapping
             if not rate_card_id:

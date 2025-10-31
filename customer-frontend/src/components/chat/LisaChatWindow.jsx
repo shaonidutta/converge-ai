@@ -11,28 +11,28 @@
  * - Responsive design
  */
 
-import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, Bot } from 'lucide-react';
-import { useChat } from '../../hooks/useChat';
-import MessageList from './MessageList';
-import MessageInput from './MessageInput';
-import TypingIndicator from './TypingIndicator';
-import QuickActions from './QuickActions';
+import React from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, Trash2, Bot } from "lucide-react";
+import { useChat } from "../../hooks/useChat";
+import MessageList from "./MessageList";
+import MessageInput from "./MessageInput";
+import TypingIndicator from "./TypingIndicator";
+import QuickActions from "./QuickActions";
 
 const LisaChatWindow = () => {
-  const { 
-    isOpen, 
-    messages, 
-    isTyping, 
-    closeChat, 
-    sendMessage, 
+  const {
+    isOpen,
+    messages,
+    isTyping,
+    closeChat,
+    sendMessage,
     clearChat,
-    sendQuickAction 
+    sendQuickAction,
   } = useChat();
 
   const handleClearChat = () => {
-    if (window.confirm('Are you sure you want to clear this chat?')) {
+    if (window.confirm("Are you sure you want to clear this chat?")) {
       clearChat();
     }
   };
@@ -94,22 +94,25 @@ const LisaChatWindow = () => {
 
             {/* Messages Area */}
             {messages.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-50">
-                <div className="w-20 h-20 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full flex items-center justify-center mb-4">
-                  <Bot className="h-12 w-12 text-white" />
+              <div className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-50 overflow-y-auto">
+                <div className="flex flex-col items-center justify-center">
+                  <div className="w-20 h-20 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full flex items-center justify-center mb-4">
+                    <Bot className="h-12 w-12 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-800 mb-2">
+                    Welcome to Lisa!
+                  </h3>
+                  <p className="text-sm text-slate-600 text-center mb-6 max-w-xs">
+                    Your AI-powered assistant for booking services and getting
+                    help
+                  </p>
+                  <QuickActions onActionClick={sendQuickAction} />
                 </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-2">
-                  Welcome to Lisa!
-                </h3>
-                <p className="text-sm text-slate-600 text-center mb-6 max-w-xs">
-                  Your AI-powered assistant for booking services and getting help
-                </p>
-                <QuickActions onActionClick={sendQuickAction} />
               </div>
             ) : (
               <>
                 <MessageList messages={messages} isTyping={isTyping} />
-                
+
                 {/* Typing Indicator */}
                 {isTyping && (
                   <div className="px-4 pb-4 bg-slate-50">
@@ -120,8 +123,8 @@ const LisaChatWindow = () => {
             )}
 
             {/* Input Area */}
-            <MessageInput 
-              onSend={sendMessage} 
+            <MessageInput
+              onSend={sendMessage}
               disabled={isTyping}
               placeholder="Type your message..."
             />
@@ -133,4 +136,3 @@ const LisaChatWindow = () => {
 };
 
 export default LisaChatWindow;
-

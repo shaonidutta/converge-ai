@@ -107,7 +107,7 @@ class IntentClassifier:
                     result = self._build_result_from_patterns(message, high_confidence_intents)
 
                     # If there's a dialog state and the matched intent is different, log it
-                    if dialog_state and dialog_state.intent != high_confidence_intents[0][0].value:
+                    if dialog_state is not None and dialog_state.intent is not None and str(dialog_state.intent) != high_confidence_intents[0][0].value:
                         logger.info(f"Pattern match overriding dialog state intent: {dialog_state.intent} → {high_confidence_intents[0][0].value}")
 
                     return result, "pattern_match"
@@ -167,18 +167,19 @@ class IntentClassifier:
 
         # Extract entities using pattern matching
         entities = self.pattern_matcher.extract_entities_from_patterns(message)
-        
+
         # Build intent results
+        import json
         intent_results = []
         for intent, confidence in pattern_matches[:self.thresholds.MAX_INTENTS]:
             # Filter entities relevant to this intent
             relevant_entities = self._filter_entities_for_intent(intent, entities)
-            
+
             intent_results.append(
                 IntentResult(
                     intent=intent.value,
                     confidence=confidence,
-                    entities_json=relevant_entities  # Changed from entities to entities_json
+                    entities_json=json.dumps(relevant_entities) if relevant_entities else None
                 )
             )
         
@@ -230,7 +231,7 @@ class IntentClassifier:
             logger.info("Using standard prompt for classification")
 
         # Get structured output from LLM
-        structured_llm = self.llm_client.with_structured_output(IntentClassificationResult)
+        structured_llm = self.llm_client.with_structured_output(IntentClassificationResult)  # type: ignore
 
         # Invoke LLM with retry logic
         from src.nlp.llm.gemini_client import with_retry
@@ -448,9 +449,9 @@ class IntentClassifier:
         if conversation_history:
             summary_parts.append(f"{len(conversation_history)} previous messages")
 
-        if dialog_state:
+        if dialog_state is not None:
             summary_parts.append(f"active dialog state ({dialog_state.state.value})")
-            if dialog_state.intent:
+            if dialog_state.intent is not None:
                 summary_parts.append(f"intent: {dialog_state.intent}")
 
         return ", ".join(summary_parts) if summary_parts else "no context"
@@ -472,7 +473,7 @@ class IntentClassifier:
                 IntentResult(
                     intent=IntentType.UNCLEAR_INTENT.value,
                     confidence=0.5,
-                    entities_json={}  # Changed from entities to entities_json
+                    entities_json=None  # No entities for unclear intent
                 )
             ],
             primary_intent=IntentType.UNCLEAR_INTENT.value,

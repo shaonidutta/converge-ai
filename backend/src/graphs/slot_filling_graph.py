@@ -19,10 +19,11 @@ Design Principles:
 """
 
 import logging
-from typing import Dict, Any, Literal
+from typing import Dict, Any, Literal, Optional
 from datetime import datetime
 
 from langgraph.graph import StateGraph, END
+from langgraph.graph.graph import CompiledGraph
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -383,14 +384,25 @@ async def extract_entity_node(
                     return state_update
 
         # Extract single entity from message (original logic)
+        # Build context for extraction
+        extraction_context = {
+            "collected_entities": collected_entities,
+            "last_question": state.get('last_question_asked'),
+            "user_id": state['user_id']
+        }
+
+        # For service_subcategory extraction, add available subcategories from metadata
+        if expected_entity == 'service_subcategory':
+            metadata = state.get('metadata', {})
+            available_subcategories = metadata.get('available_subcategories', [])
+            if available_subcategories:
+                extraction_context['available_subcategories'] = available_subcategories
+                logger.info(f"[extract_entity_node] Added {len(available_subcategories)} available subcategories to extraction context")
+
         extraction_result = await entity_extractor.extract_from_follow_up(
             message=state['current_message'],
             expected_entity=EntityType(expected_entity),
-            context={
-                "collected_entities": collected_entities,
-                "last_question": state.get('last_question_asked'),
-                "user_id": state['user_id']
-            }
+            context=extraction_context
         )
         
         if extraction_result:
@@ -558,15 +570,33 @@ async def update_dialog_state_node(
         validation_result = state.get('validation_result', {})
         extracted = state.get('extracted_entity', {})
         multiple_extracted = state.get('multiple_entities_extracted', {})
+        validation_result = validation_result or {}
 
         if validation_result.get('is_valid'):
             # Add entity to collected entities
-            entity_type = extracted['entity_type']
-            entity_value = validation_result['normalized_value']
+            entity_type = extracted.get('entity_type', '')
+            entity_value = validation_result.get('normalized_value', '')
 
             # Update in-memory state first
             collected = state.get('collected_entities', {}).copy()
             collected[entity_type] = entity_value
+
+            # Store validation metadata (e.g., rate_card_id for service_subcategory)
+            validation_metadata = validation_result.get('metadata', {})
+            logger.info(f"[update_dialog_state_node] Validation metadata: {validation_metadata}")
+            if validation_metadata:
+                # Store rate_card_id if present (needed for booking creation)
+                if 'rate_card_id' in validation_metadata:
+                    collected['_metadata_rate_card_id'] = validation_metadata['rate_card_id']
+                    logger.info(f"[update_dialog_state_node] ✅ Stored _metadata_rate_card_id: {validation_metadata['rate_card_id']}")
+                else:
+                    logger.warning(f"[update_dialog_state_node] ⚠️ No rate_card_id in validation metadata")
+
+                # Store other metadata fields if needed
+                if 'service_type' in validation_metadata:
+                    collected['_metadata_service_type'] = validation_metadata['service_type']
+            else:
+                logger.warning(f"[update_dialog_state_node] ⚠️ No validation metadata found")
 
             # If we extracted multiple entities, add them all (if they're valid)
             if multiple_extracted:
@@ -582,10 +612,13 @@ async def update_dialog_state_node(
             # Save ALL collected entities to database (not just the new one)
             # This ensures that entities from previous turns are not lost
             from src.schemas.dialog_state import DialogStateUpdate
+
+            logger.info(f"[update_dialog_state_node] 💾 Saving to database - collected_entities: {collected}")
+
             await dialog_manager.update_state(
                 session_id=state['session_id'],
                 update_data=DialogStateUpdate(
-                    collected_entities=collected,  # Save ALL entities
+                    collected_entities=collected,  # Save ALL entities including _metadata_*
                     needed_entities=needed
                 )
             )
@@ -631,7 +664,7 @@ async def update_dialog_state_node(
                     update_data=DialogStateUpdate(
                         collected_entities=collected,
                         needed_entities=needed,
-                        metadata={
+                        context={
                             "available_subcategories": validation_metadata.get('available_subcategories', []),
                             "service_type": validation_metadata.get('normalized_service_type')
                         }
@@ -671,7 +704,7 @@ async def update_dialog_state_node(
 
 async def determine_needed_entities_node(
     state: SlotFillingState,
-    db: AsyncSession = None
+    db: Optional[AsyncSession] = None
 ) -> Dict[str, Any]:
     """
     Node: Determine which entities are still needed
@@ -690,7 +723,7 @@ async def determine_needed_entities_node(
         collected = state.get('collected_entities', {})
 
         # Get required entities for this intent
-        intent_config = INTENT_CONFIGS.get(intent)
+        intent_config = INTENT_CONFIGS.get(intent) if intent else None  # type: ignore
         if not intent_config:
             logger.warning(f"[determine_needed_entities_node] No config for intent: {intent}")
             return {"needed_entities": []}
@@ -825,6 +858,14 @@ async def generate_question_node(
             logger.info(f"[generate_question_node] No entities needed, generating confirmation")
             # All entities collected, generate confirmation
             primary_intent = state.get('primary_intent')
+            if not primary_intent:
+                logger.error("[generate_question_node] No primary_intent found in state")
+                return {
+                    "error": {"type": "MissingIntent", "message": "No primary intent found", "node": "generate_question_node"},
+                    "final_response": "I'm sorry, I couldn't determine what you're trying to do. Could you please rephrase?",
+                    "response_type": "error"
+                }
+
             intent_enum = IntentType(primary_intent) if isinstance(primary_intent, str) else primary_intent
 
             confirmation = question_generator.generate_confirmation(
@@ -880,6 +921,14 @@ async def generate_question_node(
 
             # Add the original question
             primary_intent = state.get('primary_intent')
+            if not primary_intent:
+                logger.error("[generate_question_node] No primary_intent found in state")
+                return {
+                    "error": {"type": "MissingIntent", "message": "No primary intent found", "node": "generate_question_node"},
+                    "final_response": "I'm sorry, I couldn't determine what you're trying to do. Could you please rephrase?",
+                    "response_type": "error"
+                }
+
             intent_enum = IntentType(primary_intent) if isinstance(primary_intent, str) else primary_intent
 
             # Build context for question generation
@@ -899,6 +948,14 @@ async def generate_question_node(
         else:
             # Generate new question
             primary_intent = state.get('primary_intent')
+            if not primary_intent:
+                logger.error("[generate_question_node] No primary_intent found in state")
+                return {
+                    "error": {"type": "MissingIntent", "message": "No primary intent found", "node": "generate_question_node"},
+                    "final_response": "I'm sorry, I couldn't determine what you're trying to do. Could you please rephrase?",
+                    "response_type": "error"
+                }
+
             intent_enum = IntentType(primary_intent) if isinstance(primary_intent, str) else primary_intent
 
             # Build context for question generation
@@ -917,16 +974,24 @@ async def generate_question_node(
 
         logger.info(f"[generate_question_node] Question: {question[:100]}...")
 
-        # Save last_question_asked to dialog state context for follow-up detection
+        # Save last_question_asked and needed_entities to dialog state context for follow-up detection
         try:
             from src.schemas.dialog_state import DialogStateUpdate
+
+            # Prepare context update with needed_entities
+            context_update = {
+                "last_question": question,
+                "expected_entity": next_entity,
+                "needed_entities": needed  # Save needed_entities to persist across messages
+            }
+
             await dialog_manager.update_state(
                 session_id=state['session_id'],
                 update_data=DialogStateUpdate(
-                    context={"last_question": question, "expected_entity": next_entity}
+                    context=context_update
                 )
             )
-            logger.info(f"[generate_question_node] ✅ Saved last_question to dialog state context")
+            logger.info(f"[generate_question_node] ✅ Saved last_question and needed_entities to dialog state context")
         except Exception as e:
             logger.warning(f"[generate_question_node] Failed to save last_question to dialog state: {e}")
 
@@ -969,7 +1034,7 @@ async def handle_error_node(
     try:
         logger.info(f"[handle_error_node] Handling error...")
 
-        error = state.get('error', {})
+        error = state.get('error') or {}
         error_type = error.get('type', 'UnknownError')
         error_message = error.get('message', 'Something went wrong')
 
@@ -1017,7 +1082,8 @@ def should_route_to_error(state: SlotFillingState) -> Literal["error", "continue
 
 def is_follow_up_response(state: SlotFillingState) -> Literal["follow_up", "new_intent"]:
     """Check if current message is a follow-up response"""
-    if state.get('is_follow_up', False) and state.get('follow_up_confidence', 0) > 0.6:
+    follow_up_confidence = state.get('follow_up_confidence', 0)
+    if state.get('is_follow_up', False) and (follow_up_confidence or 0) > 0.6:
         return "follow_up"
     return "new_intent"
 
@@ -1032,7 +1098,7 @@ def are_all_entities_collected(state: SlotFillingState) -> Literal["all_collecte
 
 def is_validation_successful(state: SlotFillingState) -> Literal["valid", "invalid"]:
     """Check if entity validation was successful"""
-    validation_result = state.get('validation_result', {})
+    validation_result = state.get('validation_result') or {}
     if validation_result.get('is_valid', False):
         return "valid"
     return "invalid"
@@ -1066,7 +1132,7 @@ def create_slot_filling_graph(
     question_generator: QuestionGenerator,
     entity_extractor: EntityExtractor,
     entity_validator: EntityValidator
-) -> StateGraph:
+) -> CompiledGraph:
     """
     Create the Slot-Filling Graph
 
@@ -1153,7 +1219,8 @@ def create_slot_filling_graph(
         if state.get('error'):
             logger.info("[route_after_follow_up_check] Routing to: error")
             return "error"
-        if state.get('is_follow_up', False) and state.get('follow_up_confidence', 0) > 0.6:
+        follow_up_confidence = state.get('follow_up_confidence', 0)
+        if state.get('is_follow_up', False) and (follow_up_confidence or 0) > 0.6:
             logger.info("[route_after_follow_up_check] Routing to: follow_up")
             return "follow_up"
         # Check if intent has changed (user is asking a different question)
@@ -1225,14 +1292,14 @@ def create_slot_filling_graph(
         if state.get('error'):
             logger.info(f"[route_after_validation] Routing to error due to error: {state.get('error')}")
             return "error"
-        validation_result = state.get('validation_result', {})
+        validation_result = state.get('validation_result') or {}
         is_valid = validation_result.get('is_valid', False)
 
         # Debug logging
         logger.info(f"[route_after_validation] Validation result: is_valid={is_valid}")
         if not is_valid:
             error_msg = validation_result.get('error_message', 'Unknown error')
-            metadata = validation_result.get('metadata', {})
+            metadata = validation_result.get('metadata') or {}
             requires_subcategory = metadata.get('requires_subcategory_selection', False)
             logger.info(f"[route_after_validation] Validation failed: {error_msg}")
             logger.info(f"[route_after_validation] Requires subcategory selection: {requires_subcategory}")
@@ -1288,7 +1355,8 @@ def create_slot_filling_graph(
     graph.add_edge("handle_error", END)
 
     # Compile graph
-    return graph.compile()
+    compiled_graph: CompiledGraph = graph.compile()  # type: ignore
+    return compiled_graph
 
 
 # ============================================================

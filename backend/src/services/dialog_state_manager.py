@@ -404,3 +404,133 @@ class DialogStateManager:
 
         return count
 
+    # Confirmation Flow Helper Methods
+
+    async def set_pending_cancellation(
+        self,
+        session_id: str,
+        user_id: int,
+        booking_details: Dict[str, Any]
+    ) -> DialogState:
+        """
+        Set pending cancellation action awaiting user confirmation
+
+        Args:
+            session_id: Session identifier
+            user_id: User ID
+            booking_details: Booking details including order_id, service_name, date, time, amount
+
+        Returns:
+            Updated DialogState
+        """
+        pending_action = {
+            "action_type": "cancel_booking",
+            "booking_id": booking_details.get("booking_id"),
+            "order_id": booking_details.get("order_id"),
+            "service_name": booking_details.get("service_name"),
+            "preferred_date": booking_details.get("preferred_date"),
+            "preferred_time": booking_details.get("preferred_time"),
+            "total_amount": booking_details.get("total_amount"),
+            "refund_info": booking_details.get("refund_info"),
+            "reason": booking_details.get("reason", "Customer requested cancellation")
+        }
+
+        logger.info(f"[DIALOG] Setting pending cancellation for session {session_id}, order_id={pending_action.get('order_id')}")
+
+        create_data = DialogStateCreate(
+            session_id=session_id,
+            user_id=user_id,
+            state=DialogStateType.AWAITING_CONFIRMATION,
+            intent="booking_cancel",
+            collected_entities={},
+            needed_entities=[],
+            pending_action=pending_action,
+            context={
+                "confirmation_message": "Awaiting user confirmation for booking cancellation",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            },
+            expires_in_hours=1  # Confirmation expires in 1 hour
+        )
+
+        return await self.create_state(create_data)
+
+    async def set_pending_reschedule(
+        self,
+        session_id: str,
+        user_id: int,
+        booking_details: Dict[str, Any],
+        new_date: str,
+        new_time: str,
+        reason: str = "Customer requested reschedule"
+    ) -> DialogState:
+        """
+        Set pending reschedule action awaiting user confirmation
+
+        Args:
+            session_id: Session identifier
+            user_id: User ID
+            booking_details: Booking details including order_id, service_name, old date/time
+            new_date: New preferred date (YYYY-MM-DD)
+            new_time: New preferred time (HH:MM)
+            reason: Reason for rescheduling
+
+        Returns:
+            Updated DialogState
+        """
+        pending_action = {
+            "action_type": "reschedule_booking",
+            "booking_id": booking_details.get("booking_id"),
+            "order_id": booking_details.get("order_id"),
+            "service_name": booking_details.get("service_name"),
+            "old_date": booking_details.get("preferred_date"),
+            "old_time": booking_details.get("preferred_time"),
+            "new_date": new_date,
+            "new_time": new_time,
+            "reason": reason
+        }
+
+        create_data = DialogStateCreate(
+            session_id=session_id,
+            user_id=user_id,
+            state=DialogStateType.AWAITING_CONFIRMATION,
+            intent="booking_reschedule",
+            collected_entities={},
+            needed_entities=[],
+            pending_action=pending_action,
+            context={
+                "confirmation_message": "Awaiting user confirmation for booking reschedule",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            },
+            expires_in_hours=1  # Confirmation expires in 1 hour
+        )
+
+        return await self.create_state(create_data)
+
+    async def get_pending_action(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get pending action from dialog state
+
+        Args:
+            session_id: Session identifier
+
+        Returns:
+            Pending action dict or None
+        """
+        state = await self.get_active_state(session_id)
+        if not state:
+            return None
+
+        if state.state != DialogStateType.AWAITING_CONFIRMATION:
+            return None
+
+        return state.pending_action
+
+    async def clear_pending_action(self, session_id: str) -> None:
+        """
+        Clear pending action and reset dialog state
+
+        Args:
+            session_id: Session identifier
+        """
+        await self.clear_state(session_id)
+

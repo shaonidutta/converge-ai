@@ -223,7 +223,7 @@ class QuestionGenerator:
             if available_subcategories:
                 # Format subcategories with prices for LLM context
                 options_list = []
-                for i, subcategory in enumerate(available_subcategories[:5], 1):  # Limit to 5 options
+                for i, subcategory in enumerate(available_subcategories, 1):  # Show all options
                     name = subcategory.get('name', 'Unknown')
                     rate_cards = subcategory.get('rate_cards', [])
                     if rate_cards:

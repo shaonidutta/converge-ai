@@ -78,6 +78,8 @@ class EntityType(str, Enum):
     # Temporal entities
     DATE = "date"
     TIME = "time"
+    NEW_DATE = "new_date"  # For rescheduling
+    NEW_TIME = "new_time"  # For rescheduling
     
     # Location entities
     LOCATION = "location"
@@ -102,6 +104,7 @@ class EntityType(str, Enum):
 
     # Booking filter entities
     STATUS_FILTER = "status_filter"  # pending, confirmed, completed, cancelled
+    BOOKING_FILTER = "booking_filter"  # latest, recent, last, first, oldest
     SORT_BY = "sort_by"  # date, status, amount
     LIMIT = "limit"  # number of results
 
@@ -126,9 +129,12 @@ INTENT_CONFIGS: Dict[IntentType, IntentConfig] = {
         optional_entities=[
             EntityType.SERVICE_TYPE,
             EntityType.BOOKING_ID,
+            EntityType.BOOKING_FILTER,  # For "latest", "recent", "last" booking
             EntityType.LOCATION,
             EntityType.DATE,
             EntityType.TIME,
+            EntityType.NEW_DATE,  # For reschedule operations
+            EntityType.NEW_TIME,  # For reschedule operations
             EntityType.ADDRESS_LINE1,
             EntityType.ADDRESS_LINE2,
             EntityType.CITY,

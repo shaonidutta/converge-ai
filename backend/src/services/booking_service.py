@@ -399,7 +399,7 @@ class BookingService:
             response.append(BookingResponse(
                 id=booking.id,
                 order_id=booking.order_id,
-                status=booking.status.value,
+                status=booking.status.value if hasattr(booking.status, 'value') else booking.status,
                 total_amount=booking.total,
                 preferred_date=booking.preferred_date.isoformat(),
                 preferred_time=booking.preferred_time.strftime("%H:%M"),
@@ -615,7 +615,8 @@ class BookingService:
             .join(RateCard, BookingItem.rate_card_id == RateCard.id)
             .where(BookingItem.booking_id == booking.id)
         )
-        items = items_result.all()
+        # Use fetchall() instead of all() for async compatibility
+        items = items_result.fetchall()
 
         # Build response
         address_response = AddressResponse(
