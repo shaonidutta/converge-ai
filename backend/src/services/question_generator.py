@@ -212,7 +212,14 @@ class QuestionGenerator:
         # Build context string
         context_str = ""
         if collected_entities:
-            context_items = [f"{k}: {v}" for k, v in collected_entities.items()]
+            # Filter out internal metadata fields (starting with _)
+            display_entities = {k: v for k, v in collected_entities.items() if not k.startswith('_')}
+
+            # Add service name if available (from ServiceNameResolver)
+            if '_service_name' in collected_entities:
+                display_entities['service'] = collected_entities['_service_name']
+
+            context_items = [f"{k}: {v}" for k, v in display_entities.items()]
             context_str = f"\nAlready collected information: {', '.join(context_items)}"
 
         # Special handling for service subcategory questions - use LLM for conversational response
@@ -332,31 +339,40 @@ Generate the question:"""
     ) -> str:
         """
         Add context from collected entities to make question more natural
-        
+
         Examples:
         - If service_type="AC" collected, asking for date:
           "What date would you like to schedule the AC service?"
         - If date="2025-10-10" collected, asking for time:
           "What time works best for you on October 10th?"
         """
-        # Add service type to question if available
-        if "service_type" in collected_entities and entity_type != EntityType.SERVICE_TYPE:
+        # Add service name to question if available (from ServiceNameResolver)
+        # This ensures we use the actual service name (e.g., "Texture Painting") instead of just the ID
+        if "_service_name" in collected_entities and entity_type != EntityType.SERVICE_TYPE:
+            service_name = collected_entities["_service_name"]
+            question = question.replace("the service", f"the {service_name} service")
+            question = question.replace("your service", f"your {service_name} service")
+            question = question.replace("appliance repair", service_name)  # Fix LLM hallucinations
+            question = question.replace("AC repair", service_name)
+            question = question.replace("plumbing", service_name)
+        # Fallback to service_type ID if no service name available
+        elif "service_type" in collected_entities and entity_type != EntityType.SERVICE_TYPE:
             service = collected_entities["service_type"]
             question = question.replace("the service", f"the {service} service")
             question = question.replace("your service", f"your {service} service")
-        
+
         # Add date context when asking for time
         if entity_type == EntityType.TIME and "date" in collected_entities:
             date_str = collected_entities["date"]
             # Simple date formatting (can be enhanced)
             question = question.replace("?", f" on {date_str}?")
-        
+
         # Add location context when asking for date/time
         if entity_type in [EntityType.DATE, EntityType.TIME] and "location" in collected_entities:
             location = collected_entities["location"]
             if "?" in question:
                 question = question.replace("?", f" in {location}?")
-        
+
         return question
     
     def generate_confirmation(

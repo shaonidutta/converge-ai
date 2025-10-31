@@ -228,13 +228,20 @@ class BookingAgent:
             # Step 4: Auto-add service to cart if not already present
             service_type = entities.get("service_type", "").lower()
 
-            # Try to get rate_card_id from service subcategory validation metadata
-            rate_card_id = entities.get("_metadata_rate_card_id")
+            # NEW: Check for pre-resolved service from ServiceNameResolver
+            resolved_service = entities.get("_resolved_service")
+            if resolved_service and resolved_service.get("rate_card_id"):
+                rate_card_id = resolved_service["rate_card_id"]
+                logger.info(f"[BookingAgent] Using pre-resolved service: rate_card_id={rate_card_id}")
+            else:
+                # Try to get rate_card_id from service subcategory validation metadata
+                rate_card_id = entities.get("_metadata_rate_card_id")
 
             print(f"\n\n{'='*80}")
             print(f"[BookingAgent] ALL ENTITIES: {entities}")
             print(f"[BookingAgent] Entity keys: {list(entities.keys())}")
             print(f"[BookingAgent] rate_card_id: {rate_card_id}")
+            print(f"[BookingAgent] resolved_service: {resolved_service}")
             print(f"{'='*80}\n\n")
 
             logger.info(f"[BookingAgent] ALL ENTITIES: {entities}")

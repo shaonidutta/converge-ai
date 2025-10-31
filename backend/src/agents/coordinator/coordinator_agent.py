@@ -694,7 +694,7 @@ class CoordinatorAgent:
                             classifier=self.intent_classifier,
                             dialog_manager=dialog_manager,
                             question_generator=QuestionGenerator(),
-                            entity_extractor=EntityExtractor(llm_client=self.llm_client),
+                            entity_extractor=EntityExtractor(llm_client=self.llm_client, db=self.db),
                             entity_validator=EntityValidator(self.db)
                         )
 
@@ -766,7 +766,7 @@ class CoordinatorAgent:
                             classifier=self.intent_classifier,
                             dialog_manager=dialog_manager,
                             question_generator=QuestionGenerator(),
-                            entity_extractor=EntityExtractor(llm_client=self.llm_client),
+                            entity_extractor=EntityExtractor(llm_client=self.llm_client, db=self.db),
                             entity_validator=EntityValidator(self.db)
                         )
 

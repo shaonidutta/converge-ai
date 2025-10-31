@@ -277,6 +277,98 @@ async def check_follow_up_node(
         }
 
 
+async def extract_initial_entities_node(
+    state: SlotFillingState,
+    entity_extractor: EntityExtractor
+) -> Dict[str, Any]:
+    """
+    Node: Extract entities from initial message (not a follow-up)
+    This handles cases like "i want to book texture pianting" where the service name is in the initial message
+
+    Args:
+        state: Current conversation state
+        entity_extractor: Entity extractor service
+
+    Returns:
+        Updated state with extracted entities
+    """
+    try:
+        logger.info(f"[extract_initial_entities_node] Extracting entities from initial message")
+
+        message = state.get('current_message', '')
+        intent = state.get('primary_intent')
+        collected_entities = state.get('collected_entities', {})
+
+        # Only try to extract service_type for booking_management intent
+        if intent == "booking_management" and 'service_type' not in collected_entities:
+            logger.info(f"[extract_initial_entities_node] Attempting to extract service_type from: '{message}'")
+
+            # Try to extract service name using ServiceNameResolver
+            context = {
+                'intent': intent,
+                'session_id': state.get('session_id'),
+                'user_id': state.get('user_id')
+            }
+
+            extraction_result = await entity_extractor.extract_from_follow_up(
+                message=message,
+                expected_entity=EntityType.SERVICE_TYPE,
+                context=context
+            )
+
+            logger.info(f"[extract_initial_entities_node] Extraction result: {extraction_result}")
+
+            if extraction_result and extraction_result.confidence >= 0.7:
+                logger.info(f"[extract_initial_entities_node] ✅ Extracted service: {extraction_result.entity_value}")
+
+                # Check if this is a resolved service (has metadata)
+                if extraction_result.metadata and '_resolved_service' in extraction_result.metadata:
+                    resolved_service = extraction_result.metadata['_resolved_service']
+                    logger.info(f"[extract_initial_entities_node] ✅ Service pre-resolved: {resolved_service}")
+                    collected_entities['_resolved_service'] = resolved_service
+
+                    # Pre-populate service_type and service_subcategory
+                    if resolved_service.get('category_id'):
+                        collected_entities['service_type'] = str(resolved_service['category_id'])
+                        logger.info(f"[extract_initial_entities_node] Pre-populated service_type: {resolved_service['category_id']}")
+
+                    if resolved_service.get('subcategory_id'):
+                        collected_entities['service_subcategory'] = str(resolved_service['subcategory_id'])
+                        logger.info(f"[extract_initial_entities_node] Pre-populated service_subcategory: {resolved_service['subcategory_id']}")
+
+                    # Store service name for QuestionGenerator to use in context
+                    # This ensures the LLM generates questions with the correct service name
+                    service_name = resolved_service.get('subcategory_name') or resolved_service.get('service_name') or resolved_service.get('category_name')
+                    if service_name:
+                        collected_entities['_service_name'] = service_name
+                        logger.info(f"[extract_initial_entities_node] Stored service name for context: {service_name}")
+                else:
+                    # Regular service_type extraction (category only)
+                    collected_entities['service_type'] = extraction_result.entity_value
+                    logger.info(f"[extract_initial_entities_node] Extracted service_type: {extraction_result.entity_value}")
+            else:
+                logger.info(f"[extract_initial_entities_node] No service extracted or low confidence")
+
+        return {
+            "collected_entities": collected_entities,
+            "metadata": {
+                **state.get("metadata", {}),
+                "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["extract_initial_entities_node"]
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"[extract_initial_entities_node] Error: {e}", exc_info=True)
+        # Don't fail the whole flow - just continue without extracted entities
+        return {
+            "collected_entities": state.get('collected_entities', {}),
+            "metadata": {
+                **state.get("metadata", {}),
+                "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["extract_initial_entities_node"]
+            }
+        }
+
+
 async def extract_entity_node(
     state: SlotFillingState,
     entity_extractor: EntityExtractor
@@ -297,6 +389,40 @@ async def extract_entity_node(
 
         # Check if entity was already extracted by intent classifier
         collected_entities = state.get('collected_entities', {})
+
+        # NEW: Check if service was pre-resolved by ServiceNameResolver
+        # This happens when user says "i want to book texture painting" and we resolve it to a specific service
+        if expected_entity == 'service_type' and '_resolved_service' in collected_entities:
+            resolved_service = collected_entities['_resolved_service']
+            logger.info(f"[extract_entity_node] ✅ Service pre-resolved by ServiceNameResolver: {resolved_service}")
+
+            # Pre-populate service_type and service_subcategory
+            if resolved_service.get('category_id'):
+                collected_entities['service_type'] = str(resolved_service['category_id'])
+                logger.info(f"[extract_entity_node] Pre-populated service_type: {resolved_service['category_id']}")
+
+            if resolved_service.get('subcategory_id'):
+                collected_entities['service_subcategory'] = str(resolved_service['subcategory_id'])
+                logger.info(f"[extract_entity_node] Pre-populated service_subcategory: {resolved_service['subcategory_id']}")
+
+            # Return the category_id as service_type
+            return {
+                "extracted_entity": {
+                    "entity_type": "service_type",
+                    "entity_value": str(resolved_service['category_id']),
+                    "normalized_value": str(resolved_service['category_id']),
+                    "confidence": 0.95,
+                    "extraction_method": "service_name_resolver",
+                    "metadata": {"_resolved_service": resolved_service}
+                },
+                "extraction_failed": False,
+                "collected_entities": collected_entities,  # Update collected entities
+                "metadata": {
+                    **state.get("metadata", {}),
+                    "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["extract_entity_node"],
+                    "service_pre_resolved": True
+                }
+            }
 
         # Check if the expected entity was already extracted
         if expected_entity and expected_entity in collected_entities:
@@ -581,6 +707,18 @@ async def update_dialog_state_node(
             collected = state.get('collected_entities', {}).copy()
             collected[entity_type] = entity_value
 
+            # NEW: Check for resolved service metadata from ServiceNameResolver
+            extraction_metadata = extracted.get('metadata', {})
+            if extraction_metadata and '_resolved_service' in extraction_metadata:
+                resolved_service = extraction_metadata['_resolved_service']
+                collected['_resolved_service'] = resolved_service
+                logger.info(f"[update_dialog_state_node] ✅ Stored _resolved_service: {resolved_service}")
+
+                # Also store rate_card_id for booking creation
+                if resolved_service.get('rate_card_id'):
+                    collected['_metadata_rate_card_id'] = resolved_service['rate_card_id']
+                    logger.info(f"[update_dialog_state_node] ✅ Stored _metadata_rate_card_id from resolved service: {resolved_service['rate_card_id']}")
+
             # Store validation metadata (e.g., rate_card_id for service_subcategory)
             validation_metadata = validation_result.get('metadata', {})
             logger.info(f"[update_dialog_state_node] Validation metadata: {validation_metadata}")
@@ -754,6 +892,11 @@ async def determine_needed_entities_node(
 
         # Filter out already collected entities
         needed = [e for e in required_entities if e not in collected]
+
+        # NEW: If service was pre-resolved by ServiceNameResolver, skip service_subcategory
+        if '_resolved_service' in collected and 'service_subcategory' in collected:
+            logger.info(f"[determine_needed_entities_node] Service pre-resolved, service_subcategory already set")
+            # service_subcategory is already in collected, so it will be filtered out above
 
         # Special check: If location is needed for booking, check if user has existing addresses
         logger.info(f"[determine_needed_entities_node] Checking auto-fill conditions: location_needed={'location' in needed}, intent={intent}, action={collected.get('action')}, db={db is not None}")
@@ -1157,6 +1300,9 @@ def create_slot_filling_graph(
     async def _check_follow_up(state):
         return await check_follow_up_node(state, dialog_manager)
 
+    async def _extract_initial_entities(state):
+        return await extract_initial_entities_node(state, entity_extractor)
+
     async def _extract_entity(state):
         return await extract_entity_node(state, entity_extractor)
 
@@ -1177,6 +1323,7 @@ def create_slot_filling_graph(
 
     graph.add_node("classify_intent", _classify_intent)
     graph.add_node("check_follow_up", _check_follow_up)
+    graph.add_node("extract_initial_entities", _extract_initial_entities)
     graph.add_node("extract_entity", _extract_entity)
     graph.add_node("validate_entity", _validate_entity)
     graph.add_node("update_dialog_state", _update_dialog_state)
@@ -1252,7 +1399,7 @@ def create_slot_filling_graph(
                 logger.info(f"[route_after_follow_up_check] Service '{service_type}' requires validation, routing to: validate_collected_entities")
                 return "validate_collected_entities"
 
-        logger.info("[route_after_follow_up_check] Routing to: new_intent")
+        logger.info("[route_after_follow_up_check] Routing to: new_intent (extract_initial_entities)")
         return "new_intent"
 
     graph.add_conditional_edges(
@@ -1263,9 +1410,14 @@ def create_slot_filling_graph(
             "follow_up": "extract_entity",
             "intent_changed": END,  # Exit slot-filling, let coordinator handle new intent
             "validate_collected_entities": "validate_entity",  # NEW: Validate collected entities that need subcategory selection
-            "new_intent": "determine_needed_entities"
+            "new_intent": "extract_initial_entities"  # NEW: Extract entities from initial message before determining needed entities
         }
     )
+
+    # extract_initial_entities → determine_needed_entities
+    # This node extracts entities from the initial message (e.g., "i want to book texture pianting")
+    # Then we determine what entities are still needed
+    graph.add_edge("extract_initial_entities", "determine_needed_entities")
 
     # extract_entity → check if extraction failed or succeeded
     def route_after_extraction(state: SlotFillingState) -> str:

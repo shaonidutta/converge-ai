@@ -175,7 +175,47 @@ class DialogStateManager:
         
         logger.info(f"Updated dialog state for session {session_id}: state={state.state}, intent={state.intent}")
         return state
-    
+
+    async def track_mentioned_service(
+        self,
+        session_id: str,
+        service_info: Dict[str, Any]
+    ) -> None:
+        """
+        Track a recently mentioned service in conversation context
+
+        This enables context-aware service resolution when user says things like:
+        - "that one"
+        - "the first one"
+        - References a service mentioned earlier
+
+        Args:
+            session_id: Session identifier
+            service_info: Service information to track (name, rate_card_id, etc.)
+        """
+        state = await self.get_active_state(session_id)
+        if not state:
+            logger.warning(f"No active dialog state for session {session_id}, cannot track service")
+            return
+
+        # Get or initialize context
+        context = state.context or {}
+        recent_services = context.get("recent_services", [])
+
+        # Add to recent services (keep last 5)
+        recent_services.insert(0, service_info)
+        recent_services = recent_services[:5]
+
+        context["recent_services"] = recent_services
+
+        # Update state
+        await self.update_state(
+            session_id,
+            DialogStateUpdate(context=context)
+        )
+
+        logger.info(f"Tracked service in context: {service_info.get('name', 'unknown')}")
+
     async def clear_state(self, session_id: str) -> bool:
         """
         Clear dialog state for a session

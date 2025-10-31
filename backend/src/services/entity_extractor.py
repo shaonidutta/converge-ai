@@ -7,6 +7,7 @@ Approach:
 - Pattern matching (regex/rule-based) first for common cases (fast path)
 - LLM fallback when confidence is low or patterns fail
 - Context-aware extraction using conversation history
+- Service name resolution for booking intents
 
 Design Principles:
 - Fast pattern matching for common formats
@@ -20,6 +21,7 @@ import re
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.nlp.intent.config import EntityType
 from src.llm.gemini.client import LLMClient
@@ -33,22 +35,39 @@ class EntityExtractionResult(BaseModel):
     entity_value: Any
     confidence: float
     normalized_value: Optional[Any] = None
-    extraction_method: str  # "pattern", "llm", "heuristic"
+    extraction_method: str  # "pattern", "llm", "heuristic", "service_name_resolver_*"
+    metadata: Optional[Dict[str, Any]] = None  # Additional metadata (e.g., resolved service info)
 
 
 class EntityExtractor:
     """
     Extracts entity values from follow-up responses
-    
+
     Features:
     - Pattern matching (fast path)
     - LLM fallback (accurate)
     - Context-aware extraction
     - Normalized output
+    - Service name resolution for booking intents
     """
-    
-    def __init__(self, llm_client: Optional[LLMClient] = None):
+
+    def __init__(self, llm_client: Optional[LLMClient] = None, db: Optional[AsyncSession] = None):
         self.llm_client = llm_client
+        self.db = db
+        self.service_resolver = None
+
+        # Initialize ServiceNameResolver if db is provided
+        if db:
+            try:
+                from src.services.service_name_resolver import ServiceNameResolver
+                self.service_resolver = ServiceNameResolver(db)
+                logger.info("[EntityExtractor] ✅ ServiceNameResolver initialized successfully")
+            except Exception as e:
+                logger.error(f"[EntityExtractor] ❌ Failed to initialize ServiceNameResolver: {e}")
+                logger.exception(e)
+                self.service_resolver = None
+        else:
+            logger.warning("[EntityExtractor] ⚠️ No db provided, ServiceNameResolver will not be available")
     
     async def extract_multiple_entities(
         self,
@@ -110,9 +129,9 @@ class EntityExtractor:
             EntityExtractionResult or None if extraction failed
         """
         logger.info(f"[EntityExtractor] Extracting {expected_entity.value} from: '{message}'")
-        
+
         # Try pattern-based extraction first (fast path)
-        pattern_result = self._extract_with_patterns(message, expected_entity, context)
+        pattern_result = await self._extract_with_patterns(message, expected_entity, context)
         if pattern_result and pattern_result.confidence >= 0.7:
             logger.info(f"[EntityExtractor] Pattern match successful: {pattern_result.entity_value} (confidence: {pattern_result.confidence})")
             return pattern_result
@@ -136,7 +155,42 @@ class EntityExtractor:
         logger.warning(f"[EntityExtractor] Failed to extract {expected_entity.value}")
         return None
     
-    def _extract_with_patterns(
+    def _clean_conversational_prefixes(self, message: str) -> str:
+        """
+        Remove conversational prefixes and filler words to extract core content
+
+        Examples:
+        - "ok details on texture painting" -> "texture painting"
+        - "tell me about ac repair" -> "ac repair"
+        - "i want to book plumbing" -> "plumbing"
+        - "show me information on cleaning" -> "cleaning"
+        """
+        message_lower = message.lower().strip()
+
+        # Define conversational prefixes to remove (order matters - more specific first)
+        prefixes_to_remove = [
+            # Information request patterns
+            r'^(?:ok\s+)?(?:show\s+me\s+)?(?:give\s+me\s+)?(?:tell\s+me\s+)?(?:details?\s+)?(?:on|about|for|of)\s+',
+            r'^(?:ok\s+)?(?:i\s+want\s+)?(?:to\s+)?(?:see|know|get|view)\s+(?:details?\s+)?(?:on|about|for|of)\s+',
+            r'^(?:ok\s+)?(?:can\s+you\s+)?(?:show|tell|give)\s+(?:me\s+)?(?:details?\s+)?(?:on|about|for|of)\s+',
+            r'^(?:ok\s+)?(?:what\s+about|how\s+about)\s+',
+
+            # Booking intent patterns
+            r'^(?:ok\s+)?(?:i\s+)?(?:want\s+to|wanna|would\s+like\s+to)\s+(?:book|schedule|get)\s+(?:a\s+)?',
+            r'^(?:ok\s+)?(?:book|schedule|get)\s+(?:me\s+)?(?:a\s+)?',
+
+            # General filler patterns
+            r'^(?:ok|okay|alright|sure|yes|yeah)\s+',
+            r'^(?:please\s+)?(?:i\s+need|i\s+want)\s+',
+        ]
+
+        cleaned = message_lower
+        for pattern in prefixes_to_remove:
+            cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+
+        return cleaned.strip()
+
+    async def _extract_with_patterns(
         self,
         message: str,
         expected_entity: EntityType,
@@ -146,6 +200,9 @@ class EntityExtractor:
         Try to extract entity using regex patterns (fast path)
         """
         message_lower = message.lower().strip()
+
+        # Clean conversational prefixes for better entity extraction
+        cleaned_message = self._clean_conversational_prefixes(message)
 
         # ACTION patterns
         if expected_entity == EntityType.ACTION:
@@ -167,13 +224,29 @@ class EntityExtractor:
         if expected_entity == EntityType.BOOKING_ID:
             return self._extract_booking_id(message)
 
-        # Service type patterns
+        # Service type patterns - use cleaned message for better extraction
         if expected_entity == EntityType.SERVICE_TYPE:
-            return self._extract_service_type(message_lower)
+            # NEW: Try service name resolution first (handles specific service names + typos)
+            logger.info(f"[EntityExtractor] SERVICE_TYPE extraction - service_resolver: {self.service_resolver is not None}")
+            if self.service_resolver:
+                logger.info(f"[EntityExtractor] Attempting service name resolution for: '{cleaned_message}'")
+                service_name_result = await self._extract_service_name(cleaned_message, context)
+                logger.info(f"[EntityExtractor] Service name resolution result: {service_name_result}")
+                if service_name_result and service_name_result.confidence >= 0.7:
+                    logger.info(f"[EntityExtractor] Service name resolved: {service_name_result.entity_value}")
+                    return service_name_result
+                else:
+                    logger.info(f"[EntityExtractor] Service name resolution failed or low confidence")
+            else:
+                logger.warning(f"[EntityExtractor] service_resolver is None, skipping service name resolution")
 
-        # Service subcategory patterns
+            # Fall back to traditional service_type extraction
+            logger.info(f"[EntityExtractor] Falling back to traditional service_type extraction")
+            return self._extract_service_type(cleaned_message)
+
+        # Service subcategory patterns - use cleaned message for better extraction
         if expected_entity == EntityType.SERVICE_SUBCATEGORY:
-            return self._extract_service_subcategory(message_lower, context)
+            return self._extract_service_subcategory(cleaned_message, context)
 
         # Issue type patterns
         if expected_entity == EntityType.ISSUE_TYPE:
@@ -716,6 +789,70 @@ class EntityExtractor:
             )
 
         return None
+
+    async def _extract_service_name(
+        self,
+        message: str,
+        context: Dict[str, Any]
+    ) -> Optional[EntityExtractionResult]:
+        """
+        Extract and resolve service name from message using ServiceNameResolver
+
+        This handles cases like:
+        - "i want to book texture painting" (specific service name)
+        - "book texture pianting" (with typo)
+        - "details on texture painting" (after seeing it in search)
+        - "that one" (context reference)
+
+        Returns:
+            EntityExtractionResult with resolved service metadata, or None if not resolved
+        """
+        if not self.service_resolver:
+            logger.warning("[EntityExtractor] ServiceNameResolver not initialized - skipping service name resolution")
+            return None
+
+        logger.info(f"[EntityExtractor] Attempting service name resolution for: '{message}'")
+
+        try:
+            # Resolve service name using ServiceNameResolver
+            resolution = await self.service_resolver.resolve(message, context)
+
+            if not resolution.resolved:
+                logger.info(f"[EntityExtractor] Service name not resolved: {resolution.error_message}")
+                return None
+
+            logger.info(f"[EntityExtractor] Service name resolved: {resolution.service_name or resolution.subcategory_name or resolution.category_name} (confidence: {resolution.confidence}, method: {resolution.method})")
+
+            # Build metadata to pass to booking flow
+            metadata = {
+                "_resolved_service": {
+                    "rate_card_id": resolution.rate_card_id,
+                    "category_id": resolution.category_id,
+                    "subcategory_id": resolution.subcategory_id,
+                    "service_name": resolution.service_name,
+                    "category_name": resolution.category_name,
+                    "subcategory_name": resolution.subcategory_name,
+                    "price": resolution.price
+                }
+            }
+
+            # If we have category_id, use it as service_type
+            # This allows the booking flow to work with existing logic
+            if resolution.category_id:
+                return EntityExtractionResult(
+                    entity_type=EntityType.SERVICE_TYPE.value,
+                    entity_value=str(resolution.category_id),  # Use category_id as service_type
+                    confidence=resolution.confidence,
+                    normalized_value=str(resolution.category_id),
+                    extraction_method=f"service_name_resolver_{resolution.method}",
+                    metadata=metadata
+                )
+
+            return None
+
+        except Exception as e:
+            logger.error(f"[EntityExtractor] Error in service name resolution: {e}", exc_info=True)
+            return None
 
     def _extract_service_type(self, message_lower: str) -> Optional[EntityExtractionResult]:
         """Extract service type"""

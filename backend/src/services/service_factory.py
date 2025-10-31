@@ -65,8 +65,8 @@ class SlotFillingServiceFactory:
             question_generator = QuestionGenerator()
             logger.debug("[ServiceFactory] ✅ Question generator initialized")
             
-            # 5. Initialize entity extractor
-            entity_extractor = EntityExtractor(llm_client=extraction_llm)
+            # 5. Initialize entity extractor (with db for service name resolution)
+            entity_extractor = EntityExtractor(llm_client=extraction_llm, db=db)
             logger.debug("[ServiceFactory] ✅ Entity extractor initialized")
             
             # 6. Initialize entity validator
