@@ -797,9 +797,15 @@ async def update_dialog_state_node(
 
                 # Save state with service type and subcategory requirement
                 from src.schemas.dialog_state import DialogStateUpdate
+                from src.core.models.dialog_state import DialogStateType
                 await dialog_manager.update_state(
                     session_id=state['session_id'],
                     update_data=DialogStateUpdate(
+                        # Provide required fields for the DialogStateUpdate model
+                        state=DialogStateType.COLLECTING_INFO,
+                        intent=state.get('primary_intent'),
+                        pending_action=None,
+                        expires_in_hours=24,
                         collected_entities=collected,
                         needed_entities=needed,
                         context={

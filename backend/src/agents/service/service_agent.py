@@ -985,19 +985,26 @@ class ServiceAgent:
                 logger.info(f"[_infer_action_and_query] Matched category pattern: {pattern}")
                 return updated_entities
 
-        # Priority 3: Service search patterns
+        # Priority 3: Service search patterns (including conversational prefixes)
         search_patterns = [
+            # "ok details on X", "details on X", "tell me about X"
+            r'(?:ok\s+)?(?:details?|info|information)\s+(?:on|about|for)\s+(?P<query>[\w\s]+?)(?:\s*$|[.!?])',
+            # "show/tell/give me about X services"
             r'\b(show|tell|give)\s+(me\s+)?(about\s+)?(?P<query>[\w\s]+?)\s+(services?|repair|maintenance)',
+            # "search/find/look for X"
             r'\b(search|find|look\s+for)\s+(?P<query>[\w\s]+)',
+            # "do you have X services"
             r'\b(do\s+you\s+have|have\s+you\s+got)\s+(?P<query>[\w\s]+?)\s+(services?|repair)',
+            # "i want to book X" - extract service name for search
+            r'\b(?:i\s+)?(?:want\s+to|wanna|would\s+like\s+to)\s+(?:book|get|schedule)\s+(?P<query>[\w\s]+?)(?:\s*$|[.!?])',
         ]
 
         for pattern in search_patterns:
             match = re.search(pattern, message_lower)
             if match:
                 query = match.group('query').strip()
-                # Clean up common words
-                query = re.sub(r'\b(the|a|an|some|any)\b', '', query).strip()
+                # Clean up common words and filler words
+                query = re.sub(r'\b(the|a|an|some|any|ok|okay|please)\b', '', query).strip()
                 if query:
                     updated_entities["action"] = "search"
                     updated_entities["query"] = query
