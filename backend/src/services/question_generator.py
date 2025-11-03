@@ -92,9 +92,9 @@ ENTITY_QUESTION_TEMPLATES = {
     },
     EntityType.ISSUE_TYPE: {
         IntentType.COMPLAINT: [
-            "What type of issue are you facing? (quality issue, technician behavior, damage, late arrival, no-show)",
-            "Could you describe the problem you're experiencing?",
-            "What went wrong with your service?"
+            "I'm sorry to hear you're having an issue! What type of problem are you experiencing?\n\n1. No-show (technician didn't arrive)\n2. Poor service quality\n3. Technician behavior issue\n4. Damage to property\n5. Late arrival/delay\n6. Other\n\nPlease choose a number or type the issue name:",
+            "What kind of issue would you like to report?\n\n1. No-show\n2. Service quality\n3. Technician behavior\n4. Property damage\n5. Delay/late arrival\n6. Other\n\nYou can respond with a number or describe the issue:",
+            "Could you tell me what went wrong? Please select:\n\n1. Technician didn't show up\n2. Poor quality work\n3. Unprofessional behavior\n4. Something was damaged\n5. Service was delayed\n6. Other issue\n\nJust type the number or describe your issue:"
         ],
     },
     EntityType.PAYMENT_TYPE: {
@@ -171,7 +171,14 @@ class QuestionGenerator:
         """
         logger.info(f"[QuestionGenerator] Generating question for {entity_type.value}, intent: {intent.value}, attempt: {attempt_number}")
 
-        # Try LLM-generated question first
+        # For complaint issue_type, always use templates (skip LLM for speed and consistency)
+        if entity_type == EntityType.ISSUE_TYPE and intent == IntentType.COMPLAINT:
+            logger.info(f"[QuestionGenerator] Using template for complaint issue_type (skipping LLM)")
+            question = self._get_template_question(entity_type, intent, attempt_number)
+            logger.info(f"[QuestionGenerator] Template Generated: {question[:100]}...")
+            return question
+
+        # Try LLM-generated question for other cases
         try:
             question = self._generate_llm_question(
                 entity_type,

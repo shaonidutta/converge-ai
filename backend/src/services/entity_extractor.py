@@ -256,6 +256,10 @@ class EntityExtractor:
         if expected_entity == EntityType.PAYMENT_TYPE:
             return self._extract_payment_type(message_lower)
 
+        # Description patterns (for complaints)
+        if expected_entity == EntityType.DESCRIPTION:
+            return self._extract_description(message, context)
+
         # Status filter patterns
         if expected_entity == EntityType.STATUS_FILTER:
             return self._extract_status_filter(message_lower)
@@ -1032,12 +1036,36 @@ class EntityExtractor:
 
     def _extract_issue_type(self, message_lower: str) -> Optional[EntityExtractionResult]:
         """Extract issue type for complaints"""
+        # First check for numbered responses (1, 2, 3, etc.)
+        number_mappings = {
+            "1": "no_show",
+            "2": "quality",
+            "3": "behavior",
+            "4": "damage",
+            "5": "late",
+            "6": "other"
+        }
+
+        # Check if message is just a number
+        stripped_message = message_lower.strip()
+        if stripped_message in number_mappings:
+            issue_type = number_mappings[stripped_message]
+            return EntityExtractionResult(
+                entity_type=EntityType.ISSUE_TYPE.value,
+                entity_value=issue_type,
+                confidence=0.95,  # High confidence for numbered selection
+                normalized_value=issue_type,
+                extraction_method="numbered_option"
+            )
+
+        # Then check for keyword patterns
         issue_keywords = {
-            "quality": ["quality", "poor quality", "bad quality", "not satisfied", "unsatisfied"],
-            "behavior": ["behavior", "behaviour", "rude", "unprofessional", "misbehave"],
-            "damage": ["damage", "damaged", "broke", "broken", "destroyed"],
-            "late": ["late", "delayed", "delay", "waiting", "not on time"],
-            "no_show": ["no show", "didn't come", "didn't arrive", "not arrived", "missed"],
+            "no_show": ["no show", "no-show", "didn't come", "didn't arrive", "not arrived", "missed", "didn't show up", "not show up"],
+            "quality": ["quality", "poor quality", "bad quality", "not satisfied", "unsatisfied", "poor service", "bad service"],
+            "behavior": ["behavior", "behaviour", "rude", "unprofessional", "misbehave", "attitude", "inappropriate"],
+            "damage": ["damage", "damaged", "broke", "broken", "destroyed", "property damage", "something damaged"],
+            "late": ["late", "delayed", "delay", "waiting", "not on time", "late arrival"],
+            "other": ["other", "different", "something else", "not listed"]
         }
 
         for issue_type, keywords in issue_keywords.items():
@@ -1050,6 +1078,38 @@ class EntityExtractor:
                         normalized_value=issue_type,
                         extraction_method="pattern"
                     )
+
+        return None
+
+    def _extract_description(self, message: str, context: Dict[str, Any]) -> Optional[EntityExtractionResult]:
+        """Extract description for complaints and other detailed explanations"""
+        # Clean the message
+        cleaned_message = message.strip()
+
+        # For complaints, be very liberal in accepting descriptions
+        # Any message with reasonable content should be accepted as description
+        if len(cleaned_message) >= 5:  # Lowered from 10 to 5 characters
+            word_count = len(cleaned_message.split())
+
+            # Accept almost any multi-word message as description
+            if word_count >= 2:  # Lowered from 3 to 2 words
+                return EntityExtractionResult(
+                    entity_type=EntityType.DESCRIPTION.value,
+                    entity_value=cleaned_message,
+                    confidence=0.95,  # High confidence for description extraction
+                    normalized_value=cleaned_message,
+                    extraction_method="pattern"
+                )
+
+        # Even single words can be descriptions if they're meaningful
+        if len(cleaned_message) >= 3:  # At least 3 characters
+            return EntityExtractionResult(
+                entity_type=EntityType.DESCRIPTION.value,
+                entity_value=cleaned_message,
+                confidence=0.80,  # Lower confidence for very short descriptions
+                normalized_value=cleaned_message,
+                extraction_method="fallback"
+            )
 
         return None
 

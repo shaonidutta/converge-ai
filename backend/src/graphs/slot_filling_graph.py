@@ -486,10 +486,18 @@ async def extract_entity_node(
 
         # Check if we should try to extract multiple entities
         # This happens when user provides combined input like "tomorrow 4pm"
+        # OR for complaints where user might provide both issue_type and description in one message
         needed_entities = state.get('needed_entities', [])
+        intent = state.get('primary_intent')
         multiple_needed = len(needed_entities) > 1
 
-        if multiple_needed:
+        # For complaints, always try to extract multiple entities from detailed messages
+        is_complaint_with_details = (
+            intent == "complaint" and
+            len(state.get('current_message', '').split()) >= 5  # Message has 5+ words
+        )
+
+        if multiple_needed or is_complaint_with_details:
             # Try to extract multiple entities from the message
             logger.info(f"[extract_entity_node] Trying to extract multiple entities: {needed_entities}")
             multiple_results = await entity_extractor.extract_multiple_entities(
