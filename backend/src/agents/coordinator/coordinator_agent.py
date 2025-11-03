@@ -11,12 +11,14 @@ This agent serves as the central orchestrator that:
 """
 
 import logging
+import re
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.models import User, Conversation
 from src.nlp.intent.classifier import IntentClassifier
+from src.nlp.intent.config import IntentType
 from src.llm.gemini.client import LLMClient
 from src.schemas.intent import IntentClassificationResult, IntentResult
 from src.agents.policy.policy_agent import PolicyAgent
@@ -305,115 +307,234 @@ class CoordinatorAgent:
             if dialog_state is not None and getattr(dialog_state, "state", None) == DialogStateType.COLLECTING_INFO:
                 self.logger.info(f"Checking for potential intent/action switch during active dialog state: {dialog_state.intent}")
 
-                # Check if message is a short follow-up response (1-3 words without explicit intent keywords)
-                # Short responses during slot-filling should be treated as follow-up responses, not new intents
                 message_lower = message.lower().strip()
-                word_count = len(message_lower.split())
 
-                # Intent keywords that indicate a clear new intent (not just a follow-up response)
-                explicit_intent_keywords = [
-                    'what', 'show', 'list', 'tell', 'give', 'find', 'search',
-                    'book', 'cancel', 'reschedule', 'modify', 'change',
-                    'policy', 'refund', 'terms', 'conditions',
-                    'help', 'how', 'why', 'when', 'where', 'who'
+                # Check for explicit cancellation keywords
+                cancellation_keywords = [
+                    'cancel', 'stop', 'nevermind', 'never mind', 'forget it',
+                    'quit', 'exit', 'abort', 'no thanks', 'not interested'
                 ]
+                is_cancellation = any(keyword in message_lower for keyword in cancellation_keywords)
 
-                has_explicit_intent = any(keyword in message_lower for keyword in explicit_intent_keywords)
+                if is_cancellation:
+                    self.logger.info(f"Cancellation detected during slot-filling: '{message}'")
+                    # Clear the dialog state
+                    await dialog_manager.clear_state(session_id)
 
-                # If it's a short response (1-3 words) without explicit intent keywords,
-                # treat it as a follow-up response and skip intent switch detection
-                if 1 <= word_count <= 3 and not has_explicit_intent:
-                    self.logger.info(f"Short follow-up response detected ('{message}'), skipping intent switch detection")
-                else:
-                    # Classify the current message to detect potential intent/action switch
-                    try:
-                        intent_check_result, _ = await self.intent_classifier.classify(
-                            message=message,
-                            conversation_history=conversation_history,
-                            dialog_state=None  # Classify WITHOUT context to detect clear switches
-                        )
+                    return {
+                        "response": "Okay, I've cancelled that. How can I help you?",
+                        "intent": "cancellation",
+                        "confidence": 1.0,
+                        "agent_used": "coordinator",
+                        "classification_method": "cancellation",
+                        "metadata": {
+                            "previous_intent": dialog_state.intent,
+                            "cancelled": True
+                        }
+                    }
 
-                        # Get the detected intent and entities
-                        detected_intent = intent_check_result.primary_intent
-                        detected_entities = intent_check_result.intents[0].entities if intent_check_result.intents else {}
-                        detected_action = detected_entities.get("action")
-                        detected_confidence = intent_check_result.intents[0].confidence if intent_check_result.intents else 0.0
+                # For complaint intent, be very conservative about intent switching
+                # Only switch if user explicitly starts a completely new request with clear intent keywords
+                if dialog_state.intent == IntentType.COMPLAINT:
+                    # Check for VERY explicit new intent keywords that clearly indicate a new request
+                    # These should be at the START of the message to indicate a new request
+                    explicit_new_request_patterns = [
+                        r'^(i want to|i would like to|i need to|can i|could i|please)\s+(book|cancel|reschedule|modify|change|find|search|show|list)',
+                        r'^(show me|tell me|give me|find me)\s+(my|all|available)',
+                        r'^(what|how|when|where)\s+(is|are|can|do|does)',
+                        r'^(book|cancel|reschedule|modify|change)\s+(my|a|an)',
+                    ]
 
-                        # Get current action from dialog state
-                        current_action = dialog_state.collected_entities.get("action") if hasattr(dialog_state, "collected_entities") else None
+                    has_explicit_new_request = any(re.search(pattern, message_lower) for pattern in explicit_new_request_patterns)
 
-                        # Define threshold for clear switches
-                        INTENT_SWITCH_THRESHOLD = 0.75
-
-                        # Check if this is a clear intent switch OR action switch within same intent
-                        is_intent_switch = (
-                            detected_intent != dialog_state.intent and
-                            detected_confidence >= INTENT_SWITCH_THRESHOLD and
-                            detected_intent not in ["unclear_intent", "general_query"]
-                        )
-
-                        is_action_switch = (
-                            detected_intent == dialog_state.intent and
-                            detected_action is not None and
-                            current_action is not None and
-                            detected_action != current_action and
-                            detected_confidence >= INTENT_SWITCH_THRESHOLD
-                        )
-
-                        if is_intent_switch or is_action_switch:
-                            switch_type = "intent" if is_intent_switch else "action"
-                            self.logger.info(
-                                f"{switch_type.capitalize()} switch detected: {dialog_state.intent}:{current_action} -> {detected_intent}:{detected_action} "
-                                f"(confidence: {detected_confidence:.2f}). Clearing dialog state and processing new request."
-                            )
-
-                            # Clear the old dialog state
-                            await dialog_manager.clear_state(session_id)
-
-                            # Process the new intent/action
-                            primary_intent_obj = intent_check_result.intents[0]
-
-                            # Route to appropriate agent for the new intent
-                            response = await self._route_to_agent(
-                                intent_result=primary_intent_obj,
-                                user=user,
-                                session_id=session_id,
+                    if has_explicit_new_request:
+                        self.logger.info(f"Explicit new request detected: '{message[:50]}...'. Checking for intent switch.")
+                        # Only in this case, check for intent switch
+                        try:
+                            intent_check_result, _ = await self.intent_classifier.classify(
                                 message=message,
-                                conversation_history=conversation_history
+                                conversation_history=conversation_history,
+                                dialog_state=None  # Classify WITHOUT context to detect clear switches
                             )
 
-                            # Store conversation
-                            await self._store_conversation(
-                                user_id=user_id,
-                                session_id=session_id,
-                                user_message=message,
-                                assistant_response=response["response"],
-                                intent=detected_intent,
-                                agent_used=response.get("agent_used", "unknown")
+                            detected_intent = intent_check_result.primary_intent
+                            detected_confidence = intent_check_result.intents[0].confidence if intent_check_result.intents else 0.0
+
+                            # Very high threshold for switching from complaint
+                            INTENT_SWITCH_THRESHOLD = 0.90
+
+                            is_intent_switch = (
+                                detected_intent != dialog_state.intent and
+                                detected_confidence >= INTENT_SWITCH_THRESHOLD and
+                                detected_intent not in ["unclear_intent", "general_query"]
                             )
 
-                            return {
-                                "response": response["response"],
-                                "intent": detected_intent,
-                                "confidence": detected_confidence,
-                                "agent_used": response.get("agent_used", "unknown"),
-                                "classification_method": f"{switch_type}_switch",
-                                "metadata": {
-                                    **response.get("metadata", {}),
-                                    "previous_intent": dialog_state.intent,
-                                    "previous_action": current_action,
-                                    "new_action": detected_action,
-                                    "switched_from_dialog_state": True
+                            if is_intent_switch:
+                                self.logger.info(
+                                    f"Intent switch detected: {dialog_state.intent} -> {detected_intent} "
+                                    f"(confidence: {detected_confidence:.2f}). Clearing dialog state and processing new request."
+                                )
+
+                                # Clear the old dialog state
+                                await dialog_manager.clear_state(session_id)
+
+                                # Process the new intent
+                                primary_intent_obj = intent_check_result.intents[0]
+
+                                # Route to appropriate agent for the new intent
+                                response = await self._route_to_agent(
+                                    intent_result=primary_intent_obj,
+                                    user=user,
+                                    session_id=session_id,
+                                    message=message,
+                                    conversation_history=conversation_history
+                                )
+
+                                # Store conversation
+                                await self._store_conversation(
+                                    user_id=user_id,
+                                    session_id=session_id,
+                                    user_message=message,
+                                    assistant_response=response["response"],
+                                    intent=detected_intent,
+                                    agent_used=response.get("agent_used", "unknown")
+                                )
+
+                                return {
+                                    "response": response["response"],
+                                    "intent": detected_intent,
+                                    "confidence": detected_confidence,
+                                    "agent_used": response.get("agent_used", "unknown"),
+                                    "classification_method": "intent_switch",
+                                    "metadata": {
+                                        **response.get("metadata", {}),
+                                        "previous_intent": dialog_state.intent,
+                                        "switched_from_dialog_state": True
+                                    }
                                 }
-                            }
-                        else:
-                            self.logger.info(
-                                f"No clear intent/action switch detected. Continuing with slot-filling for {dialog_state.intent}:{current_action} "
-                                f"(detected: {detected_intent}:{detected_action}, confidence: {detected_confidence:.2f})"
+                            else:
+                                self.logger.info(
+                                    f"No clear intent switch detected. Continuing with slot-filling for {dialog_state.intent} "
+                                    f"(detected: {detected_intent}, confidence: {detected_confidence:.2f})"
+                                )
+
+                        except Exception as e:
+                            self.logger.warning(f"Error checking for intent switch: {e}. Continuing with slot-filling.")
+                    else:
+                        self.logger.info(
+                            f"No explicit new request detected during complaint slot-filling. "
+                            f"Treating message as follow-up response for complaint. Message: '{message[:50]}...'"
+                        )
+                        # Skip intent switch detection completely for complaint follow-ups
+
+                # For other intents (booking, service_inquiry, etc.), use the original logic
+                elif dialog_state.intent != IntentType.COMPLAINT:
+                    word_count = len(message_lower.split())
+
+                    # Intent keywords that indicate a clear new intent (not just a follow-up response)
+                    explicit_intent_keywords = [
+                        'what', 'show', 'list', 'tell', 'give', 'find', 'search',
+                        'book', 'cancel', 'reschedule', 'modify', 'change',
+                        'policy', 'refund', 'terms', 'conditions',
+                        'help', 'how', 'why', 'when', 'where', 'who'
+                    ]
+
+                    has_explicit_intent = any(keyword in message_lower for keyword in explicit_intent_keywords)
+
+                    # If it's a short response (1-3 words) without explicit intent keywords,
+                    # treat it as a follow-up response and skip intent switch detection
+                    if 1 <= word_count <= 3 and not has_explicit_intent:
+                        self.logger.info(f"Short follow-up response detected ('{message}'), skipping intent switch detection")
+                    else:
+                        # Classify the current message to detect potential intent/action switch
+                        try:
+                            intent_check_result, _ = await self.intent_classifier.classify(
+                                message=message,
+                                conversation_history=conversation_history,
+                                dialog_state=None  # Classify WITHOUT context to detect clear switches
                             )
 
-                    except Exception as e:
-                        self.logger.warning(f"Error checking for intent/action switch: {e}. Continuing with slot-filling.")
+                            # Get the detected intent and entities
+                            detected_intent = intent_check_result.primary_intent
+                            detected_entities = intent_check_result.intents[0].entities if intent_check_result.intents else {}
+                            detected_action = detected_entities.get("action")
+                            detected_confidence = intent_check_result.intents[0].confidence if intent_check_result.intents else 0.0
+
+                            # Get current action from dialog state
+                            current_action = dialog_state.collected_entities.get("action") if hasattr(dialog_state, "collected_entities") else None
+
+                            # Define threshold for clear switches
+                            INTENT_SWITCH_THRESHOLD = 0.75
+
+                            # Check if this is a clear intent switch OR action switch within same intent
+                            is_intent_switch = (
+                                detected_intent != dialog_state.intent and
+                                detected_confidence >= INTENT_SWITCH_THRESHOLD and
+                                detected_intent not in ["unclear_intent", "general_query"]
+                            )
+
+                            is_action_switch = (
+                                detected_intent == dialog_state.intent and
+                                detected_action is not None and
+                                current_action is not None and
+                                detected_action != current_action and
+                                detected_confidence >= INTENT_SWITCH_THRESHOLD
+                            )
+
+                            if is_intent_switch or is_action_switch:
+                                switch_type = "intent" if is_intent_switch else "action"
+                                self.logger.info(
+                                    f"{switch_type.capitalize()} switch detected: {dialog_state.intent}:{current_action} -> {detected_intent}:{detected_action} "
+                                    f"(confidence: {detected_confidence:.2f}). Clearing dialog state and processing new request."
+                                )
+
+                                # Clear the old dialog state
+                                await dialog_manager.clear_state(session_id)
+
+                                # Process the new intent/action
+                                primary_intent_obj = intent_check_result.intents[0]
+
+                                # Route to appropriate agent for the new intent
+                                response = await self._route_to_agent(
+                                    intent_result=primary_intent_obj,
+                                    user=user,
+                                    session_id=session_id,
+                                    message=message,
+                                    conversation_history=conversation_history
+                                )
+
+                                # Store conversation
+                                await self._store_conversation(
+                                    user_id=user_id,
+                                    session_id=session_id,
+                                    user_message=message,
+                                    assistant_response=response["response"],
+                                    intent=detected_intent,
+                                    agent_used=response.get("agent_used", "unknown")
+                                )
+
+                                return {
+                                    "response": response["response"],
+                                    "intent": detected_intent,
+                                    "confidence": detected_confidence,
+                                    "agent_used": response.get("agent_used", "unknown"),
+                                    "classification_method": f"{switch_type}_switch",
+                                    "metadata": {
+                                        **response.get("metadata", {}),
+                                        "previous_intent": dialog_state.intent,
+                                        "previous_action": current_action,
+                                        "new_action": detected_action,
+                                        "switched_from_dialog_state": True
+                                    }
+                                }
+                            else:
+                                self.logger.info(
+                                    f"No clear intent/action switch detected. Continuing with slot-filling for {dialog_state.intent}:{current_action} "
+                                    f"(detected: {detected_intent}:{detected_action}, confidence: {detected_confidence:.2f})"
+                                )
+
+                        except Exception as e:
+                            self.logger.warning(f"Error checking for intent/action switch: {e}. Continuing with slot-filling.")
 
             # If there's an active dialog state for slot-filling, use slot-filling service
             # Use explicit None check and getattr to avoid evaluating SQLAlchemy ColumnElement in boolean context
