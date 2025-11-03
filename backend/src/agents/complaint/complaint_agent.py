@@ -204,7 +204,7 @@ class ComplaintAgent:
                 "priority": priority.value,
                 "sla_response_hours": self.SLA_RESPONSE_TIME[priority],
                 "sla_resolution_hours": self.SLA_RESOLUTION_TIME[priority],
-                "booking_number": booking.booking_number if booking else None,
+                "booking_number": booking.order_id if booking else None,
                 "is_critical": priority == ComplaintPriority.CRITICAL
             },
             conversation_history=None,  # TODO: Pass conversation history from coordinator
@@ -222,7 +222,7 @@ class ComplaintAgent:
                 "response_due_at": response_due_at.isoformat(),
                 "resolution_due_at": resolution_due_at.isoformat(),
                 "booking_id": booking.id if booking else None,
-                "booking_number": booking.booking_number if booking else None
+                "order_id": booking.order_id if booking else None
             }
         }
     
