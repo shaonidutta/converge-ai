@@ -1119,10 +1119,22 @@ async def generate_question_node(
 
                 logger.info(f"[generate_question_node] 🔄 Updating dialog state to AWAITING_CONFIRMATION for session {state['session_id']}")
 
+                # Prepare pending action with collected entities for agent execution
+                intent_config = INTENT_CONFIGS.get(intent_enum)
+                agent_name = intent_config.agent if intent_config else "unknown"
+
+                pending_action = {
+                    "action_type": "execute_agent",
+                    "intent": primary_intent,
+                    "collected_entities": state.get('collected_entities', {}),
+                    "agent": agent_name
+                }
+
                 await dialog_manager.update_state(
                     session_id=state['session_id'],
                     update_data=DialogStateUpdate(
                         state=DialogStateType.AWAITING_CONFIRMATION,
+                        pending_action=pending_action,
                         context={"last_question": confirmation, "awaiting_confirmation": True}
                     )
                 )

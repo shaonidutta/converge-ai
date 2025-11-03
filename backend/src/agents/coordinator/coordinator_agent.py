@@ -221,6 +221,26 @@ class CoordinatorAgent:
                                 session_id=session_id
                             )
                             response["agent_used"] = "reschedule"
+
+                        elif action_type == "execute_agent":
+                            # Execute confirmed agent action (e.g., complaint creation)
+                            intent = pending_action.get("intent")
+                            collected_entities = pending_action.get("collected_entities", {})
+                            agent_name = pending_action.get("agent", "unknown")
+
+                            self.logger.info(f"[COORDINATOR] Executing confirmed {intent} action with agent {agent_name}")
+
+                            # Execute the appropriate agent
+                            response = await self._execute_agent(
+                                intent=intent,
+                                entities=collected_entities,
+                                user=user,
+                                session_id=session_id,
+                                message=message,
+                                conversation_history=[]
+                            )
+                            response["agent_used"] = agent_name.lower()
+
                         else:
                             # Unknown action type
                             response = {

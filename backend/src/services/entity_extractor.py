@@ -1083,6 +1083,8 @@ class EntityExtractor:
 
     def _extract_description(self, message: str, context: Dict[str, Any]) -> Optional[EntityExtractionResult]:
         """Extract description for complaints and other detailed explanations"""
+        logger.info(f"[EntityExtractor] _extract_description called with message: '{message[:50]}...'")
+
         # Clean the message
         cleaned_message = message.strip()
 
@@ -1093,6 +1095,7 @@ class EntityExtractor:
 
             # Accept almost any multi-word message as description
             if word_count >= 2:  # Lowered from 3 to 2 words
+                logger.info(f"[EntityExtractor] ✅ Description extracted: '{cleaned_message[:50]}...' (confidence: 0.95)")
                 return EntityExtractionResult(
                     entity_type=EntityType.DESCRIPTION.value,
                     entity_value=cleaned_message,
@@ -1103,6 +1106,7 @@ class EntityExtractor:
 
         # Even single words can be descriptions if they're meaningful
         if len(cleaned_message) >= 3:  # At least 3 characters
+            logger.info(f"[EntityExtractor] ✅ Short description extracted: '{cleaned_message}' (confidence: 0.80)")
             return EntityExtractionResult(
                 entity_type=EntityType.DESCRIPTION.value,
                 entity_value=cleaned_message,
@@ -1111,6 +1115,7 @@ class EntityExtractor:
                 extraction_method="fallback"
             )
 
+        logger.info(f"[EntityExtractor] ❌ Description not extracted - message too short: '{cleaned_message}'")
         return None
 
     def _extract_payment_type(self, message_lower: str) -> Optional[EntityExtractionResult]:
