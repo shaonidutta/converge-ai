@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.models import User, Conversation
 from src.nlp.intent.classifier import IntentClassifier
-from src.nlp.intent.config import IntentType
+from src.nlp.intent.config import IntentType as IntentTypeEnum
 from src.llm.gemini.client import LLMClient
 from src.schemas.intent import IntentClassificationResult, IntentResult
 from src.agents.policy.policy_agent import PolicyAgent
@@ -335,7 +335,7 @@ class CoordinatorAgent:
 
                 # For complaint intent, be very conservative about intent switching
                 # Only switch if user explicitly starts a completely new request with clear intent keywords
-                if dialog_state.intent == IntentType.COMPLAINT:
+                if dialog_state.intent == IntentTypeEnum.COMPLAINT:
                     # Check for VERY explicit new intent keywords that clearly indicate a new request
                     # These should be at the START of the message to indicate a new request
                     explicit_new_request_patterns = [
@@ -428,7 +428,7 @@ class CoordinatorAgent:
                         # Skip intent switch detection completely for complaint follow-ups
 
                 # For other intents (booking, service_inquiry, etc.), use the original logic
-                elif dialog_state.intent != IntentType.COMPLAINT:
+                elif dialog_state.intent != IntentTypeEnum.COMPLAINT:
                     word_count = len(message_lower.split())
 
                     # Intent keywords that indicate a clear new intent (not just a follow-up response)
@@ -803,8 +803,8 @@ class CoordinatorAgent:
                            f"method: {classification_method})")
 
             # Step 2: Check if this intent requires slot-filling
-            from src.nlp.intent.config import INTENT_CONFIGS, IntentType
-            intent_type = IntentType(intent_result.primary_intent)
+            from src.nlp.intent.config import INTENT_CONFIGS
+            intent_type = IntentTypeEnum(intent_result.primary_intent)
             intent_config = INTENT_CONFIGS.get(intent_type)
 
             # If intent requires entities and not all are collected, start slot-filling
