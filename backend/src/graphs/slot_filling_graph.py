@@ -978,11 +978,19 @@ async def determine_needed_entities_node(
 
         # Special handling for complaint - ensure correct order
         elif intent == "complaint":
-            # Order matters: issue_type first, then booking_id (to validate), then description
-            required_entities = ["issue_type", "booking_id", "description"]
+            # Order matters: issue_type first, then description
+            # booking_id is optional and will be collected if provided
+            required_entities = ["issue_type", "description"]
 
         # Filter out already collected entities
         needed = [e for e in required_entities if e not in collected]
+
+        # DEBUG: Log the calculation
+        logger.info(f"[determine_needed_entities_node] 🔍 DEBUG - Intent: {intent} (enum: {intent_enum})")
+        logger.info(f"[determine_needed_entities_node] 🔍 DEBUG - Intent config found: {intent_config is not None}")
+        logger.info(f"[determine_needed_entities_node] 🔍 DEBUG - Required entities: {required_entities}")
+        logger.info(f"[determine_needed_entities_node] 🔍 DEBUG - Collected entities: {list(collected.keys())}")
+        logger.info(f"[determine_needed_entities_node] 🔍 DEBUG - Needed entities: {needed}")
 
         # NEW: If service was pre-resolved by ServiceNameResolver, skip service_subcategory
         if '_resolved_service' in collected and 'service_subcategory' in collected:
