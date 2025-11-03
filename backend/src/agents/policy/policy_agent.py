@@ -205,7 +205,7 @@ class PolicyAgent:
         self,
         query: str,
         top_k: int = 5,
-        namespace: str = "documents"
+        namespace: str = "policies"
     ) -> List[Dict[str, Any]]:
         """
         Search for relevant policy documents in Pinecone with query preprocessing and reranking
@@ -213,7 +213,7 @@ class PolicyAgent:
         Args:
             query: User query text
             top_k: Number of results to return
-            namespace: Pinecone namespace (default: "documents")
+            namespace: Pinecone namespace (default: "policies")
 
         Returns:
             List of search results with scores and metadata
