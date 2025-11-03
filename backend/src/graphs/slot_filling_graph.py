@@ -976,7 +976,7 @@ async def determine_needed_entities_node(
 
         # Special handling for complaint - ensure correct order
         elif intent == "complaint":
-            # Order matters: issue_type first, then booking_id (for context), then description
+            # Order matters: issue_type first, then booking_id (to validate), then description
             required_entities = ["issue_type", "booking_id", "description"]
             elif action == "cancel":
                 # For cancellation, we need: booking_id

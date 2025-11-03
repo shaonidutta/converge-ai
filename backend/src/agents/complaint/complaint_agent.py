@@ -164,14 +164,12 @@ class ComplaintAgent:
         
         # Validate booking if provided
         booking = None
+        booking_not_found = False
         if booking_id:
             booking = await self._get_booking(booking_id, user)
             if not booking:
-                return {
-                    "response": f"❌ Booking {booking_id} not found. Please check the order ID.",
-                    "action_taken": "booking_not_found",
-                    "metadata": {"booking_id": booking_id}
-                }
+                booking_not_found = True
+                self.logger.warning(f"Booking {booking_id} not found for user {user.id}, creating complaint without booking link")
         
         # Calculate SLA deadlines
         now = datetime.now(timezone.utc)
@@ -209,8 +207,9 @@ class ComplaintAgent:
                 "priority": priority.value,
                 "sla_response_hours": self.SLA_RESPONSE_TIME[priority],
                 "sla_resolution_hours": self.SLA_RESOLUTION_TIME[priority],
-                "booking_number": booking.order_id if booking else None,
-                "is_critical": priority == ComplaintPriority.CRITICAL
+                "booking_number": booking.order_id if booking else booking_id,
+                "is_critical": priority == ComplaintPriority.CRITICAL,
+                "booking_not_found": booking_not_found
             },
             conversation_history=None,  # TODO: Pass conversation history from coordinator
             user_name=user.first_name
