@@ -89,6 +89,11 @@ ENTITY_QUESTION_TEMPLATES = {
             "Could you provide your Order ID?",
             "What's the Order ID you'd like to modify?"
         ],
+        IntentType.COMPLAINT: [
+            "To help you better, could you provide your Order ID for the booking this complaint is about? (e.g., ORDA5D9F532)",
+            "What's the Order ID for the service you're complaining about?",
+            "Please provide your Order ID so I can link this complaint to your booking:"
+        ],
     },
     EntityType.ISSUE_TYPE: {
         IntentType.COMPLAINT: [
