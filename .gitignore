@@ -14,6 +14,8 @@
 !backend/
 !customer-frontend/
 !ops-frontend/
+!tests/
+!.dev-logs/
 
 # EXCEPT these essential files (keep in git)
 !.gitignore
@@ -180,8 +182,9 @@ desktop.ini
 # MARKDOWN FILES
 # ============================================================================
 
-# Ignore all markdown files except README.md
+# Ignore all markdown files except README.md and .dev-logs/*.md
 *.md
 !README.md
 !**/README.md
+!.dev-logs/*.md
 
