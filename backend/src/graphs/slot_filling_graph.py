@@ -978,18 +978,6 @@ async def determine_needed_entities_node(
         elif intent == "complaint":
             # Order matters: issue_type first, then booking_id (to validate), then description
             required_entities = ["issue_type", "booking_id", "description"]
-            elif action == "cancel":
-                # For cancellation, we need: booking_id
-                required_entities = ["booking_id"]
-            elif action == "reschedule":
-                # For rescheduling, we need: booking_id, date, time
-                required_entities = ["booking_id", "date", "time"]
-            elif action == "modify":
-                # For modification, we need: booking_id + field to modify
-                required_entities = ["booking_id"]
-            elif action == "list":
-                # For listing bookings, no additional entities needed
-                required_entities = []
 
         # Filter out already collected entities
         needed = [e for e in required_entities if e not in collected]
