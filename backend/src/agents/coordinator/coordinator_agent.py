@@ -300,6 +300,121 @@ class CoordinatorAgent:
                         "metadata": {"action": "clarification_needed"}
                     }
 
+            # Check for intent/action switching before continuing with slot-filling
+            # If there's an active dialog state, check if user wants to switch to a different intent or action
+            if dialog_state is not None and getattr(dialog_state, "state", None) == DialogStateType.COLLECTING_INFO:
+                self.logger.info(f"Checking for potential intent/action switch during active dialog state: {dialog_state.intent}")
+
+                # Check if message is a short follow-up response (1-3 words without explicit intent keywords)
+                # Short responses during slot-filling should be treated as follow-up responses, not new intents
+                message_lower = message.lower().strip()
+                word_count = len(message_lower.split())
+
+                # Intent keywords that indicate a clear new intent (not just a follow-up response)
+                explicit_intent_keywords = [
+                    'what', 'show', 'list', 'tell', 'give', 'find', 'search',
+                    'book', 'cancel', 'reschedule', 'modify', 'change',
+                    'policy', 'refund', 'terms', 'conditions',
+                    'help', 'how', 'why', 'when', 'where', 'who'
+                ]
+
+                has_explicit_intent = any(keyword in message_lower for keyword in explicit_intent_keywords)
+
+                # If it's a short response (1-3 words) without explicit intent keywords,
+                # treat it as a follow-up response and skip intent switch detection
+                if 1 <= word_count <= 3 and not has_explicit_intent:
+                    self.logger.info(f"Short follow-up response detected ('{message}'), skipping intent switch detection")
+                else:
+                    # Classify the current message to detect potential intent/action switch
+                    try:
+                        intent_check_result, _ = await self.intent_classifier.classify(
+                            message=message,
+                            conversation_history=conversation_history,
+                            dialog_state=None  # Classify WITHOUT context to detect clear switches
+                        )
+
+                        # Get the detected intent and entities
+                        detected_intent = intent_check_result.primary_intent
+                        detected_entities = intent_check_result.intents[0].entities if intent_check_result.intents else {}
+                        detected_action = detected_entities.get("action")
+                        detected_confidence = intent_check_result.intents[0].confidence if intent_check_result.intents else 0.0
+
+                        # Get current action from dialog state
+                        current_action = dialog_state.collected_entities.get("action") if hasattr(dialog_state, "collected_entities") else None
+
+                        # Define threshold for clear switches
+                        INTENT_SWITCH_THRESHOLD = 0.75
+
+                        # Check if this is a clear intent switch OR action switch within same intent
+                        is_intent_switch = (
+                            detected_intent != dialog_state.intent and
+                            detected_confidence >= INTENT_SWITCH_THRESHOLD and
+                            detected_intent not in ["unclear_intent", "general_query"]
+                        )
+
+                        is_action_switch = (
+                            detected_intent == dialog_state.intent and
+                            detected_action is not None and
+                            current_action is not None and
+                            detected_action != current_action and
+                            detected_confidence >= INTENT_SWITCH_THRESHOLD
+                        )
+
+                        if is_intent_switch or is_action_switch:
+                            switch_type = "intent" if is_intent_switch else "action"
+                            self.logger.info(
+                                f"{switch_type.capitalize()} switch detected: {dialog_state.intent}:{current_action} -> {detected_intent}:{detected_action} "
+                                f"(confidence: {detected_confidence:.2f}). Clearing dialog state and processing new request."
+                            )
+
+                            # Clear the old dialog state
+                            await dialog_manager.clear_state(session_id)
+
+                            # Process the new intent/action
+                            primary_intent_obj = intent_check_result.intents[0]
+
+                            # Route to appropriate agent for the new intent
+                            response = await self._route_to_agent(
+                                intent_result=primary_intent_obj,
+                                user=user,
+                                session_id=session_id,
+                                message=message,
+                                conversation_history=conversation_history
+                            )
+
+                            # Store conversation
+                            await self._store_conversation(
+                                user_id=user_id,
+                                session_id=session_id,
+                                user_message=message,
+                                assistant_response=response["response"],
+                                intent=detected_intent,
+                                agent_used=response.get("agent_used", "unknown")
+                            )
+
+                            return {
+                                "response": response["response"],
+                                "intent": detected_intent,
+                                "confidence": detected_confidence,
+                                "agent_used": response.get("agent_used", "unknown"),
+                                "classification_method": f"{switch_type}_switch",
+                                "metadata": {
+                                    **response.get("metadata", {}),
+                                    "previous_intent": dialog_state.intent,
+                                    "previous_action": current_action,
+                                    "new_action": detected_action,
+                                    "switched_from_dialog_state": True
+                                }
+                            }
+                        else:
+                            self.logger.info(
+                                f"No clear intent/action switch detected. Continuing with slot-filling for {dialog_state.intent}:{current_action} "
+                                f"(detected: {detected_intent}:{detected_action}, confidence: {detected_confidence:.2f})"
+                            )
+
+                    except Exception as e:
+                        self.logger.warning(f"Error checking for intent/action switch: {e}. Continuing with slot-filling.")
+
             # If there's an active dialog state for slot-filling, use slot-filling service
             # Use explicit None check and getattr to avoid evaluating SQLAlchemy ColumnElement in boolean context
             if dialog_state is not None and getattr(dialog_state, "state", None) == DialogStateType.COLLECTING_INFO:
@@ -315,7 +430,7 @@ class CoordinatorAgent:
                     classifier=self.intent_classifier,
                     dialog_manager=dialog_manager,
                     question_generator=QuestionGenerator(),
-                    entity_extractor=EntityExtractor(llm_client=self.llm_client),
+                    entity_extractor=EntityExtractor(llm_client=self.llm_client, db=self.db),
                     entity_validator=EntityValidator(self.db)
                 )
 
@@ -493,6 +608,66 @@ class CoordinatorAgent:
                     }
 
             # No active dialog state - classify intent and check if slot-filling is needed
+
+            # PRIORITY CHECK: Before intent classification, check if message is a bare category name
+            # This handles cases like "home cleaning", "plumbing", "electrical" without trigger words
+            # Only check for short messages (1-3 words) to avoid false positives
+            message_lower = message.lower().strip()
+            word_count = len(message_lower.split())
+
+            if 1 <= word_count <= 3:
+                try:
+                    from src.agents.service.service_agent import CategoryMatcher
+                    category_matcher = CategoryMatcher(self.db)
+                    match_result = await category_matcher.match_category(message_lower)
+
+                    # Only use exact matches (confidence = 1.0) to avoid false positives
+                    if match_result and match_result["confidence"] == 1.0 and match_result["method"] == "exact":
+                        self.logger.info(f"[COORDINATOR] Bare category name detected: '{message}' -> routing to ServiceAgent")
+
+                        # Route directly to ServiceAgent with service_information intent
+                        from src.schemas.intent import IntentResult
+                        import json
+                        category_name = match_result["category"]["name"]
+                        service_intent = IntentResult(
+                            intent="service_information",
+                            confidence=1.0,
+                            entities_json=json.dumps({"service_keyword": category_name})
+                        )
+
+                        response = await self._route_to_agent(
+                            intent_result=service_intent,
+                            user=user,
+                            session_id=session_id,
+                            message=message,
+                            conversation_history=conversation_history
+                        )
+
+                        # Store conversation
+                        await self._store_conversation(
+                            user_id=user_id,
+                            session_id=session_id,
+                            user_message=message,
+                            assistant_response=response["response"],
+                            intent="service_information",
+                            agent_used=response.get("agent_used", "service")
+                        )
+
+                        return {
+                            "response": response["response"],
+                            "intent": "service_information",
+                            "confidence": 1.0,
+                            "agent_used": response.get("agent_used", "service"),
+                            "classification_method": "bare_category_match",
+                            "metadata": {
+                                **response.get("metadata", {}),
+                                "category_match": match_result
+                            }
+                        }
+                except Exception as e:
+                    self.logger.warning(f"Error checking for bare category name: {e}")
+                    # Continue with normal intent classification
+
             # Step 1: Classify intent
             intent_result, classification_method = await self.intent_classifier.classify(
                 message=message,
@@ -547,6 +722,10 @@ class CoordinatorAgent:
                             required_entities = []  # booking_filter or service_type is enough
                         else:
                             required_entities = ["booking_id"]
+                    elif action == "list":
+                        # For list: no required entities, optional status_filter, sort_by, limit
+                        required_entities = []
+                        self.logger.info(f"[COORDINATOR] List action detected with optional filters: status_filter={collected_entities.get('status_filter')}, sort_by={collected_entities.get('sort_by')}, limit={collected_entities.get('limit')}")
 
                     self.logger.info(f"[COORDINATOR] booking_management action={action}, required_entities={required_entities}")
 

@@ -817,11 +817,13 @@ class EntityExtractor:
             # Resolve service name using ServiceNameResolver
             resolution = await self.service_resolver.resolve(message, context)
 
+            logger.info(f"[EntityExtractor] ServiceNameResolver result: resolved={resolution.resolved}, error={resolution.error_message}")
+
             if not resolution.resolved:
                 logger.info(f"[EntityExtractor] Service name not resolved: {resolution.error_message}")
                 return None
 
-            logger.info(f"[EntityExtractor] Service name resolved: {resolution.service_name or resolution.subcategory_name or resolution.category_name} (confidence: {resolution.confidence}, method: {resolution.method})")
+            logger.info(f"[EntityExtractor] ✅ Service name resolved: {resolution.service_name or resolution.subcategory_name or resolution.category_name} (confidence: {resolution.confidence}, method: {resolution.method}, category_id={resolution.category_id}, subcategory_id={resolution.subcategory_id})")
 
             # Build metadata to pass to booking flow
             metadata = {
@@ -866,7 +868,7 @@ class EntityExtractor:
             # General services
             "ac": ["ac", "air conditioning", "hvac", "air conditioner", "cooling"],
             "plumbing": ["plumbing", "plumber", "pipe", "leak", "tap", "faucet", "drain"],
-            "cleaning": ["cleaning", "clean", "house cleaning", "deep cleaning", "sanitization"],
+            "cleaning": ["house cleaning", "home cleaning", "deep cleaning", "sanitization"],
             "electrical": ["electrical", "electrician", "wiring", "switch", "light", "power"],
             "painting": ["painting", "paint", "painter", "wall painting"],
             "pest_control": ["pest control", "pest", "pest service", "general pest control", "pest control service", "exterminator", "fumigation"],
@@ -877,6 +879,33 @@ class EntityExtractor:
             "salon_for_men": ["men salon", "barber", "gents salon", "male grooming", "men's salon"],
             "packers_and_movers": ["packers", "movers", "packing", "moving", "relocation", "shifting", "packers and movers"]
         }
+
+        # Check for specific subcategory names first
+        # Map subcategory keywords to their parent categories
+        subcategory_to_category = {
+            "kitchen cleaning": ("cleaning", "Kitchen Cleaning"),
+            "bathroom cleaning": ("cleaning", "Bathroom Cleaning"),
+            "sofa cleaning": ("cleaning", "Sofa Cleaning"),
+            "carpet cleaning": ("cleaning", "Carpet Cleaning"),
+            "window cleaning": ("cleaning", "Window Cleaning"),
+            "move-in cleaning": ("cleaning", "Move-in/Move-out Cleaning"),
+            "move-out cleaning": ("cleaning", "Move-in/Move-out Cleaning"),
+            "regular cleaning": ("cleaning", "Regular Cleaning"),
+            "deep cleaning": ("cleaning", "Deep Cleaning")
+        }
+
+        for subcategory, (category, subcategory_name) in subcategory_to_category.items():
+            if subcategory in message_lower:
+                # Extract category but add metadata indicating specific subcategory
+                logger.info(f"[_extract_service_type] Found subcategory keyword '{subcategory}', extracting category '{category}' with subcategory hint")
+                return EntityExtractionResult(
+                    entity_type=EntityType.SERVICE_TYPE.value,
+                    entity_value=category,
+                    confidence=0.95,  # High confidence for exact subcategory match
+                    normalized_value=category,
+                    extraction_method="pattern_subcategory",
+                    metadata={"subcategory_hint": subcategory_name}
+                )
 
         for service_type, keywords in service_keywords.items():
             for keyword in keywords:
@@ -927,6 +956,25 @@ class EntityExtractor:
             )
 
         logger.info(f"[EntityExtractor] Available subcategories: {[sub.get('name', '') for sub in available_subcategories]}")
+
+        # Check if user input is a numeric selection (e.g., "3" to select option 3)
+        if message_lower.strip().isdigit():
+            selection_index = int(message_lower.strip()) - 1  # Convert to 0-based index
+            if 0 <= selection_index < len(available_subcategories):
+                selected_subcategory = available_subcategories[selection_index]
+                subcategory_name = selected_subcategory.get('name', '')
+                subcategory_id = selected_subcategory.get('id')
+                logger.info(f"[EntityExtractor] Numeric selection: {message_lower} -> {subcategory_name} (ID: {subcategory_id})")
+                return EntityExtractionResult(
+                    entity_type=EntityType.SERVICE_SUBCATEGORY.value,
+                    entity_value=subcategory_name.lower(),
+                    confidence=0.95,
+                    normalized_value=subcategory_name.lower(),
+                    extraction_method="numeric_selection",
+                    metadata={"subcategory_id": subcategory_id, "subcategory_name": subcategory_name}
+                )
+            else:
+                logger.warning(f"[EntityExtractor] Numeric selection {message_lower} is out of range (1-{len(available_subcategories)})")
 
         # Try to match user input against available subcategories
         # Use fuzzy matching to handle variations like "deep clean" vs "deep cleaning"

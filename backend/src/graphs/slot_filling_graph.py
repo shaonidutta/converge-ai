@@ -300,7 +300,13 @@ async def extract_initial_entities_node(
         collected_entities = state.get('collected_entities', {})
 
         # Only try to extract service_type for booking_management intent
-        if intent == "booking_management" and 'service_type' not in collected_entities:
+        # Re-extract if service_type exists but doesn't have resolved service metadata
+        should_extract = (
+            intent == "booking_management" and
+            ('service_type' not in collected_entities or '_resolved_service' not in collected_entities)
+        )
+
+        if should_extract:
             logger.info(f"[extract_initial_entities_node] Attempting to extract service_type from: '{message}'")
 
             # Try to extract service name using ServiceNameResolver
@@ -342,6 +348,18 @@ async def extract_initial_entities_node(
                     if service_name:
                         collected_entities['_service_name'] = service_name
                         logger.info(f"[extract_initial_entities_node] Stored service name for context: {service_name}")
+                elif extraction_result.metadata and 'subcategory_hint' in extraction_result.metadata:
+                    # Service extracted with subcategory hint (e.g., "kitchen cleaning" -> category="cleaning", hint="Kitchen Cleaning")
+                    subcategory_hint = extraction_result.metadata['subcategory_hint']
+                    logger.info(f"[extract_initial_entities_node] ✅ Service extracted with subcategory hint: {subcategory_hint}")
+
+                    # Store category
+                    collected_entities['service_type'] = extraction_result.entity_value
+                    logger.info(f"[extract_initial_entities_node] Extracted service_type: {extraction_result.entity_value}")
+
+                    # Store subcategory hint for later resolution
+                    collected_entities['_subcategory_hint'] = subcategory_hint
+                    logger.info(f"[extract_initial_entities_node] Stored subcategory hint: {subcategory_hint}")
                 else:
                     # Regular service_type extraction (category only)
                     collected_entities['service_type'] = extraction_result.entity_value
@@ -589,6 +607,13 @@ async def validate_entity_node(
             entity_type = extracted['entity_type']
             entity_value = extracted.get('normalized_value') or extracted['entity_value']
 
+            # Check if extracted entity has subcategory hint metadata
+            if entity_type == 'service_type' and extracted.get('metadata') and 'subcategory_hint' in extracted.get('metadata', {}):
+                subcategory_hint = extracted['metadata']['subcategory_hint']
+                logger.info(f"[validate_entity_node] ✅ Found subcategory hint in extracted entity: {subcategory_hint}")
+                # Store subcategory hint in collected_entities for later use
+                collected_entities['_subcategory_hint'] = subcategory_hint
+
         # NEW: Check if we need to validate a collected service_type (subcategory validation flow)
         elif 'service_type' in collected_entities:
             logger.info(f"[validate_entity_node] Validating collected service_type: {collected_entities['service_type']}")
@@ -631,6 +656,7 @@ async def validate_entity_node(
         result = {
             "validation_result": validation_result.model_dump(),
             "extracted_entity": extracted,  # Ensure extracted_entity is available for downstream nodes
+            "collected_entities": collected_entities,  # Include updated collected_entities (may have subcategory hint)
             "metadata": {
                 **state.get("metadata", {}),
                 "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["validate_entity_node"]
@@ -641,27 +667,84 @@ async def validate_entity_node(
         if not validation_result.is_valid and entity_type == 'service_type':
             metadata = validation_result.metadata or {}
             if metadata.get('requires_subcategory_selection', False):
-                logger.info(f"[validate_entity_node] Service requires subcategory selection, updating needed entities")
+                logger.info(f"[validate_entity_node] Service requires subcategory selection, checking if already collected...")
 
-                # Add service_subcategory to needed entities (at the beginning)
-                current_needed = state.get('needed_entities', [])
-                if 'service_subcategory' not in current_needed:
-                    updated_needed = ['service_subcategory'] + current_needed
-                    result['needed_entities'] = updated_needed
-                    logger.info(f"[validate_entity_node] Updated needed_entities: {updated_needed}")
+                # Check if service_subcategory is already collected (pre-resolved by ServiceNameResolver)
+                if 'service_subcategory' in collected_entities:
+                    logger.info(f"[validate_entity_node] ✅ service_subcategory already collected (pre-resolved), skipping subcategory selection")
+                    # Mark validation as successful since subcategory is already resolved
+                    result['validation_result'] = {
+                        "is_valid": True,
+                        "normalized_value": entity_value,
+                        "metadata": {
+                            "requires_subcategory_selection": False,
+                            "subcategory_pre_resolved": True
+                        }
+                    }
+                # Check if we have a subcategory hint from extraction
+                elif '_subcategory_hint' in collected_entities:
+                    subcategory_hint = collected_entities['_subcategory_hint']
+                    logger.info(f"[validate_entity_node] ✅ Found subcategory hint: {subcategory_hint}, resolving to subcategory ID...")
 
-                # Add validation error for question generation
-                error_message = validation_result.error_message or "Please specify the service type"
-                result['validation_errors'] = state.get('validation_errors', []) + [error_message]
+                    # Resolve subcategory hint to subcategory ID
+                    available_subcategories = metadata.get('available_subcategories', [])
+                    logger.info(f"[validate_entity_node] Available subcategories: {[s.get('name') for s in available_subcategories]}")
 
-                # Add subcategory metadata for question generation
-                result['metadata'].update({
-                    'available_subcategories': metadata.get('available_subcategories', []),
-                    'service_type': entity_value,
-                    'requires_subcategory_selection': True
-                })
+                    subcategory_id = None
+                    subcategory_hint_lower = subcategory_hint.lower().strip()
 
-                logger.info(f"[validate_entity_node] Added subcategory metadata: available={metadata.get('available_subcategories', [])}")
+                    for subcat in available_subcategories:
+                        subcat_name = subcat.get('name', '').lower().strip()
+                        # Try exact match first
+                        if subcat_name == subcategory_hint_lower:
+                            subcategory_id = subcat.get('id')
+                            logger.info(f"[validate_entity_node] ✅ Exact match: Resolved '{subcategory_hint}' to ID: {subcategory_id}")
+                            break
+                        # Try partial match (e.g., "Kitchen Cleaning" matches "kitchen cleaning")
+                        if subcategory_hint_lower in subcat_name or subcat_name in subcategory_hint_lower:
+                            subcategory_id = subcat.get('id')
+                            logger.info(f"[validate_entity_node] ✅ Partial match: Resolved '{subcategory_hint}' to '{subcat.get('name')}' (ID: {subcategory_id})")
+                            break
+
+                    if subcategory_id:
+                        # Store subcategory ID in collected_entities
+                        collected_entities['service_subcategory'] = str(subcategory_id)
+                        result['collected_entities'] = collected_entities
+
+                        # Mark validation as successful
+                        result['validation_result'] = {
+                            "is_valid": True,
+                            "normalized_value": entity_value,
+                            "metadata": {
+                                "requires_subcategory_selection": False,
+                                "subcategory_resolved_from_hint": True,
+                                "subcategory_id": subcategory_id
+                            }
+                        }
+                        logger.info(f"[validate_entity_node] ✅ Subcategory resolved from hint, skipping subcategory selection")
+                    else:
+                        logger.warning(f"[validate_entity_node] ⚠️ Could not resolve subcategory hint '{subcategory_hint}' to ID. Available: {[s.get('name') for s in available_subcategories]}")
+                        # Fall through to normal subcategory selection
+                else:
+                    # Add service_subcategory to needed entities (at the beginning)
+                    current_needed = state.get('needed_entities', [])
+                    if 'service_subcategory' not in current_needed:
+                        updated_needed = ['service_subcategory'] + current_needed
+                        result['needed_entities'] = updated_needed
+                        logger.info(f"[validate_entity_node] Updated needed_entities: {updated_needed}")
+
+                    # Add validation error for question generation
+                    error_message = validation_result.error_message or "Please specify the service type"
+                    result['validation_errors'] = state.get('validation_errors', []) + [error_message]
+
+                    # Add subcategory metadata for question generation
+                    result['metadata'].update({
+                        'available_subcategories': metadata.get('available_subcategories', []),
+                        'service_type': entity_value,
+                        'requires_subcategory_selection': True
+                    })
+
+                    logger.info(f"[validate_entity_node] Added subcategory metadata: available={metadata.get('available_subcategories', [])}")
 
         return result
 
@@ -1389,6 +1472,12 @@ def create_slot_filling_graph(
         if 'service_type' in collected_entities:
             service_type = collected_entities['service_type']
             logger.info(f"[route_after_follow_up_check] Found service_type='{service_type}', checking if validation needed")
+
+            # If we don't have _resolved_service metadata, try to extract it first
+            # This allows ServiceNameResolver to resolve specific service names like "kitchen cleaning"
+            if '_resolved_service' not in collected_entities:
+                logger.info(f"[route_after_follow_up_check] No _resolved_service metadata, routing to extract_initial_entities to try service name resolution")
+                return "new_intent"
 
             # Services that require subcategory selection (all multi-option services)
             # Include all possible service name variations for compatibility
