@@ -237,6 +237,29 @@ const BookingDetailPage = () => {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column - Details */}
                 <div className="lg:col-span-2 space-y-6">
+                  {/* Booking Information */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 }}
+                    className="bg-gradient-to-br from-primary-50 to-secondary-50 rounded-xl border border-primary-200 p-6"
+                  >
+                    <h2 className="text-lg font-bold text-slate-900 mb-4">
+                      Booking Information
+                    </h2>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                        <FileText className="h-5 w-5 text-primary-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-600">Order ID</p>
+                        <p className="font-mono font-bold text-slate-900 text-lg">
+                          {booking.order_id}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+
                   {/* Schedule Details */}
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
