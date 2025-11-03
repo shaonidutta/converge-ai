@@ -63,7 +63,8 @@ class IntentPatterns:
         IntentType.COMPLAINT: [
             "complaint", "complain", "issue", "problem", "not satisfied",
             "poor service", "bad service", "unhappy", "disappointed",
-            "technician was rude", "damage", "broken", "not working"
+            "technician was rude", "damage", "broken", "not working",
+            "file a complaint", "want to file a complaint", "lodge a complaint"
         ],
         IntentType.PAYMENT_ISSUE: [
             "payment failed", "payment not working", "payment issue",
@@ -158,6 +159,8 @@ class IntentPatterns:
             r"\b(complaint|complain|issue|problem)\s+(about|with)",
             r"\b(poor|bad|terrible)\s+service",
             r"\btechnician\s+(was|is)\s+(rude|late|unprofessional)",
+            r"\b(file|lodge|submit)\s+(a\s+)?complaint",
+            r"\bwant\s+to\s+(file|lodge|submit)\s+(a\s+)?complaint",
         ],
         IntentType.POLICY_INQUIRY: [
             # Direct policy questions
