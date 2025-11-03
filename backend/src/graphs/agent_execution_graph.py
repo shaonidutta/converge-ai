@@ -190,12 +190,23 @@ async def execute_parallel_agents_node(
         logger.info(f"[execute_parallel_agents_node] Executing {len(independent_intents)} agents in parallel")
 
         start_time = datetime.now(timezone.utc)
-        
+
         # Create tasks for parallel execution
         tasks = []
         for intent in independent_intents:
+            # Convert dict to IntentResult if needed
+            from src.schemas.intent import IntentResult
+            if isinstance(intent, dict):
+                intent_result = IntentResult(
+                    intent=intent.get("intent", ""),
+                    confidence=intent.get("confidence", 0.5),
+                    entities_json=intent.get("entities_json", None)
+                )
+            else:
+                intent_result = intent
+
             task = coordinator_agent._route_to_agent_with_timing(
-                intent_result=intent,
+                intent_result=intent_result,
                 user=state.get("user"),
                 session_id=state.get("session_id", "")
             )
@@ -306,18 +317,24 @@ async def execute_sequential_agents_node(
         agents_used = []
         
         for intent in dependent_intents:
-            # Add context from previous responses
-            intent_with_context = {
-                **intent,
-                "context": {
-                    "parallel_results": parallel_responses,
-                    "sequential_results": sequential_responses
-                }
-            }
-            
+            # Convert dict to IntentResult if needed
+            from src.schemas.intent import IntentResult
+            if isinstance(intent, dict):
+                intent_result = IntentResult(
+                    intent=intent.get("intent", ""),
+                    confidence=intent.get("confidence", 0.5),
+                    entities_json=intent.get("entities_json", None)
+                )
+            else:
+                intent_result = intent
+
+            # Note: Context from previous responses is not added to IntentResult
+            # as it doesn't have a context field. If needed, this should be handled
+            # differently (e.g., through state or separate parameter)
+
             try:
                 response = await coordinator_agent._route_to_agent_with_timing(
-                    intent_result=intent_with_context,
+                    intent_result=intent_result,
                     user=state.get("user"),
                     session_id=state.get("session_id", "")
                 )
