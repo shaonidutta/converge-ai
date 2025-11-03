@@ -289,12 +289,20 @@ class SlotFillingService:
         """
         # Determine response type
         response_type = self._determine_response_type(final_state)
-        
+
         # Check if should trigger agent
+        # IMPORTANT: Do NOT trigger agent if we're awaiting confirmation
+        dialog_state_type = final_state.get("dialog_state_type", "")
+        is_awaiting_confirmation = (
+            dialog_state_type == "awaiting_confirmation" or
+            response_type == "confirmation"
+        )
+
         should_trigger_agent = (
             final_state.get("next_graph") == "agent_execution" or
-            (len(final_state.get("needed_entities", [])) == 0 and 
-             final_state.get("primary_intent") is not None)
+            (len(final_state.get("needed_entities", [])) == 0 and
+             final_state.get("primary_intent") is not None and
+             not is_awaiting_confirmation)  # Don't trigger if awaiting confirmation
         )
         
         return SlotFillingResponse(

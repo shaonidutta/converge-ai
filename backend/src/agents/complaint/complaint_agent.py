@@ -141,8 +141,13 @@ class ComplaintAgent:
         description = entities.get("description", message)
         subject = entities.get("subject", description[:100])  # First 100 chars as subject
         booking_id = entities.get("booking_id")
-        complaint_type_str = entities.get("complaint_type", "other")
-        
+
+        # Map issue_type to complaint_type (issue_type is collected from user, complaint_type is the enum)
+        issue_type = entities.get("issue_type")
+        complaint_type_str = entities.get("complaint_type", issue_type if issue_type else "other")
+
+        self.logger.info(f"[ComplaintAgent] Creating complaint: issue_type={issue_type}, complaint_type_str={complaint_type_str}, description_length={len(description) if description else 0}")
+
         # Validate description
         if not description or len(description) < 10:
             return {
@@ -150,7 +155,7 @@ class ComplaintAgent:
                 "action_taken": "missing_entity",
                 "metadata": {"missing": "description"}
             }
-        
+
         # Map complaint type
         complaint_type = self._map_complaint_type(complaint_type_str)
         
@@ -376,29 +381,64 @@ class ComplaintAgent:
         Map complaint type string to enum
 
         Args:
-            complaint_type_str: Complaint type string
+            complaint_type_str: Complaint type string (from issue_type or complaint_type entity)
 
         Returns:
             ComplaintType enum
         """
         type_mapping = {
+            # Service quality issues
             "service_quality": ComplaintType.SERVICE_QUALITY,
             "service quality": ComplaintType.SERVICE_QUALITY,
             "quality": ComplaintType.SERVICE_QUALITY,
+            "quality issue": ComplaintType.SERVICE_QUALITY,
+            "poor quality": ComplaintType.SERVICE_QUALITY,
+            "bad quality": ComplaintType.SERVICE_QUALITY,
+
+            # Provider behavior issues
             "provider_behavior": ComplaintType.PROVIDER_BEHAVIOR,
             "provider behavior": ComplaintType.PROVIDER_BEHAVIOR,
             "behavior": ComplaintType.PROVIDER_BEHAVIOR,
+            "technician behavior": ComplaintType.PROVIDER_BEHAVIOR,
+            "rude": ComplaintType.PROVIDER_BEHAVIOR,
+            "unprofessional": ComplaintType.PROVIDER_BEHAVIOR,
+
+            # Billing issues
             "billing": ComplaintType.BILLING,
             "payment": ComplaintType.BILLING,
             "charge": ComplaintType.BILLING,
+            "overcharge": ComplaintType.BILLING,
+            "wrong charge": ComplaintType.BILLING,
+
+            # Delay issues (includes no-show, late arrival)
             "delay": ComplaintType.DELAY,
             "late": ComplaintType.DELAY,
+            "late arrival": ComplaintType.DELAY,
+            "no-show": ComplaintType.DELAY,
+            "no show": ComplaintType.DELAY,
+            "noshow": ComplaintType.DELAY,
+            "didn't show up": ComplaintType.DELAY,
+            "didnt show up": ComplaintType.DELAY,
+            "not arrived": ComplaintType.DELAY,
+
+            # Cancellation issues
             "cancellation_issue": ComplaintType.CANCELLATION_ISSUE,
             "cancellation issue": ComplaintType.CANCELLATION_ISSUE,
             "cancellation": ComplaintType.CANCELLATION_ISSUE,
+            "cancelled": ComplaintType.CANCELLATION_ISSUE,
+
+            # Refund issues
             "refund_issue": ComplaintType.REFUND_ISSUE,
             "refund issue": ComplaintType.REFUND_ISSUE,
             "refund": ComplaintType.REFUND_ISSUE,
+            "refund not received": ComplaintType.REFUND_ISSUE,
+
+            # Damage issues
+            "damage": ComplaintType.OTHER,
+            "damaged": ComplaintType.OTHER,
+            "broken": ComplaintType.OTHER,
+
+            # Other
             "other": ComplaintType.OTHER,
         }
 

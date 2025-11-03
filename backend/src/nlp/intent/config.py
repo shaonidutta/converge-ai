@@ -170,7 +170,7 @@ INTENT_CONFIGS: Dict[IntentType, IntentConfig] = {
     IntentType.COMPLAINT: IntentConfig(
         intent=IntentType.COMPLAINT,
         description="User has a complaint or issue with service quality, technician behavior, or damage",
-        required_entities=[EntityType.ISSUE_TYPE],
+        required_entities=[EntityType.ISSUE_TYPE, EntityType.DESCRIPTION],
         optional_entities=[EntityType.BOOKING_ID, EntityType.SERVICE_TYPE],
         agent="ComplaintAgent",
         priority=10
