@@ -23,7 +23,6 @@ from typing import Dict, Any, Literal, Optional
 from datetime import datetime
 
 from langgraph.graph import StateGraph, END
-from langgraph.graph.graph import CompiledGraph
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -1364,7 +1363,7 @@ def create_slot_filling_graph(
     question_generator: QuestionGenerator,
     entity_extractor: EntityExtractor,
     entity_validator: EntityValidator
-) -> CompiledGraph:
+):
     """
     Create the Slot-Filling Graph
 
@@ -1602,7 +1601,7 @@ def create_slot_filling_graph(
     graph.add_edge("handle_error", END)
 
     # Compile graph
-    compiled_graph: CompiledGraph = graph.compile()  # type: ignore
+    compiled_graph = graph.compile()  # type: ignore
     return compiled_graph
 
 

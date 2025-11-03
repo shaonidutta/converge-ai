@@ -1,0 +1,27 @@
+
+================================================================================
+COMPLAINT FLOW TEST - SIMPLE VERSION
+================================================================================
+
+================================================================================
+STEP 1: Login
+================================================================================
+Traceback (most recent call last):
+  File "D:\my-projects\ConvergeAI\tests\test_complaint_simple.py", line 45, in test_complaint_flow
+    print(f"\u2705 Login Successful")
+  File "C:\Users\Shubham\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 0: character maps to <undefined>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\my-projects\ConvergeAI\tests\test_complaint_simple.py", line 178, in <module>
+    test_complaint_flow()
+  File "D:\my-projects\ConvergeAI\tests\test_complaint_simple.py", line 50, in test_complaint_flow
+    print(f"\u274c Login error: {e}")
+  File "C:\Users\Shubham\AppData\Local\Programs\Python\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>

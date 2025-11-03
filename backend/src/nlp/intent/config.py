@@ -65,7 +65,8 @@ class EntityType(str, Enum):
     
     # Issue entities
     ISSUE_TYPE = "issue_type"  # quality, behavior, damage, late, no_show
-    
+    DESCRIPTION = "description"  # Detailed description of issue/complaint
+
     # Payment entities
     PAYMENT_TYPE = "payment_type"  # failed, double_charged, wrong_amount, method
     
