@@ -978,9 +978,8 @@ async def determine_needed_entities_node(
 
         # Special handling for complaint - ensure correct order
         elif intent == "complaint":
-            # Order matters: issue_type first, then description
-            # booking_id is optional and will be collected if provided
-            required_entities = ["issue_type", "description"]
+            # Order matters: issue_type first, then booking_id (to validate), then description
+            required_entities = ["issue_type", "booking_id", "description"]
 
         # Filter out already collected entities
         needed = [e for e in required_entities if e not in collected]
