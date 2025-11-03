@@ -92,7 +92,12 @@ class PolicyAgent:
                     "action_taken": "query_missing",
                     "metadata": {}
                 }
-            
+
+            # Check if this is a generic policy query (e.g., "tell me about policies")
+            if self._is_generic_policy_query(query):
+                self.logger.info(f"Detected generic policy query: '{query}'")
+                return await self._handle_generic_policy_query(user, query)
+
             # Search for relevant policy documents (increased to 7 for better context)
             search_results = await self._search_policies(query, top_k=7)
             
@@ -582,4 +587,85 @@ Answer the question now using ONLY the CONTEXT above:""")
         except Exception as e:
             self.logger.error(f"Error calculating grounding score: {e}")
             return 0.5  # Return neutral score on error
+
+    def _is_generic_policy_query(self, query: str) -> bool:
+        """
+        Check if the query is a generic policy query (e.g., "tell me about policies")
+
+        Generic queries are those asking for an overview or list of policies,
+        rather than specific policy details.
+
+        Args:
+            query: User query string
+
+        Returns:
+            True if query is generic, False otherwise
+        """
+        query_lower = query.lower().strip()
+
+        # Generic policy query patterns
+        generic_patterns = [
+            # Direct policy overview requests
+            r'\b(tell|show|give|list|what|explain)\s+(me\s+)?(about\s+)?(your\s+)?(the\s+)?policies?\b',
+            r'\bwhat\s+(are\s+)?(your\s+)?policies?\b',
+            r'\bdo\s+you\s+have\s+(any\s+)?policies?\b',
+            r'\bcan\s+(you|u)\s+(tell|show|give)\s+(me\s+)?(about\s+)?(your\s+)?policies?\b',
+            r'\bpolicy\s+information\b',
+            r'\bpolicies?\s+(information|overview|details?)\b',
+
+            # Very short queries
+            r'^policies?$',
+            r'^your\s+policies?$',
+            r'^about\s+policies?$',
+        ]
+
+        import re
+        for pattern in generic_patterns:
+            if re.search(pattern, query_lower):
+                return True
+
+        return False
+
+    async def _handle_generic_policy_query(
+        self,
+        user: User,
+        query: str
+    ) -> Dict[str, Any]:
+        """
+        Handle generic policy queries by providing an overview of available policies
+
+        Args:
+            user: User object
+            query: Original query string
+
+        Returns:
+            Response dictionary with policy overview
+        """
+        user_name = user.first_name or "there"
+
+        # Generate a helpful overview response
+        response = (
+            f"Hi {user_name}! I'd be happy to help you understand our policies. "
+            f"We have comprehensive policies covering:\n\n"
+            f"• **Refund Policy** - Information about refunds and eligibility\n"
+            f"• **Cancellation Policy** - How to cancel bookings and any applicable charges\n"
+            f"• **Payment Policy** - Payment methods, terms, and conditions\n\n"
+            f"Which specific policy would you like to know more about? "
+            f"You can ask me questions like:\n"
+            f"- \"What is your refund policy?\"\n"
+            f"- \"How do I cancel a booking?\"\n"
+            f"- \"What payment methods do you accept?\""
+        )
+
+        self.logger.info(f"Handled generic policy query for user {user.id}")
+
+        return {
+            "response": response,
+            "action_taken": "generic_policy_overview",
+            "metadata": {
+                "query": query,
+                "query_type": "generic",
+                "available_policies": ["refund", "cancellation", "payment"]
+            }
+        }
 
