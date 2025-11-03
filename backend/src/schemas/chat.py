@@ -4,7 +4,7 @@ Request/Response models for chat API
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
@@ -62,6 +62,7 @@ class ChatMessageResponse(BaseModel):
     user_message: MessageResponse
     assistant_message: MessageResponse
     response_time_ms: int
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata including grounding_score, confidence, agent_used, etc.")
 
     class Config:
         json_schema_extra = {
@@ -83,7 +84,15 @@ class ChatMessageResponse(BaseModel):
                     "intent_confidence": None,
                     "created_at": "2025-10-08T10:30:01Z"
                 },
-                "response_time_ms": 1200
+                "response_time_ms": 1200,
+                "metadata": {
+                    "intent": "book_service",
+                    "intent_confidence": 0.95,
+                    "agent_used": "booking",
+                    "classification_method": "pattern",
+                    "grounding_score": 0.85,
+                    "confidence": "high"
+                }
             }
         }
 

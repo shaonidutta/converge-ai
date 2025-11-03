@@ -91,13 +91,14 @@ class ChatService:
             agent_calls=metadata  # Store full metadata in JSON field
         )
 
-        # 5. Return response
+        # 5. Return response with metadata
         logger.info(f"[ChatService] Message processed successfully: session={session_id}, response_time={response_time_ms}ms")
         return ChatMessageResponse(
             session_id=session_id,
             user_message=self._to_message_response(user_message),
             assistant_message=self._to_message_response(ai_message),
-            response_time_ms=response_time_ms
+            response_time_ms=response_time_ms,
+            metadata=metadata  # Include full metadata in response
         )
     
     async def _get_ai_response(

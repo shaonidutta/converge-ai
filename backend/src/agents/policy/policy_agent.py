@@ -122,8 +122,9 @@ class PolicyAgent:
             # Log grounding score for debugging
             self.logger.info(f"Grounding score for query '{query[:50]}...': {grounding_score:.4f}")
 
-            # Check if response is well-grounded (threshold: 0.35 - lowered for better UX)
-            if grounding_score < 0.35:
+            # Check if response is well-grounded (threshold: 0.25 - lowered for better UX in demo environment)
+            # Note: In production with proper policy documents, this should be 0.5+
+            if grounding_score < 0.25:
                 # Extract sources safely
                 sources_info = []
                 for r in search_results[:3]:
@@ -147,9 +148,11 @@ class PolicyAgent:
             # Return successful response
             result["action_taken"] = "policy_answered"
             result["metadata"]["grounding_score"] = grounding_score
-            result["metadata"]["confidence"] = "high" if grounding_score > 0.7 else "medium"
+            # Adjusted confidence thresholds for demo environment without full policy documents
+            # In production: high > 0.7, medium > 0.5, low > 0.35
+            result["metadata"]["confidence"] = "high" if grounding_score > 0.6 else ("medium" if grounding_score > 0.35 else "low")
             result["metadata"]["query"] = query
-            
+
             self.logger.info(f"PolicyAgent successfully answered query with grounding score: {grounding_score:.2f}")
             return result
             
@@ -202,7 +205,7 @@ class PolicyAgent:
         self,
         query: str,
         top_k: int = 5,
-        namespace: str = "policies"
+        namespace: str = "documents"
     ) -> List[Dict[str, Any]]:
         """
         Search for relevant policy documents in Pinecone with query preprocessing and reranking
@@ -210,7 +213,7 @@ class PolicyAgent:
         Args:
             query: User query text
             top_k: Number of results to return
-            namespace: Pinecone namespace (default: "policies")
+            namespace: Pinecone namespace (default: "documents")
 
         Returns:
             List of search results with scores and metadata

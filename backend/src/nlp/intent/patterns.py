@@ -3,6 +3,7 @@ Intent Pattern Matching
 
 Quick pattern-based intent classification using keywords and regex.
 This is the first step in the hybrid classification approach.
+Updated: Added status keywords to booking management regex patterns
 """
 
 import re
@@ -104,7 +105,9 @@ class IntentPatterns:
     # Regex patterns for specific intents
     REGEX_PATTERNS: Dict[IntentType, List[str]] = {
         IntentType.BOOKING_MANAGEMENT: [
-            # Cancel/reschedule with Order ID (highest priority) - case insensitive
+            # Single-word actions (highest priority for action switching)
+            r"^(cancel|reschedule|book|list)$",
+            # Cancel/reschedule with Order ID (high priority) - case insensitive
             r"\b(cancel|reschedule|change|modify)\s+(order|booking|appointment)?\s*ord[a-z0-9]{8}\b",
             r"\b(cancel|reschedule|change|modify)\s+my\s+(order|booking|appointment)?\s*ord[a-z0-9]{8}\b",
             # General booking management patterns
@@ -120,9 +123,9 @@ class IntentPatterns:
             r"\breschedule\s+(latest|recent|last)\s+(booking|appointment)",
             r"\b(change|modify|move|postpone|prepone)\s+(my)?\s*(booking|appointment|service)",
             r"\bchange\s+(appointment|booking)\s+(time|date)",
-            r"\b(list|show|view|display|see|get|check)\s+(my|all)?\s*(bookings?|appointments?)",
-            r"\b(can|could)\s+(you|u)\s+(list|show|view|check)\s+(my)?\s*(bookings?|appointments?)",
-            r"\bmy\s+(bookings?|appointments?)",
+            r"\b(list|show|view|display|see|get|check)\s+(my|all)?\s*(pending|upcoming|scheduled|active|confirmed|approved|completed|finished|done|past|cancelled|canceled)?\s*(bookings?|appointments?)",
+            r"\b(can|could)\s+(you|u)\s+(list|show|view|check)\s+(my)?\s*(pending|upcoming|scheduled|active|confirmed|approved|completed|finished|done|past|cancelled|canceled)?\s*(bookings?|appointments?)",
+            r"\bmy\s+(pending|upcoming|scheduled|active|confirmed|approved|completed|finished|done|past|cancelled|canceled)?\s*(bookings?|appointments?)",
         ],
         IntentType.SERVICE_INFORMATION: [
             r"\bwhat\s+services\s+(do|does|can)\s+(you|u|ya)",
@@ -157,10 +160,17 @@ class IntentPatterns:
             r"\btechnician\s+(was|is)\s+(rude|late|unprofessional)",
         ],
         IntentType.POLICY_INQUIRY: [
+            # Direct policy questions
             r"\b(what|tell|explain)\s+(is|are|me|about)?\s*(your|the)?\s*(cancellation|refund|warranty|privacy|return)\s+policy",
             r"\bpolicy\s+(on|for|about)\s+(cancellation|refund|warranty|returns)",
             r"\b(cancellation|refund|warranty|privacy)\s+(policy|terms|conditions)",
             r"\bterms\s+(and|&)?\s*conditions",
+            # Timeframe and rule questions (should be policy inquiry, not action)
+            r"\b(how\s+many|how\s+much|what)\s+(hours|days|time)\s+(before|after|in\s+advance)\s+.*(cancel|refund|reschedule)",
+            r"\b(when|what\s+time)\s+can\s+i\s+(cancel|get\s+refund|reschedule)",
+            r"\b(what|how)\s+(is|are)\s+the\s+(rules|conditions|requirements)\s+(for|to)\s+(cancel|refund|reschedule)",
+            r"\bcan\s+i\s+(cancel|get\s+refund|reschedule)\s+(if|when|before|after)",
+            r"\b(am\s+i|is\s+it)\s+(eligible|allowed)\s+(for|to)\s+(cancel|refund|reschedule)",
         ],
     }
     
@@ -197,13 +207,33 @@ class IntentPatterns:
                 intent_scores[intent] = min(0.95, score)
         
         # 2. Regex matching (higher confidence)
+        # Special handling for POLICY_INQUIRY timeframe questions to prioritize over action intents
+        policy_timeframe_patterns = [
+            r"\b(how\s+many|how\s+much|what)\s+(hours|days|time)\s+(before|after|in\s+advance)\s+.*(cancel|refund|reschedule)",
+            r"\b(when|what\s+time)\s+can\s+i\s+(cancel|get\s+refund|reschedule)",
+            r"\b(what|how)\s+(is|are)\s+the\s+(rules|conditions|requirements)\s+(for|to)\s+(cancel|refund|reschedule)",
+            r"\bcan\s+i\s+(cancel|get\s+refund|reschedule)\s+(if|when|before|after)",
+            r"\b(am\s+i|is\s+it)\s+(eligible|allowed)\s+(for|to)\s+(cancel|refund|reschedule)",
+        ]
+
+        # Check policy timeframe patterns first with higher priority
+        for pattern in policy_timeframe_patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                # Policy timeframe questions get highest priority (0.97) to override action intents
+                intent_scores[IntentType.POLICY_INQUIRY] = 0.97
+                break
+
+        # Then check all other regex patterns
         for intent, patterns in cls.REGEX_PATTERNS.items():
             for pattern in patterns:
                 match = re.search(pattern, message_lower)
                 if match:
-                    # Regex match gets higher confidence
+                    # Regex match gets higher confidence (0.95)
+                    # Don't override if already set to higher value (e.g., policy timeframe = 0.97)
                     current_score = intent_scores.get(intent, 0.0)
-                    intent_scores[intent] = max(current_score, 0.95)
+                    if current_score < 0.97:  # Don't override policy timeframe priority
+                        intent_scores[intent] = max(current_score, 0.95)
                     break
         
         # 3. Sort by confidence and return
@@ -293,21 +323,26 @@ class IntentPatterns:
         # IMPORTANT: Check specific action keywords FIRST (cancel, reschedule, modify, book)
         # before checking "list" patterns to avoid false matches
         if EntityType.ACTION.value not in raw_entities:
-            action_keywords = {
-                "cancel": ["cancel", "remove", "delete"],
-                "reschedule": ["reschedule", "change date", "move booking", "move appointment"],
-                "modify": ["modify", "update", "edit"],
-                "book": ["book", "schedule", "arrange", "set up"],
-            }
+            # First check for exact single-word actions (highest priority for action switching)
+            single_word_actions = ["cancel", "reschedule", "book", "list"]
+            if message_lower.strip() in single_word_actions:
+                raw_entities[EntityType.ACTION.value] = message_lower.strip()
+            else:
+                action_keywords = {
+                    "cancel": ["cancel", "remove", "delete"],
+                    "reschedule": ["reschedule", "change date", "move booking", "move appointment"],
+                    "modify": ["modify", "update", "edit"],
+                    "book": ["book", "schedule", "arrange", "set up"],
+                }
 
-            for action, keywords in action_keywords.items():
-                for keyword in keywords:
-                    pattern = r'\b' + re.escape(keyword) + r'\b'
-                    if re.search(pattern, message_lower):
-                        raw_entities[EntityType.ACTION.value] = action
+                for action, keywords in action_keywords.items():
+                    for keyword in keywords:
+                        pattern = r'\b' + re.escape(keyword) + r'\b'
+                        if re.search(pattern, message_lower):
+                            raw_entities[EntityType.ACTION.value] = action
+                            break
+                    if EntityType.ACTION.value in raw_entities:
                         break
-                if EntityType.ACTION.value in raw_entities:
-                    break
 
             # Only check for "list" action if no other action was found
             # List patterns should ONLY match when there's an explicit list/show/view action word
