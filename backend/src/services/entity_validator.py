@@ -184,23 +184,24 @@ class EntityValidator:
                     is_valid=False,
                     error_message="Invalid time format. Please use HH:MM format or say '10 AM', '2 PM'"
                 )
-            
+
             config = self.config["time"]
-            
+
             # Check if time is within service hours
-            if time_obj.hour < config["service_start_hour"] or time_obj.hour >= config["service_end_hour"]:
+            # service_end_hour is inclusive (e.g., if end_hour is 20, then 20:00 is valid)
+            if time_obj.hour < config["service_start_hour"] or time_obj.hour > config["service_end_hour"]:
                 suggestions = ["10:00", "14:00", "18:00"]
                 return ValidationResult(
                     is_valid=False,
                     error_message=f"Service hours are {config['service_start_hour']} AM to {config['service_end_hour']} PM",
                     suggestions=suggestions
                 )
-            
+
             return ValidationResult(
                 is_valid=True,
                 normalized_value=value
             )
-        
+
         except Exception as e:
             logger.error(f"[EntityValidator] Time validation error: {e}")
             return ValidationResult(

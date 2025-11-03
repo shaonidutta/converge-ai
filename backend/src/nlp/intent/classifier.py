@@ -111,9 +111,7 @@ class IntentClassifier:
                         logger.info(f"Pattern match overriding dialog state intent: {dialog_state.intent} → {high_confidence_intents[0][0].value}")
 
                     return result, "pattern_match"
-                else:
-                    logger.info(f"Multi-intent signal detected, passing to LLM: {message[:50]}...")
-        
+
         # Step 2: Use LLM for classification (ambiguous cases)
         # Use context-aware classification if context is available
         classification_method = "context_aware_llm" if has_context else "llm"

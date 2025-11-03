@@ -209,16 +209,9 @@ class CategoryMatcher:
         for category in self.categories_cache:
             category_name_lower = category["name"].lower()
 
-            # Direct substring match (but avoid partial word matches)
+            # Only exact match - no word-level matching to avoid false positives
+            # This prevents "kitchen cleaning" from matching "Home Cleaning"
             if input_text == category_name_lower:
-                return category
-
-            # Word-level match
-            input_words = set(input_text.split())
-            category_words = set(category_name_lower.split())
-
-            # Require significant word overlap
-            if len(input_words.intersection(category_words)) >= min(len(input_words), len(category_words)) * 0.5:
                 return category
 
         return None
@@ -1011,8 +1004,27 @@ class ServiceAgent:
                     logger.info(f"[_infer_action_and_query] Matched search pattern: query='{query}'")
                     return updated_entities
 
-        # Priority 4: Single word service detection (for search, not subcategories)
-        # This is for queries like just "plumbing" or "cleaning" without subcategory context
+        # Priority 4: Check if message matches a category name (for browsing subcategories)
+        # This handles cases like "home cleaning", "plumbing", "electrical" without trigger words
+        # IMPORTANT: Only match if message is short (1-3 words) and exact/high confidence match
+        # This prevents intercepting booking flow follow-ups
+        word_count = len(message_lower.split())
+        if 1 <= word_count <= 3:
+            try:
+                match_result = await self.category_matcher.match_category(message_lower)
+                # Only use exact matches (confidence = 1.0) to avoid false positives
+                # This ensures we only match actual category names, not subcategories
+                if match_result and match_result["confidence"] == 1.0 and match_result["method"] == "exact":
+                    # Exact category name match
+                    updated_entities["action"] = "browse_subcategories_by_category"
+                    updated_entities["service_keyword"] = message_lower
+                    logger.info(f"[_infer_action_and_query] Matched category name: '{message_lower}' (confidence: {match_result['confidence']})")
+                    return updated_entities
+            except Exception as e:
+                logger.warning(f"[_infer_action_and_query] Category matching failed: {e}")
+
+        # Priority 5: Single word service detection (for search, not subcategories)
+        # This is for queries like just "repair" or "installation" that don't match categories
         single_word_match = re.search(r'^\s*(\w+)\s*$', message_lower)
         if single_word_match:
             word = single_word_match.group(1)

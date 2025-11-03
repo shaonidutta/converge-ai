@@ -17,11 +17,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timedelta
 import re
+from difflib import SequenceMatcher
 
 # NLP imports
 try:
     from spellchecker import SpellChecker
-    from difflib import SequenceMatcher
     NLP_AVAILABLE = True
 except ImportError:
     NLP_AVAILABLE = False
