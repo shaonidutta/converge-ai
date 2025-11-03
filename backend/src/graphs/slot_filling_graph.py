@@ -957,9 +957,11 @@ async def determine_needed_entities_node(
         collected = state.get('collected_entities', {})
 
         # Get required entities for this intent
-        intent_config = INTENT_CONFIGS.get(intent) if intent else None  # type: ignore
+        # Convert string intent to IntentType enum if needed
+        intent_enum = IntentType(intent) if isinstance(intent, str) else intent
+        intent_config = INTENT_CONFIGS.get(intent_enum) if intent_enum else None  # type: ignore
         if not intent_config:
-            logger.warning(f"[determine_needed_entities_node] No config for intent: {intent}")
+            logger.warning(f"[determine_needed_entities_node] No config for intent: {intent} (enum: {intent_enum})")
             return {"needed_entities": []}
 
         # Determine needed entities based on action (for booking_management)
