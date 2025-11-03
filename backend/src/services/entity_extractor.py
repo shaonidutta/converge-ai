@@ -756,11 +756,17 @@ class EntityExtractor:
         - Legacy formats with hyphens: BOOK-12345, BKG-12345, ORD-12345
         - Just numbers: 12345
         """
+        logger.info(f"[EntityExtractor] _extract_booking_id called with message: '{message}'")
+
         # Pattern 1: ORD followed by 8 alphanumeric characters (current format)
         # Example: ORDA5D9F532, ORD4E33BB94
-        order_id_match = re.search(r'\b(ORD[A-Z0-9]{8})\b', message, re.IGNORECASE)
+        pattern1 = r'\b(ORD[A-Z0-9]{8})\b'
+        order_id_match = re.search(pattern1, message, re.IGNORECASE)
+        logger.info(f"[EntityExtractor] Pattern 1 '{pattern1}' match: {order_id_match.group(1) if order_id_match else 'None'}")
+
         if order_id_match:
             order_id = order_id_match.group(1).upper()
+            logger.info(f"[EntityExtractor] ✅ Booking ID extracted: '{order_id}' (confidence: 0.98)")
             return EntityExtractionResult(
                 entity_type=EntityType.BOOKING_ID.value,
                 entity_value=order_id_match.group(1),
