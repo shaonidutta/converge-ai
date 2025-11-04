@@ -162,6 +162,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
+# --- Request Timeout Middleware ---
+from src.middleware.timeout_middleware import TimeoutMiddleware
+app.add_middleware(TimeoutMiddleware, default_timeout=60)  # Increased timeout for testing
+
 # --- Prometheus Monitoring Middleware ---
 from src.middleware.prometheus_middleware import PrometheusMiddleware
 app.add_middleware(PrometheusMiddleware)

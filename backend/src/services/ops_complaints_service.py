@@ -11,7 +11,7 @@ from sqlalchemy import select, func, and_, or_, desc, asc
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.core.models import (
-    Complaint, ComplaintUpdate, Staff, User, Booking,
+    Complaint, ComplaintUpdate, Staff, User, Booking, Role,
     ComplaintType, ComplaintPriority, ComplaintStatus
 )
 from src.services.audit_service import AuditService
@@ -56,7 +56,7 @@ class OpsComplaintsService:
         """
         try:
             # Check PII access permission
-            has_full_access = self._check_full_access_permission(current_staff)
+            has_full_access = await self._check_full_access_permission(current_staff)
             
             # Build query with eager loading
             query = select(Complaint).options(
@@ -145,7 +145,7 @@ class OpsComplaintsService:
         """
         try:
             # Check PII access permission
-            has_full_access = self._check_full_access_permission(current_staff)
+            has_full_access = await self._check_full_access_permission(current_staff)
             
             # Query complaint with relationships
             query = select(Complaint).options(
@@ -236,10 +236,10 @@ class OpsComplaintsService:
             await self.db.refresh(complaint)
             
             # Build response
-            has_full_access = self._check_full_access_permission(current_staff)
+            has_full_access = await self._check_full_access_permission(current_staff)
             complaint_response = await self._build_complaint_response(complaint, has_full_access)
             
-            # Audit log
+            # Audit log (don't auto-commit, let transaction handle it)
             await self.audit_service.log_access(
                 staff_id=current_staff.id,
                 action="update_complaint",
@@ -247,7 +247,8 @@ class OpsComplaintsService:
                 resource_id=complaint_id,
                 pii_accessed=False,
                 metadata={"changes": changes},
-                request_metadata=request_metadata
+                request_metadata=request_metadata,
+                auto_commit=False
             )
             
             self.logger.info(
@@ -312,10 +313,10 @@ class OpsComplaintsService:
             await self.db.refresh(complaint)
             
             # Build response
-            has_full_access = self._check_full_access_permission(current_staff)
+            has_full_access = await self._check_full_access_permission(current_staff)
             complaint_response = await self._build_complaint_response(complaint, has_full_access)
             
-            # Audit log
+            # Audit log (don't auto-commit, let transaction handle it)
             await self.audit_service.log_access(
                 staff_id=current_staff.id,
                 action="assign_complaint",
@@ -331,7 +332,8 @@ class OpsComplaintsService:
                     },
                     "target_staff_id": assign_data.assigned_to_staff_id
                 },
-                request_metadata=request_metadata
+                request_metadata=request_metadata,
+                auto_commit=False
             )
             
             self.logger.info(
@@ -394,10 +396,10 @@ class OpsComplaintsService:
             await self.db.refresh(complaint)
 
             # Build response
-            has_full_access = self._check_full_access_permission(current_staff)
+            has_full_access = await self._check_full_access_permission(current_staff)
             complaint_response = await self._build_complaint_response(complaint, has_full_access)
 
-            # Audit log
+            # Audit log (don't auto-commit, let transaction handle it)
             await self.audit_service.log_access(
                 staff_id=current_staff.id,
                 action="resolve_complaint",
@@ -410,7 +412,8 @@ class OpsComplaintsService:
                         'resolution': {'old': old_resolution, 'new': resolve_data.resolution}
                     }
                 },
-                request_metadata=request_metadata
+                request_metadata=request_metadata,
+                auto_commit=False
             )
 
             self.logger.info(
@@ -561,7 +564,7 @@ class OpsComplaintsService:
                 )
                 update_responses.append(update_response)
 
-            # Audit log
+            # Audit log (auto-commit for read operation)
             await self.audit_service.log_access(
                 staff_id=current_staff.id,
                 action="view_complaint_updates",
@@ -572,7 +575,8 @@ class OpsComplaintsService:
                     "result_count": len(updates),
                     "include_internal": include_internal
                 },
-                request_metadata=request_metadata
+                request_metadata=request_metadata,
+                auto_commit=True
             )
 
             self.logger.info(
@@ -588,14 +592,35 @@ class OpsComplaintsService:
 
     # Helper Methods
 
-    def _check_full_access_permission(self, staff: Staff) -> bool:
+    async def _check_full_access_permission(self, staff: Staff) -> bool:
         """Check if staff has full PII access permission"""
-        return staff.has_any_permission(["ops.full_access", "ops.admin"])
+        # Always reload staff with role and permissions to avoid lazy loading issues
+        from sqlalchemy.orm import selectinload
+        from src.core.models.role import Role
+
+        result = await self.db.execute(
+            select(Staff)
+            .options(selectinload(Staff.role).selectinload(Role.permissions))
+            .where(Staff.id == staff.id)
+        )
+        staff_with_role = result.scalar_one()
+
+        return staff_with_role.has_any_permission(["ops.priority_queue.full_access", "system.admin"])
 
     async def _get_complaint_or_raise(self, complaint_id: int) -> Complaint:
         """Get complaint by ID or raise ValueError if not found"""
+        from sqlalchemy.orm import joinedload, selectinload
+
         result = await self.db.execute(
-            select(Complaint).where(Complaint.id == complaint_id)
+            select(Complaint)
+            .options(
+                joinedload(Complaint.user),
+                joinedload(Complaint.booking),
+                joinedload(Complaint.assigned_to_staff),
+                joinedload(Complaint.resolved_by_staff),
+                selectinload(Complaint.updates)
+            )
+            .where(Complaint.id == complaint_id)
         )
         complaint = result.scalar_one_or_none()
         if not complaint:
@@ -784,17 +809,31 @@ class OpsComplaintsService:
         now = datetime.now(timezone.utc)
 
         # Response overdue
-        if complaint.response_due_at and now >= complaint.response_due_at:
-            return True
+        if complaint.response_due_at:
+            # Make response_due_at timezone-aware if it's naive
+            response_due = complaint.response_due_at
+            if response_due.tzinfo is None:
+                response_due = response_due.replace(tzinfo=timezone.utc)
+            if now >= response_due:
+                return True
 
         # Resolution at risk (within 25% of deadline)
         if complaint.resolution_due_at:
-            time_remaining = complaint.resolution_due_at - now
+            # Make resolution_due_at timezone-aware if it's naive
+            resolution_due = complaint.resolution_due_at
+            if resolution_due.tzinfo is None:
+                resolution_due = resolution_due.replace(tzinfo=timezone.utc)
+
+            time_remaining = resolution_due - now
             if time_remaining.total_seconds() <= 0:
                 return True
 
             # Calculate if within 25% of total time
-            total_time = complaint.resolution_due_at - complaint.created_at
+            created_at = complaint.created_at
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+
+            total_time = resolution_due - created_at
             risk_threshold = total_time.total_seconds() * 0.25
 
             if time_remaining.total_seconds() <= risk_threshold:

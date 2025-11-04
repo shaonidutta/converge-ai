@@ -28,7 +28,7 @@ router = APIRouter(prefix="/complaints", tags=["Operations - Complaints"])
 )
 async def list_complaints(
     request: Request,
-    current_staff: Annotated[Staff, Depends(require_permissions(["complaints.view", "ops.read"]))],
+    current_staff: Annotated[Staff, Depends(require_permissions("complaints.view", "ops.priority_queue.view"))],
     db: Annotated[AsyncSession, Depends(get_db)],
     
     # Filters
@@ -79,7 +79,7 @@ async def list_complaints(
     """
     List complaints with comprehensive filtering and pagination
     
-    **Permissions Required**: `complaints.view` OR `ops.read`
+    **Permissions Required**: `complaints.view` OR `ops.priority_queue.view`
     
     **PII Access**:
     - Staff with `ops.full_access` or `ops.admin` permission see full user details
@@ -157,13 +157,13 @@ async def list_complaints(
 async def get_complaint(
     complaint_id: int,
     request: Request,
-    current_staff: Annotated[Staff, Depends(require_permissions(["complaints.view", "ops.read"]))],
+    current_staff: Annotated[Staff, Depends(require_permissions("complaints.view", "ops.priority_queue.view"))],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
     Get detailed complaint information by ID
     
-    **Permissions Required**: `complaints.view` OR `ops.read`
+    **Permissions Required**: `complaints.view` OR `ops.priority_queue.view`
     
     **Returns**: Full complaint details including user info, booking info, 
     assignment history, SLA status, and update count
@@ -208,7 +208,7 @@ async def update_complaint(
     complaint_id: int,
     update_data: ComplaintUpdateRequest,
     request: Request,
-    current_staff: Annotated[Staff, Depends(require_permissions(["complaints.assign", "ops.admin"]))],
+    current_staff: Annotated[Staff, Depends(require_permissions("complaints.assign", "system.admin"))],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
@@ -270,7 +270,7 @@ async def assign_complaint(
     complaint_id: int,
     assign_data: ComplaintAssignRequest,
     request: Request,
-    current_staff: Annotated[Staff, Depends(require_permissions(["complaints.assign", "ops.admin"]))],
+    current_staff: Annotated[Staff, Depends(require_permissions("complaints.assign", "system.admin"))],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
@@ -332,7 +332,7 @@ async def resolve_complaint(
     complaint_id: int,
     resolve_data: ComplaintResolveRequest,
     request: Request,
-    current_staff: Annotated[Staff, Depends(require_permissions(["complaints.resolve", "ops.admin"]))],
+    current_staff: Annotated[Staff, Depends(require_permissions("complaints.resolve", "system.admin"))],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
@@ -395,13 +395,13 @@ async def add_complaint_update(
     complaint_id: int,
     note_data: ComplaintNoteRequest,
     request: Request,
-    current_staff: Annotated[Staff, Depends(require_permissions(["complaints.view", "ops.read"]))],
+    current_staff: Annotated[Staff, Depends(require_permissions("complaints.view", "ops.priority_queue.view"))],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
     Add update or note to complaint
 
-    **Permissions Required**: `complaints.view` OR `ops.read`
+    **Permissions Required**: `complaints.view` OR `ops.priority_queue.view`
 
     **Note Types**:
     - `is_internal=false`: Customer-visible updates (default)
@@ -451,7 +451,7 @@ async def add_complaint_update(
 async def get_complaint_updates(
     complaint_id: int,
     request: Request,
-    current_staff: Annotated[Staff, Depends(require_permissions(["complaints.view", "ops.read"]))],
+    current_staff: Annotated[Staff, Depends(require_permissions("complaints.view", "ops.priority_queue.view"))],
     db: Annotated[AsyncSession, Depends(get_db)],
     include_internal: bool = Query(
         True,
@@ -461,7 +461,7 @@ async def get_complaint_updates(
     """
     Get all updates and notes for a complaint
 
-    **Permissions Required**: `complaints.view` OR `ops.read`
+    **Permissions Required**: `complaints.view` OR `ops.priority_queue.view`
 
     **Filtering**:
     - `include_internal=true`: Show all updates including internal notes

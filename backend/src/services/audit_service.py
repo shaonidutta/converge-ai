@@ -40,11 +40,12 @@ class AuditService:
         resource_id: Optional[int] = None,
         pii_accessed: bool = False,
         metadata: Optional[Dict[str, Any]] = None,
-        request_metadata: Optional[Dict[str, Any]] = None
+        request_metadata: Optional[Dict[str, Any]] = None,
+        auto_commit: bool = False
     ) -> OpsAuditLog:
         """
         Log ops access for audit trail
-        
+
         Args:
             staff_id: ID of staff member performing action
             action: Action performed (e.g., 'view_priority_queue', 'expand_details')
@@ -53,7 +54,8 @@ class AuditService:
             pii_accessed: Whether PII was accessed (critical for compliance)
             metadata: Additional metadata (filters, params, etc.)
             request_metadata: Request metadata (IP, user agent, etc.)
-        
+            auto_commit: Whether to commit immediately (default: False, let caller handle)
+
         Returns:
             Created OpsAuditLog instance
         """
@@ -69,10 +71,13 @@ class AuditService:
                 ip_address=request_metadata.get("ip") if request_metadata else None,
                 user_agent=request_metadata.get("user_agent") if request_metadata else None
             )
-            
+
             self.db.add(audit_log)
-            await self.db.commit()
-            await self.db.refresh(audit_log)
+
+            # Only commit if explicitly requested (for standalone audit calls)
+            if auto_commit:
+                await self.db.commit()
+                await self.db.refresh(audit_log)
             
             # Also log to application logs for immediate visibility
             log_message = (

@@ -42,7 +42,7 @@ router.include_router(complaints_router)
 )
 async def register_ops_user(
     request: OpsRegisterRequest,
-    current_staff: Annotated[Staff, Depends(require_permissions(["staff.create"]))],
+    current_staff: Annotated[Staff, Depends(require_permissions("staff.create"))],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Register a new ops user (requires staff.create permission)"""
@@ -92,7 +92,7 @@ async def login_ops_user(
     summary="List ops users"
 )
 async def list_ops_users(
-    current_staff: Annotated[Staff, Depends(require_permissions(["staff.read"]))],
+    current_staff: Annotated[Staff, Depends(require_permissions("staff.view"))],
     db: Annotated[AsyncSession, Depends(get_db)],
     role_id: Optional[int] = Query(None, description="Filter by role"),
     department: Optional[str] = Query(None, description="Filter by department"),
@@ -124,7 +124,7 @@ async def list_ops_users(
 )
 async def get_ops_user(
     staff_id: int,
-    current_staff: Annotated[Staff, Depends(require_permissions(["staff.read"]))],
+    current_staff: Annotated[Staff, Depends(require_permissions("staff.view"))],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Get ops user by ID (requires staff.read permission)"""
@@ -151,7 +151,7 @@ async def get_ops_user(
 async def update_ops_user(
     staff_id: int,
     request: OpsUpdateRequest,
-    current_staff: Annotated[Staff, Depends(require_permissions(["staff.update"]))],
+    current_staff: Annotated[Staff, Depends(require_permissions("staff.edit"))],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Update ops user (requires staff.update permission)"""
@@ -181,7 +181,7 @@ async def update_ops_user(
 )
 async def get_priority_queue(
     request: Request,
-    current_staff: Annotated[Staff, Depends(require_permissions(["ops.read"]))],
+    current_staff: Annotated[Staff, Depends(require_permissions("ops.priority_queue.view"))],
     db: Annotated[AsyncSession, Depends(get_db)],
     status_filter: Optional[str] = Query(
         None,
@@ -243,10 +243,10 @@ async def get_priority_queue(
     """
     Get priority queue items with filtering and pagination
 
-    **Permissions Required**: `ops.read`
+    **Permissions Required**: `ops.priority_queue.view`
 
     **PII Access**:
-    - Users with `ops.full_access` permission see full PII (mobile, email, name)
+    - Users with `ops.priority_queue.full_access` permission see full PII (mobile, email, name)
     - Users without full access see redacted PII
 
     **Performance**:
@@ -333,8 +333,8 @@ async def get_priority_queue(
     - `all`: All time data (default)
 
     **Permissions**:
-    - `ops.read`: Access to all metrics except detailed revenue
-    - `ops.admin`: Full access including revenue details
+    - `ops.metrics.view`: Access to all metrics except detailed revenue
+    - `system.admin`: Full access including revenue details
 
     **Performance**:
     - Metrics are cached for 5 minutes (configurable)
@@ -347,7 +347,7 @@ async def get_priority_queue(
     """
 )
 async def get_dashboard_metrics(
-    current_staff: Annotated[Staff, Depends(require_permissions(["ops.read"]))],
+    current_staff: Annotated[Staff, Depends(require_permissions("ops.metrics.view"))],
     db: Annotated[AsyncSession, Depends(get_db)],
     period: str = Query(
         "all",

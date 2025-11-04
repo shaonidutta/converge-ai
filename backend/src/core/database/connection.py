@@ -69,17 +69,20 @@ AsyncSessionLocal = async_sessionmaker(
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency for FastAPI to get database session
-    
+
     Usage:
         @app.get("/users")
         async def get_users(db: AsyncSession = Depends(get_db)):
             result = await db.execute(select(User))
             return result.scalars().all()
+
+    Note: Services are responsible for their own transaction management.
+    This dependency only provides the session and handles rollback on errors.
     """
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
+            # Don't auto-commit - let services handle their own transactions
         except Exception as e:
             await session.rollback()
             logger.error(f"Database session error: {e}")

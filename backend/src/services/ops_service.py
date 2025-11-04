@@ -120,10 +120,17 @@ class OpsService:
                 mobile=staff.mobile,
                 first_name=staff.first_name,
                 last_name=staff.last_name,
-                role_id=staff.role_id,
-                role_name=role.name,
                 department=staff.department,
-                is_active=staff.is_active
+                is_active=staff.is_active,
+                role={
+                    "id": role.id,
+                    "name": role.name,
+                    "display_name": role.display_name,
+                    "description": role.description,
+                    "level": role.level,
+                    "is_active": role.is_active
+                },
+                created_at=staff.created_at.isoformat() if staff.created_at else None
             ),
             tokens={
                 "access_token": access_token,
@@ -175,7 +182,7 @@ class OpsService:
         
         # Get permissions
         permissions_result = await self.db.execute(
-            select(Permission.code)
+            select(Permission.name)
             .join(Role.permissions)
             .where(Role.id == staff.role_id)
         )
@@ -210,10 +217,17 @@ class OpsService:
                 mobile=staff.mobile,
                 first_name=staff.first_name,
                 last_name=staff.last_name,
-                role_id=staff.role_id,
-                role_name=role.name,
                 department=staff.department,
-                is_active=staff.is_active
+                is_active=staff.is_active,
+                role={
+                    "id": role.id,
+                    "name": role.name,
+                    "display_name": role.display_name,
+                    "description": role.description,
+                    "level": role.level,
+                    "is_active": role.is_active
+                },
+                created_at=staff.created_at.isoformat() if staff.created_at else None
             ),
             tokens={
                 "access_token": access_token,
@@ -269,10 +283,17 @@ class OpsService:
                 mobile=staff.mobile,
                 first_name=staff.first_name,
                 last_name=staff.last_name,
-                role_id=staff.role_id,
-                role_name=role.name,
                 department=staff.department,
-                is_active=staff.is_active
+                is_active=staff.is_active,
+                role={
+                    "id": role.id,
+                    "name": role.name,
+                    "display_name": role.display_name,
+                    "description": role.description,
+                    "level": role.level,
+                    "is_active": role.is_active
+                },
+                created_at=staff.created_at.isoformat() if staff.created_at else ""
             )
             for staff, role in staff_list
         ]
@@ -309,10 +330,17 @@ class OpsService:
             mobile=staff.mobile,
             first_name=staff.first_name,
             last_name=staff.last_name,
-            role_id=staff.role_id,
-            role_name=role.name,
             department=staff.department,
-            is_active=staff.is_active
+            is_active=staff.is_active,
+            role={
+                "id": role.id,
+                "name": role.name,
+                "display_name": role.display_name,
+                "description": role.description,
+                "level": role.level,
+                "is_active": role.is_active
+            },
+            created_at=staff.created_at.isoformat() if staff.created_at else ""
         )
 
 
@@ -397,10 +425,17 @@ class OpsService:
             mobile=staff.mobile,
             first_name=staff.first_name,
             last_name=staff.last_name,
-            role_id=staff.role_id,
-            role_name=role.name,
             department=staff.department,
-            is_active=staff.is_active
+            is_active=staff.is_active,
+            role={
+                "id": role.id,
+                "name": role.name,
+                "display_name": role.display_name,
+                "description": role.description,
+                "level": role.level,
+                "is_active": role.is_active
+            },
+            created_at=staff.created_at.isoformat() if staff.created_at else ""
         )
 
 
