@@ -82,23 +82,27 @@ const LoginPage = () => {
   const loading = authLoading || isLoading;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center">
+      {/* Full-width background overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20"></div>
+
+      {/* Login container */}
+      <div className="relative z-10 w-full max-w-md mx-4">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
-            <Shield className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl shadow-xl mb-6">
+            <Shield className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent mb-3">
             Operations Dashboard
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 text-lg">
             Sign in to access the ConvergeAI operations panel
           </p>
         </div>
 
         {/* Login Form */}
-        <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-8">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-200/50 p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Error Message */}
             {error && (
@@ -165,7 +169,7 @@ const LoginPage = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary hover:bg-primary-600 text-white font-medium py-3 px-4 rounded-md transition-colors duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full btn-primary py-4 text-lg font-semibold flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
@@ -179,16 +183,16 @@ const LoginPage = () => {
           </form>
 
           {/* Footer */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
+          <div className="mt-8 text-center">
+            <p className="text-sm text-gray-600 font-medium">
               Authorized personnel only. All access is logged and monitored.
             </p>
           </div>
         </div>
 
         {/* Security Notice */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500">
+        <div className="mt-8 text-center">
+          <p className="text-xs text-gray-500 font-medium">
             This is a secure system. Unauthorized access is prohibited and may be subject to legal action.
           </p>
         </div>

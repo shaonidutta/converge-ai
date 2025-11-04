@@ -18,7 +18,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <div className="App">
+        <div className="App w-full min-h-screen">
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<LoginPage />} />

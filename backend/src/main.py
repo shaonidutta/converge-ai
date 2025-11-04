@@ -52,6 +52,7 @@ ALLOWED_ORIGINS = [
     "http://localhost:3001",  # Ops frontend
     "http://localhost:5173",  # Customer frontend (Vite dev server)
     "http://localhost:5174",  # Ops frontend (Vite dev server)
+    "http://localhost:5175",  # Ops frontend (Vite dev server - alternate port)
     "https://convergeAI.app",
 ]
 
