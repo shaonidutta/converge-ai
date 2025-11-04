@@ -104,24 +104,48 @@
     @apply bg-white/95 backdrop-blur-sm border border-white/20;
   }
 
+  /* Professional Dashboard Cards */
   .dashboard-card {
-    @apply bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200;
+    @apply bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-gray-300/50;
   }
 
+  .dashboard-card-elevated {
+    @apply bg-gradient-to-br from-white via-white to-gray-50/30 rounded-xl border border-gray-200/60 shadow-xl hover:shadow-2xl transition-all duration-300 hover:border-gray-300/60;
+  }
+
+  /* Professional Buttons */
+  .btn-primary {
+    @apply bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium px-4 py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 border-0 focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2;
+  }
+
+  .btn-secondary {
+    @apply bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 text-gray-700 font-medium px-4 py-2.5 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 border border-gray-200 hover:border-gray-300 focus:ring-2 focus:ring-gray-500/50 focus:ring-offset-2;
+  }
+
+  .btn-success {
+    @apply bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 border-0 focus:ring-2 focus:ring-emerald-500/50 focus:ring-offset-2;
+  }
+
+  .btn-icon {
+    @apply p-2.5 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-offset-2;
+  }
+
+  /* Sidebar Styles */
   .sidebar-item {
-    @apply flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150;
+    @apply flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200;
   }
 
   .sidebar-item-active {
-    @apply bg-primary text-primary-foreground;
+    @apply bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg;
   }
 
   .sidebar-item-inactive {
-    @apply text-gray-600 hover:bg-gray-50 hover:text-gray-900;
+    @apply text-gray-300 hover:bg-gray-700/50 hover:text-white;
   }
 
+  /* Enhanced Metric Cards */
   .metric-card {
-    @apply bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200;
+    @apply bg-gradient-to-br from-white via-white to-gray-50/30 p-6 rounded-xl border border-gray-200/60 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-gray-300/60 hover:scale-[1.02];
   }
 
   .priority-low {

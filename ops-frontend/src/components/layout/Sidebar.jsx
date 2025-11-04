@@ -101,38 +101,38 @@ const Sidebar = () => {
   };
 
   return (
-    <div className={`bg-white border-r border-gray-200 transition-all duration-300 ${
+    <div className={`bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 border-r border-gray-700/50 transition-all duration-300 ${
       isCollapsed ? "w-16" : "w-64"
-    } flex flex-col h-full`}>
+    } flex flex-col h-full shadow-2xl`}>
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-700/50">
         <div className="flex items-center justify-between">
           {!isCollapsed && (
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <Shield className="w-5 h-5 text-white" />
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Shield className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-semibold text-gray-900">Operations</h1>
-                <p className="text-xs text-gray-500">ConvergeAI</p>
+                <h1 className="text-lg font-bold text-white">Operations</h1>
+                <p className="text-xs text-gray-400">ConvergeAI</p>
               </div>
             </div>
           )}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+            className="p-2 rounded-lg hover:bg-gray-700/50 transition-all duration-200 text-gray-400 hover:text-white"
           >
             {isCollapsed ? (
-              <ChevronRight className="w-4 h-4 text-gray-600" />
+              <ChevronRight className="w-4 h-4" />
             ) : (
-              <ChevronLeft className="w-4 h-4 text-gray-600" />
+              <ChevronLeft className="w-4 h-4" />
             )}
           </button>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 p-4 space-y-1">
         {navigationItems.map((item) => (
           <PermissionGate
             key={item.name}
@@ -140,10 +140,10 @@ const Sidebar = () => {
           >
             <Link
               to={item.href}
-              className={`flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`flex items-center space-x-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
                 isActiveRoute(item.href)
-                  ? "bg-primary text-white"
-                  : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                  ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg transform scale-[1.02]"
+                  : "text-gray-300 hover:bg-gray-700/50 hover:text-white hover:transform hover:scale-[1.01]"
               }`}
               title={isCollapsed ? item.name : undefined}
             >
@@ -155,26 +155,26 @@ const Sidebar = () => {
       </nav>
 
       {/* User Info & Logout */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-gray-700/50">
         {!isCollapsed && staff && (
-          <div className="mb-3 p-3 bg-gray-50 rounded-md">
-            <p className="text-sm font-medium text-gray-900 truncate">
+          <div className="mb-4 p-3 bg-gradient-to-r from-gray-800/50 to-gray-700/50 rounded-xl border border-gray-600/30">
+            <p className="text-sm font-semibold text-white truncate">
               {staff.name}
             </p>
-            <p className="text-xs text-gray-500 truncate">
+            <p className="text-xs text-gray-400 truncate">
               {staff.email}
             </p>
-            <div className="mt-1">
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+            <div className="mt-2">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm">
                 {role}
               </span>
             </div>
           </div>
         )}
-        
+
         <button
           onClick={handleLogout}
-          className={`flex items-center space-x-3 w-full px-3 py-2 rounded-md text-sm font-medium text-red-700 hover:bg-red-50 hover:text-red-900 transition-colors ${
+          className={`flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-all duration-200 hover:transform hover:scale-[1.01] ${
             isCollapsed ? "justify-center" : ""
           }`}
           title={isCollapsed ? "Logout" : undefined}

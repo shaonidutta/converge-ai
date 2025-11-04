@@ -136,26 +136,49 @@ const Dashboard = () => {
    */
   const MetricCard = ({ title, value, change, icon: Icon, color = "blue" }) => {
     const colorClasses = {
-      blue: "bg-blue-50 text-blue-600 border-blue-200",
-      green: "bg-green-50 text-green-600 border-green-200",
-      yellow: "bg-yellow-50 text-yellow-600 border-yellow-200",
-      red: "bg-red-50 text-red-600 border-red-200",
+      blue: {
+        gradient: "from-blue-500 to-blue-600",
+        bg: "bg-gradient-to-br from-blue-50 via-blue-50 to-blue-100/50",
+        text: "text-blue-600",
+        icon: "text-white"
+      },
+      green: {
+        gradient: "from-emerald-500 to-emerald-600",
+        bg: "bg-gradient-to-br from-emerald-50 via-emerald-50 to-emerald-100/50",
+        text: "text-emerald-600",
+        icon: "text-white"
+      },
+      yellow: {
+        gradient: "from-amber-500 to-amber-600",
+        bg: "bg-gradient-to-br from-amber-50 via-amber-50 to-amber-100/50",
+        text: "text-amber-600",
+        icon: "text-white"
+      },
+      red: {
+        gradient: "from-red-500 to-red-600",
+        bg: "bg-gradient-to-br from-red-50 via-red-50 to-red-100/50",
+        text: "text-red-600",
+        icon: "text-white"
+      },
     };
 
+    const colors = colorClasses[color];
+
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
+      <div className="dashboard-card-elevated group cursor-pointer">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-600">{title}</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">{title}</p>
+            <p className="text-4xl font-bold text-gray-900 mt-3 group-hover:scale-105 transition-transform duration-200">{value}</p>
             {change && (
-              <p className={`text-sm mt-2 ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-sm mt-2 flex items-center ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <TrendingUp className="w-4 h-4 mr-1" />
                 {change >= 0 ? '+' : ''}{change}% from last period
               </p>
             )}
           </div>
-          <div className={`p-3 rounded-lg ${colorClasses[color]}`}>
-            <Icon className="w-6 h-6" />
+          <div className={`p-4 rounded-2xl bg-gradient-to-br ${colors.gradient} shadow-lg group-hover:shadow-xl transition-all duration-200 group-hover:scale-110`}>
+            <Icon className={`w-8 h-8 ${colors.icon}`} />
           </div>
         </div>
       </div>
@@ -167,26 +190,55 @@ const Dashboard = () => {
    */
   const PriorityQueueItem = ({ item }) => {
     const priorityColors = {
-      low: "bg-green-100 text-green-800",
-      medium: "bg-yellow-100 text-yellow-800",
-      high: "bg-orange-100 text-orange-800",
-      critical: "bg-red-100 text-red-800",
+      low: {
+        bg: "bg-gradient-to-r from-green-100 to-green-200",
+        text: "text-green-800",
+        border: "border-green-300",
+        icon: "text-green-600"
+      },
+      medium: {
+        bg: "bg-gradient-to-r from-yellow-100 to-yellow-200",
+        text: "text-yellow-800",
+        border: "border-yellow-300",
+        icon: "text-yellow-600"
+      },
+      high: {
+        bg: "bg-gradient-to-r from-orange-100 to-orange-200",
+        text: "text-orange-800",
+        border: "border-orange-300",
+        icon: "text-orange-600"
+      },
+      critical: {
+        bg: "bg-gradient-to-r from-red-100 to-red-200",
+        text: "text-red-800",
+        border: "border-red-300",
+        icon: "text-red-600"
+      },
     };
 
+    const colors = priorityColors[item.priority] || priorityColors.medium;
+
     return (
-      <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
+      <div className="flex items-center justify-between p-5 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-200/60 hover:shadow-lg hover:border-gray-300/60 transition-all duration-200 group">
         <div className="flex-1">
-          <h4 className="text-sm font-medium text-gray-900">{item.title}</h4>
-          <p className="text-sm text-gray-600 mt-1">{item.description}</p>
-          <div className="flex items-center space-x-2 mt-2">
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${priorityColors[item.priority]}`}>
-              {item.priority}
-            </span>
-            <span className="text-xs text-gray-500">{item.created_at}</span>
+          <div className="flex items-start space-x-3">
+            <div className={`p-2 rounded-lg ${colors.bg} ${colors.border} border`}>
+              <Clock className={`w-4 h-4 ${colors.icon}`} />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{item.title}</h4>
+              <p className="text-sm text-gray-600 mt-1 leading-relaxed">{item.description}</p>
+              <div className="flex items-center space-x-3 mt-3">
+                <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wide ${colors.bg} ${colors.text} border ${colors.border}`}>
+                  {item.priority}
+                </span>
+                <span className="text-xs text-gray-500 font-medium">{item.created_at}</span>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="ml-4">
-          <button className="text-primary hover:text-primary-600 text-sm font-medium">
+        <div className="ml-6">
+          <button className="btn-primary text-sm">
             Review
           </button>
         </div>
@@ -201,37 +253,50 @@ const Dashboard = () => {
     const data = getComplaintsByPriorityData();
 
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Complaints by Priority</h3>
-          <PieChart className="w-5 h-5 text-gray-400" />
+      <div className="dashboard-card-elevated">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">Complaints by Priority</h3>
+            <p className="text-sm text-gray-500 mt-1">Distribution of complaint priorities</p>
+          </div>
+          <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
+            <PieChart className="w-6 h-6 text-white" />
+          </div>
         </div>
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={320}>
           <RechartsPieChart>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius={60}
-              outerRadius={100}
-              paddingAngle={5}
+              innerRadius={70}
+              outerRadius={110}
+              paddingAngle={3}
               dataKey="value"
             >
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />
               ))}
             </Pie>
-            <Tooltip formatter={(value) => [value, 'Count']} />
+            <Tooltip
+              formatter={(value) => [value, 'Count']}
+              contentStyle={{
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                border: 'none',
+                borderRadius: '12px',
+                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+              }}
+            />
           </RechartsPieChart>
         </ResponsiveContainer>
-        <div className="flex flex-wrap gap-4 mt-4">
+        <div className="flex flex-wrap gap-4 mt-6">
           {data.map((item, index) => (
-            <div key={index} className="flex items-center space-x-2">
+            <div key={index} className="flex items-center space-x-3 bg-gray-50/50 px-3 py-2 rounded-lg">
               <div
-                className="w-3 h-3 rounded-full"
+                className="w-4 h-4 rounded-full shadow-sm"
                 style={{ backgroundColor: item.color }}
               ></div>
-              <span className="text-sm text-gray-600">{item.name}: {item.value}</span>
+              <span className="text-sm font-medium text-gray-700">{item.name}: <span className="font-bold">{item.value}</span></span>
             </div>
           ))}
         </div>
@@ -243,18 +308,42 @@ const Dashboard = () => {
     const data = getComplaintsByStatusData();
 
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Complaints by Status</h3>
-          <BarChart3 className="w-5 h-5 text-gray-400" />
+      <div className="dashboard-card-elevated">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">Complaints by Status</h3>
+            <p className="text-sm text-gray-500 mt-1">Current status distribution</p>
+          </div>
+          <div className="p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg">
+            <BarChart3 className="w-6 h-6 text-white" />
+          </div>
         </div>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="value" fill="#486581" radius={[4, 4, 0, 0]} />
+        <ResponsiveContainer width="100%" height={320}>
+          <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 12, fill: '#6b7280' }}
+              axisLine={{ stroke: '#d1d5db' }}
+            />
+            <YAxis
+              tick={{ fontSize: 12, fill: '#6b7280' }}
+              axisLine={{ stroke: '#d1d5db' }}
+            />
+            <Tooltip
+              formatter={(value) => [value, 'Count']}
+              contentStyle={{
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                border: 'none',
+                borderRadius: '12px',
+                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+              }}
+            />
+            <Bar
+              dataKey="value"
+              fill="#486581"
+              radius={[6, 6, 0, 0]}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -265,24 +354,50 @@ const Dashboard = () => {
     const data = getRevenueData();
 
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Revenue by Status</h3>
-          <TrendingUp className="w-5 h-5 text-gray-400" />
+      <div className="dashboard-card-elevated">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">Revenue by Status</h3>
+            <p className="text-sm text-gray-500 mt-1">Revenue distribution across booking statuses</p>
+          </div>
+          <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg">
+            <TrendingUp className="w-6 h-6 text-white" />
+          </div>
         </div>
-        <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip formatter={(value) => [`₹${value.toLocaleString()}`, 'Revenue']} />
+        <ResponsiveContainer width="100%" height={320}>
+          <AreaChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 12, fill: '#6b7280' }}
+              axisLine={{ stroke: '#d1d5db' }}
+            />
+            <YAxis
+              tick={{ fontSize: 12, fill: '#6b7280' }}
+              axisLine={{ stroke: '#d1d5db' }}
+            />
+            <Tooltip
+              formatter={(value) => [`₹${value.toLocaleString()}`, 'Revenue']}
+              contentStyle={{
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                border: 'none',
+                borderRadius: '12px',
+                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+              }}
+            />
             <Area
               type="monotone"
               dataKey="value"
-              stroke="#486581"
-              fill="#486581"
-              fillOpacity={0.3}
+              stroke="#10B981"
+              fill="url(#areaGradient)"
+              strokeWidth={3}
             />
+            <defs>
+              <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10B981" stopOpacity={0.4} />
+                <stop offset="100%" stopColor="#10B981" stopOpacity={0.1} />
+              </linearGradient>
+            </defs>
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -318,139 +433,164 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Welcome Section with Auto-refresh Controls */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Operations Dashboard
-            </h2>
-            <p className="text-gray-600">
-              Monitor key metrics, manage priority queue, and oversee operations performance.
-            </p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="text-sm text-gray-500">
-              Last updated: {lastUpdated.toLocaleTimeString()}
+    <div className="min-h-full bg-transparent">
+      {/* Professional Header Section */}
+      <div className="bg-gradient-to-r from-white via-blue-50/30 to-indigo-50/20 border-b border-gray-200/50 backdrop-blur-sm">
+        <div className="px-6 py-8">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
+                Operations Dashboard
+              </h1>
+              <p className="text-gray-600 text-lg">
+                Monitor key metrics, manage priority queue, and oversee operations performance.
+              </p>
             </div>
-            <button
-              onClick={() => fetchDashboardData()}
-              className="flex items-center space-x-2 px-3 py-2 bg-primary text-white rounded-md hover:bg-primary-600 transition-colors"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Refresh</span>
-            </button>
-            <button
-              onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`flex items-center space-x-2 px-3 py-2 rounded-md transition-colors ${
-                autoRefresh
-                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <Activity className={`w-4 h-4 ${autoRefresh ? 'animate-pulse' : ''}`} />
-              <span>{autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}</span>
-            </button>
+            <div className="flex items-center space-x-6">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-700">Last updated</p>
+                <p className="text-lg font-semibold text-blue-600">
+                  {lastUpdated.toLocaleTimeString()}
+                </p>
+              </div>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => fetchDashboardData()}
+                  className="btn-primary flex items-center space-x-2 group"
+                >
+                  <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-300" />
+                  <span>Refresh</span>
+                </button>
+                <button
+                  onClick={() => setAutoRefresh(!autoRefresh)}
+                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+                    autoRefresh
+                      ? 'btn-success'
+                      : 'btn-secondary'
+                  }`}
+                >
+                  <Activity className={`w-4 h-4 ${autoRefresh ? 'animate-pulse text-white' : 'text-gray-600'}`} />
+                  <span>{autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard
-          title="Active Bookings"
-          value={metrics?.realtime?.active_bookings || 0}
-          change={metrics?.bookings?.growth_rate}
-          icon={Users}
-          color="blue"
-        />
-        <MetricCard
-          title="Open Complaints"
-          value={metrics?.complaints?.unresolved || 0}
-          change={null}
-          icon={MessageSquare}
-          color="yellow"
-        />
-        <MetricCard
-          title="Priority Queue"
-          value={priorityQueue.length || 0}
-          change={null}
-          icon={Clock}
-          color="red"
-        />
-        <MetricCard
-          title="SLA Compliance"
-          value={`${Math.round(metrics?.sla?.compliance_rate || 0)}%`}
-          change={null}
-          icon={TrendingUp}
-          color="green"
-        />
+      {/* Enhanced Metrics Grid */}
+      <div className="px-6 py-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <MetricCard
+            title="Active Bookings"
+            value={metrics?.realtime?.active_bookings || 0}
+            change={metrics?.bookings?.growth_rate}
+            icon={Users}
+            color="blue"
+          />
+          <MetricCard
+            title="Open Complaints"
+            value={metrics?.complaints?.unresolved || 0}
+            change={null}
+            icon={MessageSquare}
+            color="yellow"
+          />
+          <MetricCard
+            title="Priority Queue"
+            value={priorityQueue.length || 0}
+            change={null}
+            icon={Clock}
+            color="red"
+          />
+          <MetricCard
+            title="SLA Compliance"
+            value={`${Math.round(metrics?.sla?.compliance_rate || 0)}%`}
+            change={null}
+            icon={TrendingUp}
+            color="green"
+          />
+        </div>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        <ComplaintsPriorityChart />
-        <ComplaintsStatusChart />
-        <RevenueChart />
+      {/* Enhanced Charts Section */}
+      <div className="px-6 pb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <ComplaintsPriorityChart />
+          <ComplaintsStatusChart />
+          <RevenueChart />
+        </div>
       </div>
 
-      {/* Priority Queue Section */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Priority Queue
-          </h3>
-          <button className="text-primary hover:text-primary-600 text-sm font-medium">
-            View All
+      {/* Enhanced Priority Queue Section */}
+      <div className="px-6 pb-6">
+        <div className="dashboard-card-elevated">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">Priority Queue</h3>
+              <p className="text-sm text-gray-500 mt-1">High-priority items requiring immediate attention</p>
+            </div>
+            <button className="btn-primary">
+              View All
+            </button>
+          </div>
+
+          {priorityQueue.length > 0 ? (
+            <div className="space-y-4">
+              {priorityQueue.map((item, index) => (
+                <PriorityQueueItem key={index} item={item} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <CheckCircle className="w-8 h-8 text-white" />
+              </div>
+              <p className="text-gray-600 text-lg font-medium">No items in priority queue</p>
+              <p className="text-gray-500 text-sm mt-1">All high-priority items have been resolved</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Enhanced Quick Actions */}
+      <div className="px-6 pb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <button className="dashboard-card-elevated text-left group hover:scale-[1.02] transition-all duration-200">
+            <div className="p-4 bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl w-16 h-16 mb-4 flex items-center justify-center group-hover:shadow-xl transition-shadow">
+              <AlertTriangle className="w-8 h-8 text-white" />
+            </div>
+            <h4 className="text-xl font-bold text-gray-900 mb-2">
+              Review Alerts
+            </h4>
+            <p className="text-gray-600">
+              Check and manage system alerts and notifications
+            </p>
+          </button>
+
+          <button className="dashboard-card-elevated text-left group hover:scale-[1.02] transition-all duration-200">
+            <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl w-16 h-16 mb-4 flex items-center justify-center group-hover:shadow-xl transition-shadow">
+              <MessageSquare className="w-8 h-8 text-white" />
+            </div>
+            <h4 className="text-xl font-bold text-gray-900 mb-2">
+              Manage Complaints
+            </h4>
+            <p className="text-gray-600">
+              View and resolve customer complaints
+            </p>
+          </button>
+
+          <button className="dashboard-card-elevated text-left group hover:scale-[1.02] transition-all duration-200">
+            <div className="p-4 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl w-16 h-16 mb-4 flex items-center justify-center group-hover:shadow-xl transition-shadow">
+              <Users className="w-8 h-8 text-white" />
+            </div>
+            <h4 className="text-xl font-bold text-gray-900 mb-2">
+              Staff Management
+            </h4>
+            <p className="text-gray-600">
+              Manage staff roles and permissions
+            </p>
           </button>
         </div>
-        
-        {priorityQueue.length > 0 ? (
-          <div className="space-y-4">
-            {priorityQueue.map((item, index) => (
-              <PriorityQueueItem key={index} item={item} />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
-            <p className="text-gray-600">No items in priority queue</p>
-          </div>
-        )}
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <button className="bg-white border border-gray-200 rounded-lg p-6 text-left hover:shadow-md transition-shadow">
-          <AlertTriangle className="w-8 h-8 text-yellow-500 mb-3" />
-          <h4 className="text-lg font-semibold text-gray-900 mb-2">
-            Review Alerts
-          </h4>
-          <p className="text-gray-600 text-sm">
-            Check and manage system alerts and notifications
-          </p>
-        </button>
-
-        <button className="bg-white border border-gray-200 rounded-lg p-6 text-left hover:shadow-md transition-shadow">
-          <MessageSquare className="w-8 h-8 text-blue-500 mb-3" />
-          <h4 className="text-lg font-semibold text-gray-900 mb-2">
-            Manage Complaints
-          </h4>
-          <p className="text-gray-600 text-sm">
-            View and resolve customer complaints
-          </p>
-        </button>
-
-        <button className="bg-white border border-gray-200 rounded-lg p-6 text-left hover:shadow-md transition-shadow">
-          <Users className="w-8 h-8 text-green-500 mb-3" />
-          <h4 className="text-lg font-semibold text-gray-900 mb-2">
-            Staff Management
-          </h4>
-          <p className="text-gray-600 text-sm">
-            Manage staff roles and permissions
-          </p>
-        </button>
       </div>
     </div>
   );
