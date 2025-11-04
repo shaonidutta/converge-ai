@@ -165,20 +165,20 @@ const Dashboard = () => {
     const colors = colorClasses[color];
 
     return (
-      <div className="dashboard-card-elevated group cursor-pointer">
+      <div className="bg-gradient-to-br from-white via-white to-gray-50/30 p-4 rounded-xl border border-gray-200/60 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-gray-300/60 hover:scale-[1.02] group cursor-pointer">
         <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">{title}</p>
-            <p className="text-4xl font-bold text-gray-900 mt-3 group-hover:scale-105 transition-transform duration-200">{value}</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">{title}</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1 group-hover:scale-105 transition-transform duration-200 truncate">{value}</p>
             {change && (
-              <p className={`text-sm mt-2 flex items-center ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                <TrendingUp className="w-4 h-4 mr-1" />
+              <p className={`text-xs mt-1.5 flex items-center ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <TrendingUp className="w-3 h-3 mr-1" />
                 {change >= 0 ? '+' : ''}{change}% from last period
               </p>
             )}
           </div>
-          <div className={`p-4 rounded-2xl bg-gradient-to-br ${colors.gradient} shadow-lg group-hover:shadow-xl transition-all duration-200 group-hover:scale-110`}>
-            <Icon className={`w-8 h-8 ${colors.icon}`} />
+          <div className={`p-3 rounded-xl bg-gradient-to-br ${colors.gradient} shadow-md group-hover:shadow-lg transition-all duration-200 group-hover:scale-105 flex-shrink-0 ml-3`}>
+            <Icon className={`w-6 h-6 ${colors.icon}`} />
           </div>
         </div>
       </div>
@@ -219,26 +219,24 @@ const Dashboard = () => {
     const colors = priorityColors[item.priority] || priorityColors.medium;
 
     return (
-      <div className="flex items-center justify-between p-5 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-200/60 hover:shadow-lg hover:border-gray-300/60 transition-all duration-200 group">
-        <div className="flex-1">
-          <div className="flex items-start space-x-3">
-            <div className={`p-2 rounded-lg ${colors.bg} ${colors.border} border`}>
-              <Clock className={`w-4 h-4 ${colors.icon}`} />
-            </div>
-            <div className="flex-1">
-              <h4 className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{item.title}</h4>
-              <p className="text-sm text-gray-600 mt-1 leading-relaxed">{item.description}</p>
-              <div className="flex items-center space-x-3 mt-3">
-                <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wide ${colors.bg} ${colors.text} border ${colors.border}`}>
-                  {item.priority}
-                </span>
-                <span className="text-xs text-gray-500 font-medium">{item.created_at}</span>
-              </div>
+      <div className="flex items-center justify-between p-4 bg-gradient-to-r from-white via-white to-gray-50/30 rounded-xl border border-gray-200/60 hover:shadow-lg hover:border-gray-300/60 transition-all duration-200 group hover:scale-[1.01]">
+        <div className="flex items-center space-x-4 flex-1">
+          <div className={`p-3 rounded-xl ${colors.bg} ${colors.border} border shadow-sm`}>
+            <Clock className={`w-5 h-5 ${colors.icon}`} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">{item.title}</h4>
+            <p className="text-sm text-gray-600 mt-1 leading-relaxed line-clamp-2">{item.description}</p>
+            <div className="flex items-center space-x-3 mt-2">
+              <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold uppercase tracking-wide ${colors.bg} ${colors.text} border ${colors.border}`}>
+                {item.priority}
+              </span>
+              <span className="text-xs text-gray-500 font-medium">{item.created_at}</span>
             </div>
           </div>
         </div>
-        <div className="ml-6">
-          <button className="btn-primary text-sm">
+        <div className="ml-4 flex-shrink-0">
+          <button className="btn-primary text-sm px-4 py-2">
             Review
           </button>
         </div>
@@ -253,25 +251,25 @@ const Dashboard = () => {
     const data = getComplaintsByPriorityData();
 
     return (
-      <div className="dashboard-card-elevated">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-gradient-to-br from-white via-white to-gray-50/30 p-4 rounded-xl border border-gray-200/60 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-gray-300/60">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-xl font-bold text-gray-900">Complaints by Priority</h3>
-            <p className="text-sm text-gray-500 mt-1">Distribution of complaint priorities</p>
+            <h3 className="text-lg font-bold text-gray-900">Complaints by Priority</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Distribution of complaint priorities</p>
           </div>
-          <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
-            <PieChart className="w-6 h-6 text-white" />
+          <div className="p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-md">
+            <PieChart className="w-5 h-5 text-white" />
           </div>
         </div>
-        <ResponsiveContainer width="100%" height={320}>
+        <ResponsiveContainer width="100%" height={280}>
           <RechartsPieChart>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius={70}
-              outerRadius={110}
-              paddingAngle={3}
+              innerRadius={60}
+              outerRadius={95}
+              paddingAngle={2}
               dataKey="value"
             >
               {data.map((entry, index) => (
@@ -283,20 +281,21 @@ const Dashboard = () => {
               contentStyle={{
                 backgroundColor: 'rgba(255, 255, 255, 0.95)',
                 border: 'none',
-                borderRadius: '12px',
-                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                fontSize: '12px'
               }}
             />
           </RechartsPieChart>
         </ResponsiveContainer>
-        <div className="flex flex-wrap gap-4 mt-6">
+        <div className="flex flex-wrap gap-2 mt-4">
           {data.map((item, index) => (
-            <div key={index} className="flex items-center space-x-3 bg-gray-50/50 px-3 py-2 rounded-lg">
+            <div key={index} className="flex items-center space-x-2 bg-gray-50/50 px-2 py-1.5 rounded-md">
               <div
-                className="w-4 h-4 rounded-full shadow-sm"
+                className="w-3 h-3 rounded-full shadow-sm"
                 style={{ backgroundColor: item.color }}
               ></div>
-              <span className="text-sm font-medium text-gray-700">{item.name}: <span className="font-bold">{item.value}</span></span>
+              <span className="text-xs font-medium text-gray-700">{item.name}: <span className="font-bold">{item.value}</span></span>
             </div>
           ))}
         </div>
@@ -308,26 +307,26 @@ const Dashboard = () => {
     const data = getComplaintsByStatusData();
 
     return (
-      <div className="dashboard-card-elevated">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-gradient-to-br from-white via-white to-gray-50/30 p-4 rounded-xl border border-gray-200/60 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-gray-300/60">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-xl font-bold text-gray-900">Complaints by Status</h3>
-            <p className="text-sm text-gray-500 mt-1">Current status distribution</p>
+            <h3 className="text-lg font-bold text-gray-900">Complaints by Status</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Current status distribution</p>
           </div>
-          <div className="p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg">
-            <BarChart3 className="w-6 h-6 text-white" />
+          <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg shadow-md">
+            <BarChart3 className="w-5 h-5 text-white" />
           </div>
         </div>
-        <ResponsiveContainer width="100%" height={320}>
-          <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={data} margin={{ top: 15, right: 20, left: 15, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
             <XAxis
               dataKey="name"
-              tick={{ fontSize: 12, fill: '#6b7280' }}
+              tick={{ fontSize: 11, fill: '#6b7280' }}
               axisLine={{ stroke: '#d1d5db' }}
             />
             <YAxis
-              tick={{ fontSize: 12, fill: '#6b7280' }}
+              tick={{ fontSize: 11, fill: '#6b7280' }}
               axisLine={{ stroke: '#d1d5db' }}
             />
             <Tooltip
@@ -335,14 +334,15 @@ const Dashboard = () => {
               contentStyle={{
                 backgroundColor: 'rgba(255, 255, 255, 0.95)',
                 border: 'none',
-                borderRadius: '12px',
-                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                fontSize: '12px'
               }}
             />
             <Bar
               dataKey="value"
               fill="#486581"
-              radius={[6, 6, 0, 0]}
+              radius={[4, 4, 0, 0]}
             />
           </BarChart>
         </ResponsiveContainer>
@@ -354,26 +354,26 @@ const Dashboard = () => {
     const data = getRevenueData();
 
     return (
-      <div className="dashboard-card-elevated">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-gradient-to-br from-white via-white to-gray-50/30 p-4 rounded-xl border border-gray-200/60 shadow-lg hover:shadow-xl transition-all duration-300 hover:border-gray-300/60">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-xl font-bold text-gray-900">Revenue by Status</h3>
-            <p className="text-sm text-gray-500 mt-1">Revenue distribution across booking statuses</p>
+            <h3 className="text-lg font-bold text-gray-900">Revenue by Status</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Revenue distribution across booking statuses</p>
           </div>
-          <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl shadow-lg">
-            <TrendingUp className="w-6 h-6 text-white" />
+          <div className="p-2 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg shadow-md">
+            <TrendingUp className="w-5 h-5 text-white" />
           </div>
         </div>
-        <ResponsiveContainer width="100%" height={320}>
-          <AreaChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <ResponsiveContainer width="100%" height={280}>
+          <AreaChart data={data} margin={{ top: 15, right: 20, left: 15, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
             <XAxis
               dataKey="name"
-              tick={{ fontSize: 12, fill: '#6b7280' }}
+              tick={{ fontSize: 11, fill: '#6b7280' }}
               axisLine={{ stroke: '#d1d5db' }}
             />
             <YAxis
-              tick={{ fontSize: 12, fill: '#6b7280' }}
+              tick={{ fontSize: 11, fill: '#6b7280' }}
               axisLine={{ stroke: '#d1d5db' }}
             />
             <Tooltip
@@ -381,8 +381,9 @@ const Dashboard = () => {
               contentStyle={{
                 backgroundColor: 'rgba(255, 255, 255, 0.95)',
                 border: 'none',
-                borderRadius: '12px',
-                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                fontSize: '12px'
               }}
             />
             <Area
@@ -390,7 +391,7 @@ const Dashboard = () => {
               dataKey="value"
               stroke="#10B981"
               fill="url(#areaGradient)"
-              strokeWidth={3}
+              strokeWidth={2}
             />
             <defs>
               <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
@@ -436,34 +437,34 @@ const Dashboard = () => {
     <div className="min-h-full bg-transparent">
       {/* Professional Header Section */}
       <div className="bg-gradient-to-r from-white via-blue-50/30 to-indigo-50/20 border-b border-gray-200/50 backdrop-blur-sm">
-        <div className="px-6 py-8">
+        <div className="px-6 py-6">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
                 Operations Dashboard
               </h1>
-              <p className="text-gray-600 text-lg">
+              <p className="text-gray-600 text-base">
                 Monitor key metrics, manage priority queue, and oversee operations performance.
               </p>
             </div>
-            <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-4">
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-700">Last updated</p>
-                <p className="text-lg font-semibold text-blue-600">
+                <p className="text-xs font-medium text-gray-700">Last updated</p>
+                <p className="text-base font-semibold text-blue-600">
                   {lastUpdated.toLocaleTimeString()}
                 </p>
               </div>
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
                 <button
                   onClick={() => fetchDashboardData()}
-                  className="btn-primary flex items-center space-x-2 group"
+                  className="btn-primary flex items-center space-x-2 group text-sm px-3 py-2"
                 >
                   <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-300" />
                   <span>Refresh</span>
                 </button>
                 <button
                   onClick={() => setAutoRefresh(!autoRefresh)}
-                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
                     autoRefresh
                       ? 'btn-success'
                       : 'btn-secondary'
@@ -479,8 +480,8 @@ const Dashboard = () => {
       </div>
 
       {/* Enhanced Metrics Grid */}
-      <div className="px-6 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="px-6 py-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
             title="Active Bookings"
             value={metrics?.realtime?.active_bookings || 0}
@@ -513,8 +514,8 @@ const Dashboard = () => {
       </div>
 
       {/* Enhanced Charts Section */}
-      <div className="px-6 pb-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="px-6 pb-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
           <ComplaintsPriorityChart />
           <ComplaintsStatusChart />
           <RevenueChart />
@@ -522,8 +523,8 @@ const Dashboard = () => {
       </div>
 
       {/* Enhanced Priority Queue Section */}
-      <div className="px-6 pb-6">
-        <div className="dashboard-card-elevated">
+      <div className="px-6 pb-8">
+        <div className="dashboard-card-elevated p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-xl font-bold text-gray-900">Priority Queue</h3>
@@ -535,7 +536,7 @@ const Dashboard = () => {
           </div>
 
           {priorityQueue.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {priorityQueue.map((item, index) => (
                 <PriorityQueueItem key={index} item={item} />
               ))}
@@ -554,8 +555,12 @@ const Dashboard = () => {
 
       {/* Enhanced Quick Actions */}
       <div className="px-6 pb-8">
+        <div className="mb-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Quick Actions</h3>
+          <p className="text-sm text-gray-500">Access frequently used operations and management tools</p>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <button className="dashboard-card-elevated text-left group hover:scale-[1.02] transition-all duration-200">
+          <button className="dashboard-card-elevated p-6 text-left group hover:scale-[1.02] transition-all duration-200">
             <div className="p-4 bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl w-16 h-16 mb-4 flex items-center justify-center group-hover:shadow-xl transition-shadow">
               <AlertTriangle className="w-8 h-8 text-white" />
             </div>
@@ -567,7 +572,7 @@ const Dashboard = () => {
             </p>
           </button>
 
-          <button className="dashboard-card-elevated text-left group hover:scale-[1.02] transition-all duration-200">
+          <button className="dashboard-card-elevated p-6 text-left group hover:scale-[1.02] transition-all duration-200">
             <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl w-16 h-16 mb-4 flex items-center justify-center group-hover:shadow-xl transition-shadow">
               <MessageSquare className="w-8 h-8 text-white" />
             </div>
@@ -579,7 +584,7 @@ const Dashboard = () => {
             </p>
           </button>
 
-          <button className="dashboard-card-elevated text-left group hover:scale-[1.02] transition-all duration-200">
+          <button className="dashboard-card-elevated p-6 text-left group hover:scale-[1.02] transition-all duration-200">
             <div className="p-4 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl w-16 h-16 mb-4 flex items-center justify-center group-hover:shadow-xl transition-shadow">
               <Users className="w-8 h-8 text-white" />
             </div>
