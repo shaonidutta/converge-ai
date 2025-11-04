@@ -25,7 +25,13 @@ from src.services.metrics_service import MetricsService
 from src.services.config_service import ConfigService
 from src.services.audit_service import AuditService
 
+# Import complaints router
+from src.api.v1.routes.ops_complaints import router as complaints_router
+
 router = APIRouter(prefix="/ops", tags=["Ops Management"])
+
+# Include complaints sub-router
+router.include_router(complaints_router)
 
 
 @router.post(
