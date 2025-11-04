@@ -1,0 +1,164 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Background colors - Professional dashboard theme */
+    --background: 0 0% 100%;
+    --foreground: 222 84% 5%;
+
+    /* Card colors */
+    --card: 0 0% 100%;
+    --card-foreground: 222 84% 5%;
+
+    /* Popover colors */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 84% 5%;
+
+    /* Primary color - Professional Blue (#2563EB) */
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary color - Slate Gray (#64748B) */
+    --secondary: 215 20% 65%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Muted colors */
+    --muted: 210 40% 98%;
+    --muted-foreground: 215 16% 47%;
+
+    /* Accent color - Amber (#F59E0B) */
+    --accent: 43 96% 56%;
+    --accent-foreground: 222 84% 5%;
+
+    /* Destructive/Error color - Red (#EF4444) */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Border and input colors */
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+
+    /* Ring color for focus states */
+    --ring: 221 83% 53%;
+
+    /* Border radius */
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222 84% 5%;
+    --foreground: 210 40% 98%;
+    --card: 222 84% 5%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 84% 5%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 215 20% 65%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 43 96% 56%;
+    --accent-foreground: 222 84% 5%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 221 83% 53%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+  }
+}
+
+@layer utilities {
+  .animate-in {
+    animation: fade-in 0.3s ease-out;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r;
+  }
+
+  .glass {
+    @apply bg-white/95 backdrop-blur-sm border border-white/20;
+  }
+
+  .dashboard-card {
+    @apply bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+
+  .sidebar-item {
+    @apply flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150;
+  }
+
+  .sidebar-item-active {
+    @apply bg-primary text-primary-foreground;
+  }
+
+  .sidebar-item-inactive {
+    @apply text-gray-600 hover:bg-gray-50 hover:text-gray-900;
+  }
+
+  .metric-card {
+    @apply bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200;
+  }
+
+  .priority-low {
+    @apply text-green-600 bg-green-50 border-green-200;
+  }
+
+  .priority-medium {
+    @apply text-amber-600 bg-amber-50 border-amber-200;
+  }
+
+  .priority-high {
+    @apply text-orange-600 bg-orange-50 border-orange-200;
+  }
+
+  .priority-critical {
+    @apply text-red-600 bg-red-50 border-red-200;
+  }
+
+  .status-active {
+    @apply text-green-600 bg-green-50;
+  }
+
+  .status-inactive {
+    @apply text-gray-600 bg-gray-50;
+  }
+
+  .status-pending {
+    @apply text-amber-600 bg-amber-50;
+  }
+
+  .sla-ontrack {
+    @apply text-green-600 bg-green-50;
+  }
+
+  .sla-atrisk {
+    @apply text-amber-600 bg-amber-50;
+  }
+
+  .sla-breached {
+    @apply text-red-600 bg-red-50;
+  }
+}
