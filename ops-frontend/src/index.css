@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Source+Sans+Pro:wght@300;400;600;700;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -18,12 +18,12 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 84% 5%;
 
-    /* Primary color - Professional Blue (#2563EB) */
-    --primary: 221 83% 53%;
+    /* Primary color - Corporate Steel Blue (#486581) */
+    --primary: 210 28% 39%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary color - Slate Gray (#64748B) */
-    --secondary: 215 20% 65%;
+    /* Secondary color - Professional Enterprise Gray (#4A5568) */
+    --secondary: 215 25% 35%;
     --secondary-foreground: 0 0% 100%;
 
     /* Muted colors */
@@ -79,8 +79,10 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'IBM Plex Sans', 'Source Sans Pro', 'Inter', system-ui, -apple-system, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+    font-weight: 400;
+    letter-spacing: -0.01em;
   }
 
   h1, h2, h3, h4, h5, h6 {

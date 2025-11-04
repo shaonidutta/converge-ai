@@ -20,33 +20,33 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
-        // Operations dashboard theme - professional blue/gray palette
+        // Enterprise Operations Dashboard Theme - Corporate Steel Blue
         primary: {
-          DEFAULT: "#2563EB", // Blue-600
-          50: "#EFF6FF",
-          100: "#DBEAFE",
-          200: "#BFDBFE",
-          300: "#93C5FD",
-          400: "#60A5FA",
-          500: "#3B82F6",
-          600: "#2563EB",
-          700: "#1D4ED8",
-          800: "#1E40AF",
-          900: "#1E3A8A",
+          DEFAULT: "#486581", // Corporate steel blue
+          50: "#F0F4F8",
+          100: "#D9E2EC",
+          200: "#BCCCDC",
+          300: "#9FB3C8",
+          400: "#829AB1",
+          500: "#627D98", // Professional steel blue
+          600: "#486581", // Main corporate blue
+          700: "#334E68", // Deep corporate blue
+          800: "#243B53", // Dark enterprise blue
+          900: "#102A43", // Very dark blue
           foreground: "#FFFFFF",
         },
         secondary: {
-          DEFAULT: "#64748B", // Slate-500
-          50: "#F8FAFC",
-          100: "#F1F5F9",
+          DEFAULT: "#4A5568", // Professional enterprise gray
+          50: "#F7FAFC",
+          100: "#EDF2F7",
           200: "#E2E8F0",
           300: "#CBD5E1",
-          400: "#94A3B8",
-          500: "#64748B",
-          600: "#475569",
-          700: "#334155",
-          800: "#1E293B",
-          900: "#0F172A",
+          400: "#A0AEC0",
+          500: "#718096", // Professional gray
+          600: "#4A5568", // Main enterprise gray
+          700: "#2D3748", // Dark professional gray
+          800: "#1A202C", // Very dark gray
+          900: "#171923", // Almost black
           foreground: "#FFFFFF",
         },
         accent: {
