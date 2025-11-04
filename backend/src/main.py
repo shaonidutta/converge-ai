@@ -51,6 +51,7 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Customer frontend (React)
     "http://localhost:3001",  # Ops frontend
     "http://localhost:5173",  # Customer frontend (Vite dev server)
+    "http://localhost:5174",  # Ops frontend (Vite dev server)
     "https://convergeAI.app",
 ]
 
@@ -141,8 +142,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*"],
 )
 
 # --- Rate Limiting ---

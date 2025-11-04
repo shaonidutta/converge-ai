@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }) => {
       // Store staff data
       localStorage.setItem("ops_staff", JSON.stringify(staffData));
       localStorage.setItem("ops_staff_id", staffData.id.toString());
-      localStorage.setItem("ops_staff_role", staffData.role);
+      localStorage.setItem("ops_staff_role", staffData.role?.name || staffData.role);
       localStorage.setItem("ops_permissions", JSON.stringify(staffPermissions));
     } catch (error) {
       console.error("Error storing staff data:", error);
@@ -101,31 +101,32 @@ export const AuthProvider = ({ children }) => {
       if (storedStaff) {
         setStaff(storedStaff);
         setPermissions(storedPermissions);
-        setRole(storedStaff.role);
+        setRole(storedStaff.role?.name || storedStaff.role);
         setIsLoggedIn(true);
       }
 
-      // Validate token by making a test API call
-      try {
-        const response = await api.auth.getMe();
-        const staffData = response.data;
-        
-        setStaff(staffData);
-        setPermissions(staffData.permissions || []);
-        setRole(staffData.role);
-        setIsLoggedIn(true);
-        
-        // Update stored data
-        localStorage.setItem("ops_staff", JSON.stringify(staffData));
-        localStorage.setItem("ops_staff_id", staffData.id.toString());
-        localStorage.setItem("ops_staff_role", staffData.role);
-        localStorage.setItem("ops_permissions", JSON.stringify(staffData.permissions || []));
-        
-      } catch (error) {
-        console.error("Token validation failed:", error);
-        // Token is invalid, clear auth data
-        handleLogout();
-      }
+      // TODO: Validate token by making a test API call when /auth/me endpoint is available
+      // For now, we rely on the stored data from login
+      // try {
+      //   const response = await api.auth.getMe();
+      //   const staffData = response.data;
+      //
+      //   setStaff(staffData);
+      //   setPermissions(staffData.permissions || []);
+      //   setRole(staffData.role?.name || staffData.role);
+      //   setIsLoggedIn(true);
+      //
+      //   // Update stored data
+      //   localStorage.setItem("ops_staff", JSON.stringify(staffData));
+      //   localStorage.setItem("ops_staff_id", staffData.id.toString());
+      //   localStorage.setItem("ops_staff_role", staffData.role?.name || staffData.role);
+      //   localStorage.setItem("ops_permissions", JSON.stringify(staffData.permissions || []));
+      //
+      // } catch (error) {
+      //   console.error("Token validation failed:", error);
+      //   // Token is invalid, clear auth data
+      //   handleLogout();
+      // }
     } catch (error) {
       console.error("Auth initialization error:", error);
       handleLogout();
@@ -142,7 +143,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       
       const response = await api.auth.login(credentials);
-      const { staff: staffData, tokens, permissions: staffPermissions } = response.data;
+      const { user: staffData, tokens, permissions: staffPermissions } = response.data;
 
       // Store authentication data
       storeStaffData(staffData, tokens, staffPermissions);
@@ -150,7 +151,7 @@ export const AuthProvider = ({ children }) => {
       // Update state
       setStaff(staffData);
       setPermissions(staffPermissions);
-      setRole(staffData.role);
+      setRole(staffData.role?.name || staffData.role);
       setIsLoggedIn(true);
 
       return { success: true, staff: staffData };
