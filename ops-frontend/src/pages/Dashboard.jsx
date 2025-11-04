@@ -1,14 +1,33 @@
-import { useState, useEffect } from "react";
-import { 
-  Users, 
-  MessageSquare, 
-  Clock, 
+import { useState, useEffect, useCallback } from "react";
+import {
+  Users,
+  MessageSquare,
+  Clock,
   TrendingUp,
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Activity
+  Activity,
+  RefreshCw,
+  BarChart3,
+  PieChart
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  Area,
+  AreaChart
+} from 'recharts';
 import api from "../services/api";
 
 /**
@@ -26,13 +45,15 @@ const Dashboard = () => {
   const [priorityQueue, setPriorityQueue] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   /**
    * Fetch dashboard data
    */
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       setError(null);
 
       // Fetch metrics and priority queue in parallel
@@ -43,20 +64,72 @@ const Dashboard = () => {
 
       setMetrics(metricsResponse.data);
       setPriorityQueue(queueResponse.data.items || []);
+      setLastUpdated(new Date());
     } catch (err) {
       console.error("Dashboard data fetch error:", err);
       setError("Failed to load dashboard data");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
-  };
+  }, []);
 
   /**
    * Load data on component mount
    */
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [fetchDashboardData]);
+
+  /**
+   * Auto-refresh functionality
+   */
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(() => {
+      fetchDashboardData(false); // Don't show loading spinner for auto-refresh
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, fetchDashboardData]);
+
+  /**
+   * Process chart data
+   */
+  const getComplaintsByPriorityData = () => {
+    if (!metrics?.complaints?.by_priority) return [];
+
+    const priorities = metrics.complaints.by_priority;
+    return [
+      { name: 'Low', value: priorities.low || 0, color: '#10B981' },
+      { name: 'Medium', value: priorities.medium || 0, color: '#F59E0B' },
+      { name: 'High', value: priorities.high || 0, color: '#EF4444' },
+      { name: 'Critical', value: priorities.critical || 0, color: '#DC2626' }
+    ];
+  };
+
+  const getComplaintsByStatusData = () => {
+    if (!metrics?.complaints?.by_status) return [];
+
+    const status = metrics.complaints.by_status;
+    return [
+      { name: 'Open', value: status.open || 0 },
+      { name: 'In Progress', value: status.in_progress || 0 },
+      { name: 'Resolved', value: status.resolved || 0 },
+      { name: 'Closed', value: status.closed || 0 }
+    ];
+  };
+
+  const getRevenueData = () => {
+    if (!metrics?.revenue?.by_status) return [];
+
+    const revenue = metrics.revenue.by_status;
+    return [
+      { name: 'Confirmed', value: Math.round(revenue.confirmed || 0) },
+      { name: 'Completed', value: Math.round(revenue.completed || 0) },
+      { name: 'Cancelled', value: Math.round(revenue.cancelled || 0) }
+    ];
+  };
 
   /**
    * Metric card component
@@ -121,6 +194,101 @@ const Dashboard = () => {
     );
   };
 
+  /**
+   * Chart components
+   */
+  const ComplaintsPriorityChart = () => {
+    const data = getComplaintsByPriorityData();
+
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Complaints by Priority</h3>
+          <PieChart className="w-5 h-5 text-gray-400" />
+        </div>
+        <ResponsiveContainer width="100%" height={300}>
+          <RechartsPieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={60}
+              outerRadius={100}
+              paddingAngle={5}
+              dataKey="value"
+            >
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip formatter={(value) => [value, 'Count']} />
+          </RechartsPieChart>
+        </ResponsiveContainer>
+        <div className="flex flex-wrap gap-4 mt-4">
+          {data.map((item, index) => (
+            <div key={index} className="flex items-center space-x-2">
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: item.color }}
+              ></div>
+              <span className="text-sm text-gray-600">{item.name}: {item.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const ComplaintsStatusChart = () => {
+    const data = getComplaintsByStatusData();
+
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Complaints by Status</h3>
+          <BarChart3 className="w-5 h-5 text-gray-400" />
+        </div>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="value" fill="#486581" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  };
+
+  const RevenueChart = () => {
+    const data = getRevenueData();
+
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Revenue by Status</h3>
+          <TrendingUp className="w-5 h-5 text-gray-400" />
+        </div>
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip formatter={(value) => [`₹${value.toLocaleString()}`, 'Revenue']} />
+            <Area
+              type="monotone"
+              dataKey="value"
+              stroke="#486581"
+              fill="#486581"
+              fillOpacity={0.3}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -151,46 +319,80 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
+      {/* Welcome Section with Auto-refresh Controls */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Operations Dashboard
-        </h2>
-        <p className="text-gray-600">
-          Monitor key metrics, manage priority queue, and oversee operations performance.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              Operations Dashboard
+            </h2>
+            <p className="text-gray-600">
+              Monitor key metrics, manage priority queue, and oversee operations performance.
+            </p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="text-sm text-gray-500">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </div>
+            <button
+              onClick={() => fetchDashboardData()}
+              className="flex items-center space-x-2 px-3 py-2 bg-primary text-white rounded-md hover:bg-primary-600 transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Refresh</span>
+            </button>
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`flex items-center space-x-2 px-3 py-2 rounded-md transition-colors ${
+                autoRefresh
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Activity className={`w-4 h-4 ${autoRefresh ? 'animate-pulse' : ''}`} />
+              <span>{autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard
           title="Active Bookings"
-          value={metrics?.active_bookings || 0}
-          change={metrics?.booking_change}
+          value={metrics?.realtime?.active_bookings || 0}
+          change={metrics?.bookings?.growth_rate}
           icon={Users}
           color="blue"
         />
         <MetricCard
           title="Open Complaints"
-          value={metrics?.open_complaints || 0}
-          change={metrics?.complaint_change}
+          value={metrics?.complaints?.unresolved || 0}
+          change={null}
           icon={MessageSquare}
           color="yellow"
         />
         <MetricCard
           title="Priority Queue"
-          value={metrics?.priority_queue_count || 0}
-          change={metrics?.queue_change}
+          value={priorityQueue.length || 0}
+          change={null}
           icon={Clock}
           color="red"
         />
         <MetricCard
           title="SLA Compliance"
-          value={`${metrics?.sla_compliance || 0}%`}
-          change={metrics?.sla_change}
+          value={`${Math.round(metrics?.sla?.compliance_rate || 0)}%`}
+          change={null}
           icon={TrendingUp}
           color="green"
         />
+      </div>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        <ComplaintsPriorityChart />
+        <ComplaintsStatusChart />
+        <RevenueChart />
       </div>
 
       {/* Priority Queue Section */}

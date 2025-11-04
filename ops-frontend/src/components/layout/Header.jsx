@@ -156,7 +156,7 @@ const Header = ({ title = "Dashboard", onRefresh = null }) => {
                   {staff.name}
                 </p>
                 <p className="text-xs text-gray-500">
-                  {staff.role}
+                  {staff.role?.display_name || staff.role?.name || staff.role}
                 </p>
               </div>
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
