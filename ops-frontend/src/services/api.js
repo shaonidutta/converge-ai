@@ -349,6 +349,32 @@ const api = {
      */
     schedule: (data) => apiClient.post('/ops/reports/schedule', data),
   },
+
+  // Priority Queue API
+  priorityQueue: {
+    /**
+     * Get priority queue item by ID
+     * @param {number} id - Item ID
+     * @returns {Promise} API response with item details
+     */
+    getById: (id) => apiClient.get(`/ops/priority-queue/${id}`),
+
+    /**
+     * Review priority queue item
+     * @param {number} id - Item ID
+     * @param {Object} data - Review data
+     * @returns {Promise} API response
+     */
+    review: (id, data) => apiClient.post(`/ops/priority-queue/${id}/review`, data),
+
+    /**
+     * Assign priority queue item
+     * @param {number} id - Item ID
+     * @param {Object} data - Assignment data
+     * @returns {Promise} API response
+     */
+    assign: (id, data) => apiClient.post(`/ops/priority-queue/${id}/assign`, data),
+  },
 };
 
 export default api;

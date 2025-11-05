@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import ComplaintsPage from './pages/ComplaintsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import ReportsPage from './pages/ReportsPage';
+import PriorityQueuePage from './pages/PriorityQueuePage';
 
 /**
  * Main App Component
@@ -46,8 +47,10 @@ function App() {
               <Route path="analytics" element={<AnalyticsPage />} />
               <Route path="reports" element={<ReportsPage />} />
 
+              {/* Priority Queue */}
+              <Route path="priority-queue" element={<PriorityQueuePage />} />
+
               {/* Placeholder routes for future implementation */}
-              <Route path="priority-queue" element={<div className="p-8 text-center text-gray-500">Priority Queue - Coming Soon</div>} />
               <Route path="alerts" element={<div className="p-8 text-center text-gray-500">Alerts - Coming Soon</div>} />
               <Route path="staff" element={<div className="p-8 text-center text-gray-500">Staff Management - Coming Soon</div>} />
               <Route path="settings" element={<div className="p-8 text-center text-gray-500">Settings - Coming Soon</div>} />
