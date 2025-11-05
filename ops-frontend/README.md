@@ -1,16 +1,49 @@
-# React + Vite
+# ConvergeAI Operations Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A comprehensive operations management dashboard for ConvergeAI service booking platform.
 
-Currently, two official plugins are available:
+## Ì∫Ä Quick Start
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+cd ops-frontend
+npm install
+npm run dev
+```
 
-## React Compiler
+Open http://localhost:5174
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+**Test Credentials:**
+- Email: ops.admin@convergeai.com
+- Password: OpsPass123!
 
-## Expanding the ESLint configuration
+## ‚úÖ Features Complete
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- Dashboard with real-time metrics
+- Complaints management
+- Analytics & reporting
+- Priority queue
+- Staff management
+- Settings & configuration
+- Alerts system
+
+## Ìª†Ô∏è Tech Stack
+
+- React 18 + Vite
+- TailwindCSS
+- Recharts
+- Axios
+- React Router
+
+## Ì≥ä Pages
+
+1. Dashboard - Real-time KPIs
+2. Priority Queue - High-priority items
+3. Complaints - Tracking & resolution
+4. Alerts - Notifications
+5. Analytics - Insights
+6. Reports - Export capabilities
+7. Staff - Management
+8. Settings - Configuration
+
+**Status:** ‚úÖ All Core Features Complete
+**Version:** 1.0.0
