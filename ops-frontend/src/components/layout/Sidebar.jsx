@@ -32,6 +32,26 @@ const Sidebar = () => {
   const { staff, logout, role } = useAuth();
 
   /**
+   * Get staff full name from first_name and last_name
+   */
+  const getStaffFullName = () => {
+    if (!staff) return 'Operations Admin';
+
+    const firstName = staff.first_name || '';
+    const lastName = staff.last_name || '';
+
+    if (firstName && lastName) {
+      return `${firstName} ${lastName}`;
+    } else if (firstName) {
+      return firstName;
+    } else if (lastName) {
+      return lastName;
+    }
+
+    return staff.email || 'Operations Admin';
+  };
+
+  /**
    * Navigation items with permissions
    */
   const navigationItems = [
@@ -159,7 +179,7 @@ const Sidebar = () => {
         {!isCollapsed && staff && (
           <div className="mb-4 p-3 bg-gradient-to-r from-gray-800/50 to-gray-700/50 rounded-xl border border-gray-600/30">
             <p className="text-sm font-semibold text-white truncate">
-              {staff.name}
+              {getStaffFullName()}
             </p>
             <p className="text-xs text-gray-400 truncate">
               {staff.email}
