@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }) => {
   /**
    * Get stored staff data from localStorage
    */
-  const getStoredStaff = useCallback(() => {
+  const getStoredStaff = () => {
     try {
       const staffData = localStorage.getItem("ops_staff");
       return staffData ? JSON.parse(staffData) : null;
@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }) => {
       console.error("Error parsing stored staff data:", error);
       return null;
     }
-  }, []);
+  };
 
   /**
    * Store staff data in localStorage
@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }) => {
       // Store tokens
       localStorage.setItem("ops_access_token", tokens.access_token);
       localStorage.setItem("ops_refresh_token", tokens.refresh_token);
-      
+
       // Store staff data
       localStorage.setItem("ops_staff", JSON.stringify(staffData));
       localStorage.setItem("ops_staff_id", staffData.id.toString());
@@ -72,6 +72,21 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error("Error storing staff data:", error);
     }
+  }, []);
+
+  /**
+   * Handle logout (clear state and storage)
+   */
+  const handleLogout = useCallback(() => {
+    // Clear authentication data
+    clearAuth();
+
+    // Reset state
+    setStaff(null);
+    setPermissions([]);
+    setRole(null);
+    setIsLoggedIn(false);
+    setLoading(false);
   }, []);
 
   /**
@@ -86,6 +101,7 @@ export const AuthProvider = ({ children }) => {
       const refreshToken = getRefreshToken();
 
       if (!accessToken || !refreshToken) {
+        console.log('No tokens found, user not authenticated');
         setIsLoggedIn(false);
         setStaff(null);
         setPermissions([]);
@@ -94,15 +110,25 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
+      console.log('Tokens found, restoring auth state...');
+
       // Get stored staff data
       const storedStaff = getStoredStaff();
       const storedPermissions = getStaffPermissions();
-      
+
       if (storedStaff) {
+        console.log('Restoring staff data:', storedStaff);
         setStaff(storedStaff);
         setPermissions(storedPermissions);
         setRole(storedStaff.role?.name || storedStaff.role);
         setIsLoggedIn(true);
+        console.log('Auth state restored successfully');
+      } else {
+        console.log('No stored staff data found');
+        setIsLoggedIn(false);
+        setStaff(null);
+        setPermissions([]);
+        setRole(null);
       }
 
       // TODO: Validate token by making a test API call when /auth/me endpoint is available
@@ -133,7 +159,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [getStoredStaff]);
+  }, [handleLogout]);
 
   /**
    * Login function
@@ -178,22 +204,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       handleLogout();
     }
-  }, []);
-
-  /**
-   * Handle logout (clear state and storage)
-   */
-  const handleLogout = useCallback(() => {
-    // Clear authentication data
-    clearAuth();
-    
-    // Reset state
-    setStaff(null);
-    setPermissions([]);
-    setRole(null);
-    setIsLoggedIn(false);
-    setLoading(false);
-  }, []);
+  }, [handleLogout]);
 
   /**
    * Check if staff has specific permission
