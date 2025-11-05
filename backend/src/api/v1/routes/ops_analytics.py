@@ -29,7 +29,7 @@ from src.schemas.ops_analytics import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/ops/analytics", tags=["Operations Analytics"])
+router = APIRouter(prefix="/analytics", tags=["Operations Analytics"])
 
 
 @router.get("/kpis", response_model=AnalyticsKPIResponse)
