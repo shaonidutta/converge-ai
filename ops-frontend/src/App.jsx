@@ -8,6 +8,9 @@ import ComplaintsPage from './pages/ComplaintsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import ReportsPage from './pages/ReportsPage';
 import PriorityQueuePage from './pages/PriorityQueuePage';
+import StaffPage from './pages/StaffPage';
+import SettingsPage from './pages/SettingsPage';
+import AlertsPage from './pages/AlertsPage';
 
 /**
  * Main App Component
@@ -50,10 +53,14 @@ function App() {
               {/* Priority Queue */}
               <Route path="priority-queue" element={<PriorityQueuePage />} />
 
-              {/* Placeholder routes for future implementation */}
-              <Route path="alerts" element={<div className="p-8 text-center text-gray-500">Alerts - Coming Soon</div>} />
-              <Route path="staff" element={<div className="p-8 text-center text-gray-500">Staff Management - Coming Soon</div>} />
-              <Route path="settings" element={<div className="p-8 text-center text-gray-500">Settings - Coming Soon</div>} />
+              {/* Staff Management */}
+              <Route path="staff" element={<StaffPage />} />
+
+              {/* Settings & Configuration */}
+              <Route path="settings" element={<SettingsPage />} />
+
+              {/* Alerts & Notifications */}
+              <Route path="alerts" element={<AlertsPage />} />
             </Route>
 
             {/* Catch all route */}
