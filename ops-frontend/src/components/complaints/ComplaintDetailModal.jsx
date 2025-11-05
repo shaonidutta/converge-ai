@@ -4,7 +4,7 @@ import {
   UserCheck, MessageSquare, Edit3, Save, FileText, Phone,
   Mail, MapPin, Package, DollarSign, RefreshCw, Plus
 } from 'lucide-react';
-import { api } from '../../services/api';
+import api from '../../services/api';
 
 const ComplaintDetailModal = ({ complaint, onClose, onUpdate }) => {
   const [loading, setLoading] = useState(false);

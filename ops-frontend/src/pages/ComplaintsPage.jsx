@@ -4,7 +4,7 @@ import {
   Clock, AlertTriangle, MessageSquare, Calendar, User,
   ChevronDown, ChevronRight, X, Plus, Edit3, FileText
 } from 'lucide-react';
-import { api } from '../services/api';
+import api from '../services/api';
 import ComplaintDetailModal from '../components/complaints/ComplaintDetailModal';
 import ComplaintFilters from '../components/complaints/ComplaintFilters';
 import ComplaintStatusBadge from '../components/complaints/ComplaintStatusBadge';
@@ -58,8 +58,9 @@ const ComplaintsPage = () => {
       });
 
       const response = await api.complaints.getComplaints(params);
-      
-      if (response.data.success) {
+
+      // Handle both success format and direct format
+      if (response.data.success || response.data.complaints) {
         setComplaints(response.data.complaints || []);
         setTotalComplaints(response.data.total || 0);
         setTotalPages(Math.ceil((response.data.total || 0) / 20));

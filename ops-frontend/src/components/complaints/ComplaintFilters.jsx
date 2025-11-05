@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, User, AlertTriangle, Filter } from 'lucide-react';
-import { api } from '../../services/api';
+import api from '../../services/api';
 
 const ComplaintFilters = ({ filters, onFilterChange, onClose }) => {
   const [localFilters, setLocalFilters] = useState(filters);
