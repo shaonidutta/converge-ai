@@ -5,6 +5,7 @@ import MainLayout from './components/layout/MainLayout';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import ComplaintsPage from './pages/ComplaintsPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 
 /**
  * Main App Component
@@ -40,10 +41,12 @@ function App() {
               {/* Complaints Management */}
               <Route path="complaints" element={<ComplaintsPage />} />
 
+              {/* Analytics & Reporting */}
+              <Route path="analytics" element={<AnalyticsPage />} />
+
               {/* Placeholder routes for future implementation */}
               <Route path="priority-queue" element={<div className="p-8 text-center text-gray-500">Priority Queue - Coming Soon</div>} />
               <Route path="alerts" element={<div className="p-8 text-center text-gray-500">Alerts - Coming Soon</div>} />
-              <Route path="analytics" element={<div className="p-8 text-center text-gray-500">Analytics - Coming Soon</div>} />
               <Route path="staff" element={<div className="p-8 text-center text-gray-500">Staff Management - Coming Soon</div>} />
               <Route path="settings" element={<div className="p-8 text-center text-gray-500">Settings - Coming Soon</div>} />
             </Route>
