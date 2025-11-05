@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  TrendingUp,
+  TrendingDown,
   Calendar,
   Download,
   RefreshCw,
@@ -32,7 +32,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-import Header from '../components/layout/Header';
+import api from '../services/api';
 
 /**
  * Analytics Page Component
@@ -98,65 +98,57 @@ const AnalyticsPage = () => {
   const PIE_COLORS = [COLORS.primary, COLORS.secondary, COLORS.success, COLORS.warning, COLORS.danger, COLORS.info];
 
   /**
-   * Fetch analytics data
+   * Fetch analytics data from backend APIs
    */
   const fetchAnalyticsData = async () => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API calls
-      // Simulated data for now
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Prepare query parameters
+      const params = {
+        time_range: timeRange,
+        ...(timeRange === 'custom' && customDateRange.start && customDateRange.end && {
+          start_date: customDateRange.start,
+          end_date: customDateRange.end
+        })
+      };
 
-      // Mock KPI data
+      // Fetch all analytics data in parallel
+      const [kpisResponse, trendsResponse, categoriesResponse, statusResponse, performanceResponse] = await Promise.all([
+        api.analytics.getKPIs(params),
+        api.analytics.getTrends(params),
+        api.analytics.getCategories(params),
+        api.analytics.getStatus(params),
+        api.analytics.getPerformance(params)
+      ]);
+
+      // Update KPI data
+      const kpis = kpisResponse.data;
       setKpiData({
-        totalBookings: { value: 1247, change: 12.5, trend: 'up' },
-        totalRevenue: { value: 89450, change: 8.3, trend: 'up' },
-        activeComplaints: { value: 23, change: -15.2, trend: 'down' },
-        avgResolutionTime: { value: 4.2, change: -10.5, trend: 'down' },
-        customerSatisfaction: { value: 4.6, change: 5.2, trend: 'up' },
-        staffUtilization: { value: 87, change: 3.1, trend: 'up' }
+        totalBookings: kpis.total_bookings,
+        totalRevenue: kpis.total_revenue,
+        activeComplaints: kpis.active_complaints,
+        avgResolutionTime: kpis.avg_resolution_time,
+        customerSatisfaction: kpis.customer_satisfaction,
+        staffUtilization: kpis.staff_utilization
       });
 
-      // Mock trend data
-      setTrendData([
-        { date: 'Mon', bookings: 45, revenue: 3200, complaints: 5 },
-        { date: 'Tue', bookings: 52, revenue: 3800, complaints: 3 },
-        { date: 'Wed', bookings: 48, revenue: 3500, complaints: 4 },
-        { date: 'Thu', bookings: 61, revenue: 4200, complaints: 6 },
-        { date: 'Fri', bookings: 55, revenue: 3900, complaints: 2 },
-        { date: 'Sat', bookings: 67, revenue: 4800, complaints: 3 },
-        { date: 'Sun', bookings: 58, revenue: 4100, complaints: 4 }
-      ]);
+      // Update trend data
+      setTrendData(trendsResponse.data.data || []);
 
-      // Mock category data
-      setCategoryData([
-        { name: 'Cleaning', value: 450, percentage: 36 },
-        { name: 'Plumbing', value: 320, percentage: 26 },
-        { name: 'Electrical', value: 280, percentage: 22 },
-        { name: 'Carpentry', value: 150, percentage: 12 },
-        { name: 'Others', value: 47, percentage: 4 }
-      ]);
+      // Update category data
+      setCategoryData(categoriesResponse.data.data || []);
 
-      // Mock status distribution
-      setStatusDistribution([
-        { name: 'Completed', value: 856, color: COLORS.success },
-        { name: 'In Progress', value: 234, color: COLORS.info },
-        { name: 'Pending', value: 123, color: COLORS.warning },
-        { name: 'Cancelled', value: 34, color: COLORS.danger }
-      ]);
+      // Update status distribution
+      setStatusDistribution(statusResponse.data.data || []);
 
-      // Mock performance data
-      setPerformanceData([
-        { metric: 'Response Time', current: 85, target: 90 },
-        { metric: 'Resolution Rate', current: 92, target: 95 },
-        { metric: 'Customer Satisfaction', current: 88, target: 85 },
-        { metric: 'Staff Efficiency', current: 87, target: 80 },
-        { metric: 'SLA Compliance', current: 94, target: 95 }
-      ]);
+      // Update performance data
+      setPerformanceData(performanceResponse.data.data || []);
 
       setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching analytics data:', error);
+      // Show error notification to user
+      alert('Failed to fetch analytics data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -243,12 +235,29 @@ const AnalyticsPage = () => {
   }, []);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <Header title="Analytics & Insights" onRefresh={handleRefresh} />
+    <div className="min-h-full bg-gray-50">
+      {/* Page Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Analytics & Insights</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className={`p-2 text-gray-600 hover:bg-gray-100 rounded-md transition-colors ${loading ? 'animate-spin' : ''}`}
+            title="Refresh Data"
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      <div className="p-6">
         {/* Filters Bar */}
         <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between flex-wrap gap-4">

@@ -255,6 +255,46 @@ const api = {
   },
 
   // ============================================
+  // Analytics APIs
+  // ============================================
+  analytics: {
+    /**
+     * Get KPI metrics for analytics dashboard
+     * @param {Object} params - Query parameters (time_range, start_date, end_date)
+     * @returns {Promise} API response with KPI data
+     */
+    getKPIs: (params = {}) => apiClient.get('/analytics/kpis', { params }),
+
+    /**
+     * Get trend data for charts
+     * @param {Object} params - Query parameters (time_range, start_date, end_date)
+     * @returns {Promise} API response with trend data
+     */
+    getTrends: (params = {}) => apiClient.get('/analytics/trends', { params }),
+
+    /**
+     * Get service category distribution
+     * @param {Object} params - Query parameters (time_range, start_date, end_date)
+     * @returns {Promise} API response with category data
+     */
+    getCategories: (params = {}) => apiClient.get('/analytics/categories', { params }),
+
+    /**
+     * Get booking status distribution
+     * @param {Object} params - Query parameters (time_range, start_date, end_date)
+     * @returns {Promise} API response with status data
+     */
+    getStatus: (params = {}) => apiClient.get('/analytics/status', { params }),
+
+    /**
+     * Get performance metrics vs targets
+     * @param {Object} params - Query parameters (time_range, start_date, end_date)
+     * @returns {Promise} API response with performance data
+     */
+    getPerformance: (params = {}) => apiClient.get('/analytics/performance', { params }),
+  },
+
+  // ============================================
   // Health Check API
   // ============================================
   health: {

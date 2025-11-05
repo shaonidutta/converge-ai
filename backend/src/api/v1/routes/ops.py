@@ -27,11 +27,15 @@ from src.services.audit_service import AuditService
 
 # Import complaints router
 from src.api.v1.routes.ops_complaints import router as complaints_router
+# Import analytics router
+from src.api.v1.routes.ops_analytics import router as analytics_router
 
 router = APIRouter(prefix="/ops", tags=["Ops Management"])
 
 # Include complaints sub-router
 router.include_router(complaints_router)
+# Include analytics sub-router
+router.include_router(analytics_router)
 
 
 @router.post(

@@ -53,6 +53,8 @@ const Sidebar = () => {
 
   /**
    * Navigation items with permissions
+   * Note: Permissions are empty arrays to allow all authenticated users to access
+   * Fine-grained permission checks should be done at the API level
    */
   const navigationItems = [
     {
@@ -65,37 +67,37 @@ const Sidebar = () => {
       name: "Priority Queue",
       href: "/priority-queue",
       icon: Clock,
-      permissions: ["view_priority_queue"],
+      permissions: [],
     },
     {
       name: "Complaints",
       href: "/complaints",
       icon: MessageSquare,
-      permissions: ["view_complaints"],
+      permissions: [],
     },
     {
       name: "Alerts",
       href: "/alerts",
       icon: AlertTriangle,
-      permissions: ["view_alerts"],
+      permissions: [],
     },
     {
       name: "Analytics",
       href: "/analytics",
       icon: BarChart3,
-      permissions: ["view_analytics"],
+      permissions: [],
     },
     {
       name: "Staff",
       href: "/staff",
       icon: Users,
-      permissions: ["manage_staff"],
+      permissions: [],
     },
     {
       name: "Settings",
       href: "/settings",
       icon: Settings,
-      permissions: ["manage_settings"],
+      permissions: [],
     },
   ];
 
