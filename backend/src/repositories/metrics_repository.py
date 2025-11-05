@@ -381,14 +381,21 @@ class MetricsRepository:
 
     async def get_active_bookings_count(self) -> int:
         """
-        Get count of active bookings (in_progress)
+        Get count of active bookings (pending, confirmed, in_progress)
+
+        Note: Since payment module is not implemented, bookings with 'pending'
+        status should be counted as 'active' bookings.
 
         Returns:
             Count of active bookings
         """
         result = await self.db.execute(
             select(func.count(Booking.id)).where(
-                Booking.status == BookingStatus.IN_PROGRESS
+                Booking.status.in_([
+                    BookingStatus.PENDING,
+                    BookingStatus.CONFIRMED,
+                    BookingStatus.IN_PROGRESS
+                ])
             )
         )
         count = result.scalar()

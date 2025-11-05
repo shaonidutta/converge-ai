@@ -752,8 +752,8 @@ class OpsComplaintsService:
                 id=complaint.booking.id,
                 order_id=complaint.booking.order_id,
                 status=complaint.booking.status.value,
-                total_amount=complaint.booking.total_amount,
-                scheduled_date=complaint.booking.scheduled_date
+                total_amount=float(complaint.booking.total) if complaint.booking.total else None,
+                scheduled_date=complaint.booking.preferred_date
             )
 
         # Assigned staff info

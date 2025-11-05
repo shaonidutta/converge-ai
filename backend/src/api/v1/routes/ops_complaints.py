@@ -126,88 +126,15 @@ async def list_complaints(
             "endpoint": "list_complaints"
         }
         
-        # TEMPORARY MOCK DATA FOR PHASE 3 TESTING
-        mock_complaints = [
-            {
-                "id": 1,
-                "complaint_type": "service_quality",
-                "subject": "Poor service quality during AC repair",
-                "description": "The technician arrived late and did not properly fix the AC unit. It's still not cooling properly.",
-                "status": "open",
-                "priority": "high",
-                "user_info": {
-                    "id": 1,
-                    "name": "John Doe",
-                    "email": "john@example.com",
-                    "mobile": "9876543210"
-                },
-                "booking_info": {
-                    "id": 1,
-                    "order_id": "ORD001",
-                    "service_name": "AC Repair",
-                    "scheduled_date": "2025-11-04T10:00:00Z",
-                    "status": "confirmed"
-                },
-                "assigned_to_staff": None,
-                "resolved_by_staff": None,
-                "created_at": "2025-11-04T08:00:00Z",
-                "updated_at": "2025-11-04T08:00:00Z",
-                "assigned_at": None,
-                "resolved_at": None,
-                "response_due_at": "2025-11-04T12:00:00Z",
-                "resolution_due_at": "2025-11-06T08:00:00Z",
-                "sla_breach_risk": True,
-                "resolution": None,
-                "updates_count": 0
-            },
-            {
-                "id": 2,
-                "complaint_type": "billing",
-                "subject": "Incorrect billing amount charged",
-                "description": "I was charged ₹2500 for plumbing service but the quote was ₹1800. Please review the billing.",
-                "status": "in_progress",
-                "priority": "medium",
-                "user_info": {
-                    "id": 2,
-                    "name": "Jane Smith",
-                    "email": "jane@example.com",
-                    "mobile": "9876543211"
-                },
-                "booking_info": {
-                    "id": 2,
-                    "order_id": "ORD002",
-                    "service_name": "Plumbing Service",
-                    "scheduled_date": "2025-11-03T14:00:00Z",
-                    "status": "completed"
-                },
-                "assigned_to_staff": {
-                    "id": 1,
-                    "employee_id": "EMP001",
-                    "name": "Operations Admin",
-                    "department": "Operations"
-                },
-                "resolved_by_staff": None,
-                "created_at": "2025-11-03T16:00:00Z",
-                "updated_at": "2025-11-04T09:00:00Z",
-                "assigned_at": "2025-11-04T09:00:00Z",
-                "resolved_at": None,
-                "response_due_at": "2025-11-03T20:00:00Z",
-                "resolution_due_at": "2025-11-05T16:00:00Z",
-                "sla_breach_risk": False,
-                "resolution": None,
-                "updates_count": 2
-            }
-        ]
+        # Call service
+        service = OpsComplaintsService(db)
+        result = await service.list_complaints(
+            current_staff=current_staff,
+            filters=filters,
+            request_metadata=request_metadata
+        )
 
-        return {
-            "success": True,
-            "complaints": mock_complaints,
-            "total": len(mock_complaints),
-            "skip": skip,
-            "limit": limit,
-            "has_more": False,
-            "debug": "mock_data_v2"
-        }
+        return result
         
     except ValueError as e:
         raise HTTPException(
@@ -249,82 +176,15 @@ async def get_complaint(
             "endpoint": "get_complaint"
         }
         
-        # TEMPORARY MOCK DATA FOR PHASE 3 TESTING
-        if complaint_id == 1:
-            mock_complaint = {
-                "id": 1,
-                "complaint_type": "service_quality",
-                "subject": "Poor service quality during AC repair",
-                "description": "The technician arrived late and did not properly fix the AC unit. It's still not cooling properly.",
-                "status": "open",
-                "priority": "high",
-                "user_info": {
-                    "id": 1,
-                    "name": "John Doe",
-                    "email": "john@example.com",
-                    "mobile": "9876543210"
-                },
-                "booking_info": {
-                    "id": 1,
-                    "order_id": "ORD001",
-                    "service_name": "AC Repair",
-                    "scheduled_date": "2025-11-04T10:00:00Z",
-                    "status": "confirmed"
-                },
-                "assigned_to_staff": None,
-                "resolved_by_staff": None,
-                "created_at": "2025-11-04T08:00:00Z",
-                "updated_at": "2025-11-04T08:00:00Z",
-                "assigned_at": None,
-                "resolved_at": None,
-                "response_due_at": "2025-11-04T12:00:00Z",
-                "resolution_due_at": "2025-11-06T08:00:00Z",
-                "sla_breach_risk": True,
-                "resolution": None,
-                "updates_count": 0
-            }
-        elif complaint_id == 2:
-            mock_complaint = {
-                "id": 2,
-                "complaint_type": "billing",
-                "subject": "Incorrect billing amount charged",
-                "description": "I was charged ₹2500 for plumbing service but the quote was ₹1800. Please review the billing.",
-                "status": "in_progress",
-                "priority": "medium",
-                "user_info": {
-                    "id": 2,
-                    "name": "Jane Smith",
-                    "email": "jane@example.com",
-                    "mobile": "9876543211"
-                },
-                "booking_info": {
-                    "id": 2,
-                    "order_id": "ORD002",
-                    "service_name": "Plumbing Service",
-                    "scheduled_date": "2025-11-03T14:00:00Z",
-                    "status": "completed"
-                },
-                "assigned_to_staff": {
-                    "id": 1,
-                    "employee_id": "EMP001",
-                    "name": "Operations Admin",
-                    "department": "Operations"
-                },
-                "resolved_by_staff": None,
-                "created_at": "2025-11-03T16:00:00Z",
-                "updated_at": "2025-11-04T09:00:00Z",
-                "assigned_at": "2025-11-04T09:00:00Z",
-                "resolved_at": None,
-                "response_due_at": "2025-11-03T20:00:00Z",
-                "resolution_due_at": "2025-11-05T16:00:00Z",
-                "sla_breach_risk": False,
-                "resolution": None,
-                "updates_count": 2
-            }
-        else:
-            raise ValueError(f"Complaint {complaint_id} not found")
+        # Call service
+        service = OpsComplaintsService(db)
+        result = await service.get_complaint_by_id(
+            complaint_id=complaint_id,
+            current_staff=current_staff,
+            request_metadata=request_metadata
+        )
 
-        return mock_complaint
+        return result
         
     except ValueError as e:
         raise HTTPException(
@@ -617,34 +477,16 @@ async def get_complaint_updates(
             "endpoint": "get_complaint_updates"
         }
 
-        # TEMPORARY MOCK DATA FOR PHASE 3 TESTING
-        if complaint_id == 2:
-            mock_updates = [
-                {
-                    "id": 1,
-                    "complaint_id": 2,
-                    "staff_id": 1,
-                    "staff_name": "Operations Admin",
-                    "update_type": "internal_note",
-                    "content": "Contacted customer to verify billing details. Customer confirmed the discrepancy.",
-                    "is_internal": True,
-                    "created_at": "2025-11-04T09:15:00Z"
-                },
-                {
-                    "id": 2,
-                    "complaint_id": 2,
-                    "staff_id": 1,
-                    "staff_name": "Operations Admin",
-                    "update_type": "customer_update",
-                    "content": "We are reviewing your billing concern and will provide a resolution within 24 hours.",
-                    "is_internal": False,
-                    "created_at": "2025-11-04T09:30:00Z"
-                }
-            ]
-        else:
-            mock_updates = []
+        # Call service
+        service = OpsComplaintsService(db)
+        result = await service.get_complaint_updates(
+            complaint_id=complaint_id,
+            current_staff=current_staff,
+            include_internal=include_internal,
+            request_metadata=request_metadata
+        )
 
-        return mock_updates
+        return result
 
     except ValueError as e:
         raise HTTPException(
