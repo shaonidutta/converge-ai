@@ -202,22 +202,26 @@ class OpsAnalyticsService:
         return AnalyticsTrendResponse(data=trend_data)
     
     async def get_category_distribution(
-        self, 
-        time_range: TimeRange, 
-        start_date: Optional[str] = None, 
+        self,
+        time_range: TimeRange,
+        start_date: Optional[str] = None,
         end_date: Optional[str] = None
     ) -> AnalyticsCategoryResponse:
         """Get service category distribution"""
-        
+        from src.core.models.booking_item import BookingItem
+        from src.core.models.rate_card import RateCard
+
         start, end = self._get_date_range(time_range, start_date, end_date)
-        
-        # Query bookings grouped by category
+
+        # Query bookings grouped by category through BookingItem -> RateCard -> Category
         query = (
             select(
                 Category.name,
-                func.count(Booking.id).label('count')
+                func.count(func.distinct(Booking.id)).label('count')
             )
-            .join(Booking, Booking.category_id == Category.id)
+            .join(BookingItem, BookingItem.booking_id == Booking.id)
+            .join(RateCard, RateCard.id == BookingItem.rate_card_id)
+            .join(Category, Category.id == RateCard.category_id)
             .where(
                 and_(
                     Booking.created_at >= start,
@@ -225,15 +229,15 @@ class OpsAnalyticsService:
                 )
             )
             .group_by(Category.name)
-            .order_by(func.count(Booking.id).desc())
+            .order_by(func.count(func.distinct(Booking.id)).desc())
         )
-        
+
         result = await self.db.execute(query)
         rows = result.all()
-        
+
         # Calculate total and percentages
         total = sum(row.count for row in rows)
-        
+
         category_data = []
         for row in rows:
             percentage = (row.count / total * 100) if total > 0 else 0
@@ -242,7 +246,7 @@ class OpsAnalyticsService:
                 value=row.count,
                 percentage=round(percentage, 1)
             ))
-        
+
         return AnalyticsCategoryResponse(data=category_data)
     
     async def get_status_distribution(
@@ -362,10 +366,13 @@ class OpsAnalyticsService:
     
     async def _avg_resolution_time(self, start: datetime, end: datetime) -> float:
         """Calculate average resolution time in hours"""
+        from sqlalchemy import text, literal_column
+
+        # Use TIMESTAMPDIFF with literal SQL to avoid quoting issues
         query = select(
             func.avg(
                 func.timestampdiff(
-                    'HOUR',
+                    literal_column('HOUR'),
                     Complaint.created_at,
                     Complaint.resolved_at
                 )

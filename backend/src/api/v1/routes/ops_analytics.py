@@ -14,7 +14,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.database import get_db
+from src.core.database.connection import get_db
 from src.core.security.dependencies import get_current_staff
 from src.core.models.staff import Staff
 from src.services.ops_analytics_service import OpsAnalyticsService
