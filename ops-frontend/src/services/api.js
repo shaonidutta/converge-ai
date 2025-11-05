@@ -304,6 +304,51 @@ const api = {
      */
     check: () => apiClient.get('/health'),
   },
+
+  // Reports API
+  reports: {
+    /**
+     * Generate a report
+     * @param {Object} data - Report generation parameters
+     * @returns {Promise} API response with generated report
+     */
+    generate: (data) => apiClient.post('/ops/reports/generate', data, { responseType: 'blob' }),
+
+    /**
+     * Get list of reports
+     * @param {Object} params - Query parameters
+     * @returns {Promise} API response with reports list
+     */
+    list: (params) => apiClient.get('/ops/reports', { params }),
+
+    /**
+     * Get report by ID
+     * @param {number} id - Report ID
+     * @returns {Promise} API response with report details
+     */
+    getById: (id) => apiClient.get(`/ops/reports/${id}`),
+
+    /**
+     * Download report
+     * @param {number} id - Report ID
+     * @returns {Promise} API response with report file
+     */
+    download: (id) => apiClient.get(`/ops/reports/${id}/download`, { responseType: 'blob' }),
+
+    /**
+     * Delete report
+     * @param {number} id - Report ID
+     * @returns {Promise} API response
+     */
+    delete: (id) => apiClient.delete(`/ops/reports/${id}`),
+
+    /**
+     * Schedule report
+     * @param {Object} data - Schedule parameters
+     * @returns {Promise} API response
+     */
+    schedule: (data) => apiClient.post('/ops/reports/schedule', data),
+  },
 };
 
 export default api;

@@ -1,17 +1,18 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  AlertTriangle, 
-  MessageSquare, 
-  Users, 
-  Settings, 
+import {
+  LayoutDashboard,
+  AlertTriangle,
+  MessageSquare,
+  Users,
+  Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
   Shield,
   BarChart3,
-  Clock
+  Clock,
+  FileText
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { PermissionGate } from "../ProtectedRoute";
@@ -85,6 +86,12 @@ const Sidebar = () => {
       name: "Analytics",
       href: "/analytics",
       icon: BarChart3,
+      permissions: [],
+    },
+    {
+      name: "Reports",
+      href: "/reports",
+      icon: FileText,
       permissions: [],
     },
     {
