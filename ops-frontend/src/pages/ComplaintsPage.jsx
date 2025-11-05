@@ -100,8 +100,9 @@ const ComplaintsPage = () => {
   const handleViewComplaint = async (complaintId) => {
     try {
       const response = await api.complaints.getComplaint(complaintId);
-      if (response.data.success) {
-        setSelectedComplaint(response.data.complaint);
+      // Backend returns ComplaintResponse directly, not wrapped in {success: true, complaint: {...}}
+      if (response.data) {
+        setSelectedComplaint(response.data);
         setShowDetailModal(true);
       }
     } catch (err) {
