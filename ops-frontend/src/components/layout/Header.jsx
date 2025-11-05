@@ -81,6 +81,51 @@ const Header = ({ title = "Dashboard", onRefresh = null }) => {
     return date.toLocaleTimeString();
   };
 
+  /**
+   * Get staff initials from first_name and last_name
+   */
+  const getStaffInitials = () => {
+    if (!staff) return 'OA'; // Default: Operations Admin
+
+    const firstName = staff.first_name || '';
+    const lastName = staff.last_name || '';
+
+    // Get first character of first name and last name
+    const firstInitial = firstName.charAt(0).toUpperCase();
+    const lastInitial = lastName.charAt(0).toUpperCase();
+
+    // Return both initials if available, otherwise return what we have
+    if (firstInitial && lastInitial) {
+      return firstInitial + lastInitial;
+    } else if (firstInitial) {
+      return firstInitial;
+    } else if (lastInitial) {
+      return lastInitial;
+    }
+
+    return 'OA'; // Fallback
+  };
+
+  /**
+   * Get staff full name
+   */
+  const getStaffFullName = () => {
+    if (!staff) return 'Operations Admin';
+
+    const firstName = staff.first_name || '';
+    const lastName = staff.last_name || '';
+
+    if (firstName && lastName) {
+      return `${firstName} ${lastName}`;
+    } else if (firstName) {
+      return firstName;
+    } else if (lastName) {
+      return lastName;
+    }
+
+    return staff.email || 'Operations Admin';
+  };
+
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
@@ -153,7 +198,7 @@ const Header = ({ title = "Dashboard", onRefresh = null }) => {
             <div className="flex items-center space-x-3 pl-4 border-l border-gray-200">
               <div className="text-right">
                 <p className="text-sm font-medium text-gray-900">
-                  {staff.name}
+                  {getStaffFullName()}
                 </p>
                 <p className="text-xs text-gray-500">
                   {staff.role?.display_name || staff.role?.name || staff.role}
@@ -161,7 +206,7 @@ const Header = ({ title = "Dashboard", onRefresh = null }) => {
               </div>
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <span className="text-sm font-medium text-white">
-                  {staff.name?.charAt(0)?.toUpperCase() || 'S'}
+                  {getStaffInitials()}
                 </span>
               </div>
             </div>
