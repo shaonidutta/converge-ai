@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './components/layout/MainLayout';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
+import ComplaintsPage from './pages/ComplaintsPage';
 
 /**
  * Main App Component
@@ -36,9 +37,11 @@ function App() {
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
 
+              {/* Complaints Management */}
+              <Route path="complaints" element={<ComplaintsPage />} />
+
               {/* Placeholder routes for future implementation */}
               <Route path="priority-queue" element={<div className="p-8 text-center text-gray-500">Priority Queue - Coming Soon</div>} />
-              <Route path="complaints" element={<div className="p-8 text-center text-gray-500">Complaints - Coming Soon</div>} />
               <Route path="alerts" element={<div className="p-8 text-center text-gray-500">Alerts - Coming Soon</div>} />
               <Route path="analytics" element={<div className="p-8 text-center text-gray-500">Analytics - Coming Soon</div>} />
               <Route path="staff" element={<div className="p-8 text-center text-gray-500">Staff Management - Coming Soon</div>} />

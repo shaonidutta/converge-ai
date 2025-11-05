@@ -178,6 +178,7 @@ const api = {
      * @returns {Promise} API response
      */
     assignComplaint: (complaintId, assignmentData) => apiClient.post(`/complaints/${complaintId}/assign`, assignmentData),
+    assign: (complaintId, assignmentData) => apiClient.post(`/complaints/${complaintId}/assign`, assignmentData),
 
     /**
      * Resolve complaint
@@ -186,6 +187,7 @@ const api = {
      * @returns {Promise} API response
      */
     resolveComplaint: (complaintId, resolutionData) => apiClient.post(`/complaints/${complaintId}/resolve`, resolutionData),
+    resolve: (complaintId, resolutionData) => apiClient.post(`/complaints/${complaintId}/resolve`, resolutionData),
 
     /**
      * Get complaint updates/history
@@ -193,6 +195,7 @@ const api = {
      * @returns {Promise} API response with complaint updates
      */
     getComplaintUpdates: (complaintId) => apiClient.get(`/complaints/${complaintId}/updates`),
+    getUpdates: (complaintId) => apiClient.get(`/complaints/${complaintId}/updates`),
 
     /**
      * Add complaint update
@@ -201,6 +204,7 @@ const api = {
      * @returns {Promise} API response
      */
     addComplaintUpdate: (complaintId, updateData) => apiClient.post(`/complaints/${complaintId}/updates`, updateData),
+    addUpdate: (complaintId, updateData) => apiClient.post(`/complaints/${complaintId}/updates`, updateData),
   },
 
   // ============================================
@@ -213,6 +217,7 @@ const api = {
      * @returns {Promise} API response with staff list
      */
     getStaff: (params = {}) => apiClient.get('/users', { params }),
+    getStaffList: (params = {}) => apiClient.get('/users', { params }),
 
     /**
      * Get specific staff member
