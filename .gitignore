@@ -15,12 +15,16 @@
 !customer-frontend/
 !ops-frontend/
 !tests/
-!.dev-logs/
 
 # EXCEPT these essential files (keep in git)
 !.gitignore
 !README.md
 !docker-compose.yml
+
+# ============================================================================
+# DEV LOGS - Keep locally, never push to GitHub
+# ============================================================================
+.dev-logs/
 
 # ============================================================================
 # BACKEND - Ignore planning and task files
@@ -182,9 +186,8 @@ desktop.ini
 # MARKDOWN FILES
 # ============================================================================
 
-# Ignore all markdown files except README.md and .dev-logs/*.md
+# Ignore all markdown files except README.md
 *.md
 !README.md
 !**/README.md
-!.dev-logs/*.md
 

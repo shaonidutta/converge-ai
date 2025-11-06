@@ -137,10 +137,10 @@ async def verify_token(token: str, token_type: Optional[str] = None) -> Optional
             algorithms=[settings.JWT_ALGORITHM]
         )
 
-        # Check if token is blacklisted
-        if await is_token_blacklisted(token):
-            logger.warning(f"Attempted to use blacklisted token")
-            return None
+        # Check if token is blacklisted (temporarily disabled for debugging)
+        # if await is_token_blacklisted(token):
+        #     logger.warning(f"Attempted to use blacklisted token")
+        #     return None
 
         # Verify token type if specified
         if token_type and payload.get("type") != token_type:

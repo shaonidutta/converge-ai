@@ -156,7 +156,7 @@ class OpsDashboardService:
     
     async def _check_full_access_permission(self, staff: Staff) -> bool:
         """
-        Check if staff has ops.full_access permission for PII
+        Check if staff has ops.priority_queue.full_access permission for PII
         
         Args:
             staff: Staff instance
@@ -169,12 +169,12 @@ class OpsDashboardService:
             if not staff.role:
                 return False
             
-            # Check if role has ops.full_access or ops.admin permission
+            # Check if role has ops.priority_queue.full_access or system.admin permission
             permissions = await self._get_staff_permissions(staff)
-            
+
             has_access = (
-                "ops.full_access" in permissions or 
-                "ops.admin" in permissions
+                "ops.priority_queue.full_access" in permissions or
+                "system.admin" in permissions
             )
             
             self.logger.debug(

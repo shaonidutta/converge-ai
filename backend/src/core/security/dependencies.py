@@ -135,10 +135,11 @@ async def get_current_staff(
         # Get staff from database
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
-        
+        from src.core.models.role import Role
+
         result = await db.execute(
             select(Staff)
-            .options(selectinload(Staff.role).selectinload(Staff.role.property.mapper.class_.permissions))
+            .options(selectinload(Staff.role).selectinload(Role.permissions))
             .where(Staff.id == user_id)
         )
         staff = result.scalar_one_or_none()

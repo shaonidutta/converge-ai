@@ -51,6 +51,8 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Customer frontend (React)
     "http://localhost:3001",  # Ops frontend
     "http://localhost:5173",  # Customer frontend (Vite dev server)
+    "http://localhost:5174",  # Ops frontend (Vite dev server)
+    "http://localhost:5175",  # Ops frontend (Vite dev server - alternate port)
     "https://convergeAI.app",
 ]
 
@@ -141,8 +143,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*"],
 )
 
 # --- Rate Limiting ---
@@ -161,6 +163,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+# --- Request Timeout Middleware ---
+from src.middleware.timeout_middleware import TimeoutMiddleware
+app.add_middleware(TimeoutMiddleware, default_timeout=60)  # Increased timeout for testing
 
 # --- Prometheus Monitoring Middleware ---
 from src.middleware.prometheus_middleware import PrometheusMiddleware
@@ -247,10 +253,31 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Access log for every request"""
-    logger.info(f"Request: {request.method} {request.url.path} from {request.client.host}")
+    """Access log for every request with performance monitoring"""
+    import time
+
+    start_time = time.time()
+    client_ip = request.client.host if request.client else "unknown"
+
+    logger.info(f"Request: {request.method} {request.url.path} from {client_ip}")
+
     response = await call_next(request)
-    logger.info(f"Response: {response.status_code} {request.url.path}")
+
+    # Calculate response time
+    response_time = time.time() - start_time
+    response_time_ms = round(response_time * 1000, 2)
+
+    # Log response with timing
+    logger.info(f"Response: {response.status_code} {request.url.path} ({response_time_ms}ms)")
+
+    # Log slow requests (>1 second) as warnings
+    if response_time > 1.0:
+        logger.warning(f"SLOW REQUEST: {request.method} {request.url.path} took {response_time_ms}ms")
+
+    # Log complaints API performance specifically
+    if "/ops/complaints" in request.url.path:
+        logger.info(f"COMPLAINTS_API_PERFORMANCE: {request.method} {request.url.path} - {response_time_ms}ms - Status: {response.status_code}")
+
     return response
 
 # =============================================

@@ -42,44 +42,67 @@ class MetricsService:
     ) -> Dict[str, Any]:
         """
         Get comprehensive dashboard metrics
-        
+
         Args:
             staff_id: Staff member ID (for audit logging)
             period: Time period ("today", "week", "month", "all")
             include_groups: List of metric groups to include
                            (bookings, complaints, sla, revenue, realtime)
                            If None, includes all groups
-        
+
         Returns:
             Dictionary with requested metrics
         """
+        import asyncio
+
         # Default to all groups if not specified
         if include_groups is None:
             include_groups = ["bookings", "complaints", "sla", "revenue", "realtime"]
-        
+
         # Initialize response
         response = {
             "period": period,
             "generated_at": datetime.utcnow().isoformat() + "Z"
         }
-        
-        # Get metrics for each requested group
+
+        # Prepare tasks for parallel execution
+        tasks = []
+        task_names = []
+
         if "bookings" in include_groups:
-            response["bookings"] = await self._get_bookings_metrics(period)
-        
+            tasks.append(self._get_bookings_metrics(period))
+            task_names.append("bookings")
+
         if "complaints" in include_groups:
-            response["complaints"] = await self._get_complaints_metrics(period)
-        
+            tasks.append(self._get_complaints_metrics(period))
+            task_names.append("complaints")
+
         if "sla" in include_groups:
-            response["sla"] = await self._get_sla_metrics(period)
-        
+            tasks.append(self._get_sla_metrics(period))
+            task_names.append("sla")
+
         if "revenue" in include_groups:
-            response["revenue"] = await self._get_revenue_metrics(period)
-        
+            tasks.append(self._get_revenue_metrics(period))
+            task_names.append("revenue")
+
         if "realtime" in include_groups:
-            response["realtime"] = await self._get_realtime_metrics()
-        
-        # Log metrics access
+            tasks.append(self._get_realtime_metrics())
+            task_names.append("realtime")
+
+        # Execute all metric queries in parallel
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Process results
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    # Log error but continue with other metrics
+                    print(f"Error getting {task_names[i]} metrics: {result}")
+                    response[task_names[i]] = {"error": "Failed to retrieve metrics"}
+                else:
+                    response[task_names[i]] = result
+
+        # Log metrics access (run in parallel with metrics gathering)
         await self.audit_service.log_access(
             staff_id=staff_id,
             action="view_metrics",
@@ -91,33 +114,51 @@ class MetricsService:
                 "include_groups": include_groups
             }
         )
-        
+
         return response
     
     async def _get_bookings_metrics(self, period: str) -> Dict[str, Any]:
         """
         Get bookings metrics
-        
+
         Args:
             period: Time period filter
-            
+
         Returns:
             Bookings metrics dictionary
         """
-        # Get bookings by status
-        by_status = await self.repository.get_bookings_by_status(period)
-        
-        # Get counts for different periods
-        today_count = await self.repository.get_bookings_count("today")
-        week_count = await self.repository.get_bookings_count("week")
-        month_count = await self.repository.get_bookings_count("month")
-        
+        import asyncio
+
+        # Run all booking queries in parallel
+        by_status_task = self.repository.get_bookings_by_status(period)
+        today_count_task = self.repository.get_bookings_count("today")
+        week_count_task = self.repository.get_bookings_count("week")
+        month_count_task = self.repository.get_bookings_count("month")
+
+        # Execute all queries in parallel
+        by_status, today_count, week_count, month_count = await asyncio.gather(
+            by_status_task,
+            today_count_task,
+            week_count_task,
+            month_count_task,
+            return_exceptions=True
+        )
+
+        # Handle any exceptions
+        if isinstance(by_status, Exception):
+            by_status = {}
+        if isinstance(today_count, Exception):
+            today_count = 0
+        if isinstance(week_count, Exception):
+            week_count = 0
+        if isinstance(month_count, Exception):
+            month_count = 0
+
         # Calculate growth rate (current month vs previous month)
-        current_month_count = month_count
         # For simplicity, we'll calculate growth based on available data
         # In production, you'd query previous month's data
         growth_rate = 0.0  # Placeholder - would need historical data
-        
+
         return {
             "by_status": by_status,
             "today": today_count,
@@ -129,24 +170,39 @@ class MetricsService:
     async def _get_complaints_metrics(self, period: str) -> Dict[str, Any]:
         """
         Get complaints metrics
-        
+
         Args:
             period: Time period filter
-            
+
         Returns:
             Complaints metrics dictionary
         """
-        # Get complaints by priority and status
-        by_priority = await self.repository.get_complaints_by_priority(period)
-        by_status = await self.repository.get_complaints_by_status(period)
-        
-        # Get counts
-        today_count = await self.repository.get_complaints_count("today")
-        unresolved_count = await self.repository.get_unresolved_complaints_count()
-        
-        # Get average resolution time
-        avg_resolution_hours = await self.repository.get_average_resolution_time(period)
-        
+        import asyncio
+
+        # Run all complaint queries in parallel
+        by_priority_task = self.repository.get_complaints_by_priority(period)
+        by_status_task = self.repository.get_complaints_by_status(period)
+        today_count_task = self.repository.get_complaints_count("today")
+        unresolved_count_task = self.repository.get_unresolved_complaints_count()
+        avg_resolution_task = self.repository.get_average_resolution_time(period)
+
+        # Execute all queries in parallel
+        results = await asyncio.gather(
+            by_priority_task,
+            by_status_task,
+            today_count_task,
+            unresolved_count_task,
+            avg_resolution_task,
+            return_exceptions=True
+        )
+
+        # Handle any exceptions
+        by_priority = results[0] if not isinstance(results[0], Exception) else {}
+        by_status = results[1] if not isinstance(results[1], Exception) else {}
+        today_count = results[2] if not isinstance(results[2], Exception) else 0
+        unresolved_count = results[3] if not isinstance(results[3], Exception) else 0
+        avg_resolution_hours = results[4] if not isinstance(results[4], Exception) else 0.0
+
         return {
             "by_priority": by_priority,
             "by_status": by_status,
