@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  FileText, Download, Calendar, Filter, TrendingUp, 
+import {
+  FileText, Download, Calendar, Filter, TrendingUp,
   Users, DollarSign, AlertCircle, Clock, CheckCircle,
-  FileSpreadsheet, FilePdf, Send, Plus, Edit, Trash2
+  FileSpreadsheet, Send, Plus, Edit, Trash2, File
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -79,48 +79,37 @@ const ReportsPage = () => {
   const fetchReports = async () => {
     setLoading(true);
     try {
-      // Mock data for now - will be replaced with real API
-      const mockReports = [
-        {
-          id: 1,
-          name: 'Monthly Bookings Report - December 2024',
-          type: 'bookings-summary',
-          createdAt: '2024-12-01T10:00:00Z',
-          createdBy: 'Operations Admin',
-          status: 'completed',
-          format: 'pdf'
-        },
-        {
-          id: 2,
-          name: 'Complaints Analysis - Q4 2024',
-          type: 'complaints-analysis',
-          createdAt: '2024-12-15T14:30:00Z',
-          createdBy: 'Operations Admin',
-          status: 'completed',
-          format: 'excel'
-        }
-      ];
-      setReports(mockReports);
+      // TODO: Backend reports API not yet implemented
+      // Once backend is ready, uncomment this:
+      // const response = await api.reports.list({ filters });
+      // setReports(response.data.reports || []);
+
+      // For now, show empty state
+      setReports([]);
     } catch (error) {
       console.error('Error fetching reports:', error);
+      setReports([]);
     } finally {
       setLoading(false);
     }
   };
 
   const handleGenerateReport = async (template, format) => {
+    // TODO: Backend reports API not yet implemented
+    alert('Report generation feature is coming soon! Backend API is under development.');
+
+    /* Once backend is ready, uncomment this:
     setLoading(true);
     try {
-      // Call API to generate report
       const response = await api.reports.generate({
         templateId: template.id,
         format: format,
         filters: filters
       });
-      
+
       // Download the generated report
-      const blob = new Blob([response.data], { 
-        type: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      const blob = new Blob([response.data], {
+        type: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -130,7 +119,7 @@ const ReportsPage = () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       fetchReports();
     } catch (error) {
       console.error('Error generating report:', error);
@@ -138,18 +127,17 @@ const ReportsPage = () => {
     } finally {
       setLoading(false);
     }
+    */
   };
 
   const handleExportReport = (reportId, format) => {
-    // Mock export functionality
-    console.log(`Exporting report ${reportId} as ${format}`);
-    alert(`Report exported as ${format.toUpperCase()}`);
+    // TODO: Backend reports export API not yet implemented
+    alert('Report export feature is coming soon! Backend API is under development.');
   };
 
   const handleScheduleReport = (template) => {
-    // Mock schedule functionality
-    console.log('Scheduling report:', template);
-    alert('Report scheduling feature coming soon!');
+    // TODO: Backend report scheduling API not yet implemented
+    alert('Report scheduling feature is coming soon! Backend API is under development.');
   };
 
   const getColorClasses = (color) => {

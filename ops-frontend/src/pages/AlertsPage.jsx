@@ -18,60 +18,6 @@ const AlertsPage = () => {
     type: 'all'
   });
 
-  // Mock alerts data
-  const mockAlerts = [
-    {
-      id: 1,
-      title: 'High Priority Complaint Unresolved',
-      message: 'Complaint #1234 has been unresolved for over 24 hours',
-      severity: 'critical',
-      type: 'complaint',
-      status: 'unread',
-      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      metadata: { complaint_id: 1234, priority: 95 }
-    },
-    {
-      id: 2,
-      title: 'SLA Breach Warning',
-      message: '5 bookings are at risk of SLA breach in the next 2 hours',
-      severity: 'high',
-      type: 'sla',
-      status: 'unread',
-      created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-      metadata: { booking_count: 5 }
-    },
-    {
-      id: 3,
-      title: 'Revenue Milestone Achieved',
-      message: 'Monthly revenue target of ₹5,00,000 has been achieved',
-      severity: 'info',
-      type: 'revenue',
-      status: 'read',
-      created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-      metadata: { revenue: 500000 }
-    },
-    {
-      id: 4,
-      title: 'Staff Workload Alert',
-      message: 'Staff member John Doe has 15+ active assignments',
-      severity: 'medium',
-      type: 'staff',
-      status: 'unread',
-      created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-      metadata: { staff_id: 5, assignment_count: 15 }
-    },
-    {
-      id: 5,
-      title: 'System Performance Degradation',
-      message: 'API response time increased by 40% in the last hour',
-      severity: 'high',
-      type: 'system',
-      status: 'unread',
-      created_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-      metadata: { response_time_ms: 850 }
-    }
-  ];
-
   useEffect(() => {
     fetchAlerts();
   }, [filters]);
@@ -79,25 +25,26 @@ const AlertsPage = () => {
   const fetchAlerts = async () => {
     setLoading(true);
     try {
-      // Mock data - replace with actual API call
-      // const response = await api.alerts.getList(filters);
-      // setAlerts(response.data);
-      
-      // Filter mock data
-      let filtered = mockAlerts;
+      // Build query parameters
+      const params = {
+        unread_only: filters.status === 'unread',
+        page: 1,
+        page_size: 50
+      };
+
       if (filters.severity !== 'all') {
-        filtered = filtered.filter(a => a.severity === filters.severity);
+        params.severities = filters.severity;
       }
-      if (filters.status !== 'all') {
-        filtered = filtered.filter(a => a.status === filters.status);
-      }
+
       if (filters.type !== 'all') {
-        filtered = filtered.filter(a => a.type === filters.type);
+        params.alert_types = filters.type;
       }
-      
-      setAlerts(filtered);
+
+      const response = await api.alerts.getList(params);
+      setAlerts(response.data.alerts || []);
     } catch (error) {
       console.error('Error fetching alerts:', error);
+      setAlerts([]);
     } finally {
       setLoading(false);
     }
@@ -105,26 +52,30 @@ const AlertsPage = () => {
 
   const handleMarkAsRead = async (alertId) => {
     try {
-      // await api.alerts.markAsRead(alertId);
-      setAlerts(alerts.map(a => a.id === alertId ? { ...a, status: 'read' } : a));
+      await api.alerts.markAsRead(alertId);
+      // Update local state
+      setAlerts(alerts.map(a => a.id === alertId ? { ...a, is_read: true } : a));
     } catch (error) {
       console.error('Error marking alert as read:', error);
+      alert('Failed to mark alert as read. Please try again.');
     }
   };
 
   const handleDismiss = async (alertId) => {
     try {
-      // await api.alerts.dismiss(alertId);
+      await api.alerts.dismiss(alertId);
+      // Remove from local state
       setAlerts(alerts.filter(a => a.id !== alertId));
     } catch (error) {
       console.error('Error dismissing alert:', error);
+      alert('Failed to dismiss alert. Please try again.');
     }
   };
 
   const handleViewDetails = (alert) => {
     setSelectedAlert(alert);
     setShowDetailModal(true);
-    if (alert.status === 'unread') {
+    if (!alert.is_read) {
       handleMarkAsRead(alert.id);
     }
   };
@@ -193,7 +144,7 @@ const AlertsPage = () => {
     return `${diffDays}d ago`;
   };
 
-  const unreadCount = alerts.filter(a => a.status === 'unread').length;
+  const unreadCount = alerts.filter(a => !a.is_read).length;
 
   return (
     <div className="p-6 space-y-6">
@@ -282,7 +233,7 @@ const AlertsPage = () => {
             <div
               key={alert.id}
               className={`bg-white rounded-xl shadow-sm border transition-all duration-200 hover:shadow-md ${
-                alert.status === 'unread' ? 'border-[#486581] border-l-4' : 'border-gray-200'
+                !alert.is_read ? 'border-[#486581] border-l-4' : 'border-gray-200'
               }`}
             >
               <div className="p-4">
@@ -309,7 +260,7 @@ const AlertsPage = () => {
                         {getTimeAgo(alert.created_at)}
                       </span>
                       <span className="capitalize">{alert.type}</span>
-                      {alert.status === 'unread' && (
+                      {!alert.is_read && (
                         <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">
                           New
                         </span>
@@ -385,7 +336,7 @@ const AlertsPage = () => {
 
                   <div>
                     <label className="text-sm font-medium text-gray-700">Status</label>
-                    <p className="text-gray-900 mt-1 capitalize">{selectedAlert.status}</p>
+                    <p className="text-gray-900 mt-1 capitalize">{selectedAlert.is_read ? 'Read' : 'Unread'}</p>
                   </div>
 
                   <div>
