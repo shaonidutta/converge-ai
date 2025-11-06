@@ -330,23 +330,42 @@ async def extract_initial_entities_node(
                 if extraction_result.metadata and '_resolved_service' in extraction_result.metadata:
                     resolved_service = extraction_result.metadata['_resolved_service']
                     logger.info(f"[extract_initial_entities_node] ✅ Service pre-resolved: {resolved_service}")
-                    collected_entities['_resolved_service'] = resolved_service
 
-                    # Pre-populate service_type and service_subcategory
-                    if resolved_service.get('category_id'):
-                        collected_entities['service_type'] = str(resolved_service['category_id'])
-                        logger.info(f"[extract_initial_entities_node] Pre-populated service_type: {resolved_service['category_id']}")
+                    # Check if service has subcategory_id
+                    has_subcategory = resolved_service.get('subcategory_id') is not None
 
-                    if resolved_service.get('subcategory_id'):
-                        collected_entities['service_subcategory'] = str(resolved_service['subcategory_id'])
-                        logger.info(f"[extract_initial_entities_node] Pre-populated service_subcategory: {resolved_service['subcategory_id']}")
+                    if has_subcategory:
+                        # Service is fully resolved (has both category and subcategory)
+                        logger.info(f"[extract_initial_entities_node] Service fully resolved with subcategory")
+                        collected_entities['_resolved_service'] = resolved_service
 
-                    # Store service name for QuestionGenerator to use in context
-                    # This ensures the LLM generates questions with the correct service name
-                    service_name = resolved_service.get('subcategory_name') or resolved_service.get('service_name') or resolved_service.get('category_name')
-                    if service_name:
-                        collected_entities['_service_name'] = service_name
-                        logger.info(f"[extract_initial_entities_node] Stored service name for context: {service_name}")
+                        # Pre-populate service_type and service_subcategory
+                        if resolved_service.get('category_id'):
+                            collected_entities['service_type'] = str(resolved_service['category_id'])
+                            logger.info(f"[extract_initial_entities_node] Pre-populated service_type: {resolved_service['category_id']}")
+
+                        if resolved_service.get('subcategory_id'):
+                            collected_entities['service_subcategory'] = str(resolved_service['subcategory_id'])
+                            logger.info(f"[extract_initial_entities_node] Pre-populated service_subcategory: {resolved_service['subcategory_id']}")
+
+                        # Store service name for QuestionGenerator to use in context
+                        service_name = resolved_service.get('subcategory_name') or resolved_service.get('service_name') or resolved_service.get('category_name')
+                        if service_name:
+                            collected_entities['_service_name'] = service_name
+                            logger.info(f"[extract_initial_entities_node] Stored service name for context: {service_name}")
+                    else:
+                        # Service resolved to category only (no subcategory)
+                        # Store only category_id, let validation handle subcategory selection
+                        logger.info(f"[extract_initial_entities_node] Service resolved to category only (no subcategory), will need subcategory selection")
+                        if resolved_service.get('category_id'):
+                            collected_entities['service_type'] = str(resolved_service['category_id'])
+                            logger.info(f"[extract_initial_entities_node] Extracted service_type (category only): {resolved_service['category_id']}")
+
+                        # Store category name for context
+                        category_name = resolved_service.get('category_name')
+                        if category_name:
+                            collected_entities['_service_name'] = category_name
+                            logger.info(f"[extract_initial_entities_node] Stored category name for context: {category_name}")
                 elif extraction_result.metadata and 'subcategory_hint' in extraction_result.metadata:
                     # Service extracted with subcategory hint (e.g., "kitchen cleaning" -> category="cleaning", hint="Kitchen Cleaning")
                     subcategory_hint = extraction_result.metadata['subcategory_hint']
@@ -996,6 +1015,48 @@ async def determine_needed_entities_node(
             logger.info(f"[determine_needed_entities_node] Service pre-resolved, service_subcategory already set")
             # service_subcategory is already in collected, so it will be filtered out above
 
+        # CRITICAL: Check if service_type requires subcategory selection
+        # This must happen BEFORE we proceed to generate questions
+        if intent == "booking_management" and 'service_type' in collected and 'service_subcategory' not in collected:
+            service_type = collected.get('service_type', '')
+            logger.info(f"[determine_needed_entities_node] Checking if service_type='{service_type}' requires subcategory selection")
+
+            # Map category IDs to service names
+            category_id_to_service = {
+                "1": "home_cleaning",
+                "13": "ac",
+                "2": "appliance_repair",
+                "3": "plumbing",
+                "4": "electrical",
+                "5": "carpentry",
+                "6": "painting",
+                "7": "pest_control",
+                "8": "water_purifier",
+                "9": "car_care",
+                "10": "salon_for_women",
+                "11": "salon_for_men",
+                "12": "packers_and_movers"
+            }
+
+            # Convert category ID to service name if needed
+            normalized_service = category_id_to_service.get(service_type, service_type.lower())
+
+            # Services that require subcategory selection
+            services_requiring_subcategory = {
+                "home_cleaning", "appliance_repair", "plumbing", "electrical",
+                "carpentry", "painting", "pest_control", "water_purifier",
+                "car_care", "salon_for_women", "salon_for_men", "packers_and_movers"
+            }
+
+            if normalized_service in services_requiring_subcategory:
+                # Add service_subcategory to the FRONT of needed entities (highest priority)
+                if 'service_subcategory' not in needed:
+                    needed.insert(0, 'service_subcategory')
+                    logger.info(f"[determine_needed_entities_node] ✅ Service '{normalized_service}' requires subcategory selection, added to needed entities")
+                    logger.info(f"[determine_needed_entities_node] Updated needed entities: {needed}")
+            else:
+                logger.info(f"[determine_needed_entities_node] Service '{normalized_service}' does NOT require subcategory selection")
+
         # Special check: If location is needed for booking, check if user has existing addresses
         logger.info(f"[determine_needed_entities_node] Checking auto-fill conditions: location_needed={'location' in needed}, intent={intent}, action={collected.get('action')}, db={db is not None}")
 
@@ -1494,6 +1555,28 @@ def create_slot_filling_graph(
             service_type = collected_entities['service_type']
             logger.info(f"[route_after_follow_up_check] Found service_type='{service_type}', checking if validation needed")
 
+            # Map category IDs to service names for validation check
+            category_id_to_service = {
+                "1": "home_cleaning",
+                "13": "ac",
+                "2": "appliance_repair",
+                "3": "plumbing",
+                "4": "electrical",
+                "5": "carpentry",
+                "6": "painting",
+                "7": "pest_control",
+                "8": "water_purifier",
+                "9": "car_care",
+                "10": "salon_for_women",
+                "11": "salon_for_men",
+                "12": "packers_and_movers"
+            }
+
+            # Convert category ID to service name if needed
+            normalized_service_type = category_id_to_service.get(service_type, service_type)
+            if service_type != normalized_service_type:
+                logger.info(f"[route_after_follow_up_check] Converted category ID '{service_type}' to service name '{normalized_service_type}'")
+
             # If we don't have _resolved_service metadata, try to extract it first
             # This allows ServiceNameResolver to resolve specific service names like "kitchen cleaning"
             if '_resolved_service' not in collected_entities:
@@ -1511,8 +1594,8 @@ def create_slot_filling_graph(
                 'car_care', 'car', 'salon_for_women', 'salon_for_men', 'salon',
                 'packers_and_movers', 'packers', 'movers'
             ]
-            if service_type in services_requiring_validation:
-                logger.info(f"[route_after_follow_up_check] Service '{service_type}' requires validation, routing to: validate_collected_entities")
+            if normalized_service_type in services_requiring_validation:
+                logger.info(f"[route_after_follow_up_check] Service '{normalized_service_type}' (original: '{service_type}') requires validation, routing to: validate_collected_entities")
                 return "validate_collected_entities"
 
         logger.info("[route_after_follow_up_check] Routing to: new_intent (extract_initial_entities)")

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Users,
   MessageSquare,
@@ -41,6 +42,7 @@ import api from "../services/api";
  * - Quick action buttons
  */
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [metrics, setMetrics] = useState(null);
   const [priorityQueue, setPriorityQueue] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -530,7 +532,10 @@ const Dashboard = () => {
               <h3 className="text-xl font-bold text-gray-900">Priority Queue</h3>
               <p className="text-sm text-gray-500 mt-1">High-priority items requiring immediate attention</p>
             </div>
-            <button className="btn-primary">
+            <button
+              className="btn-primary"
+              onClick={() => navigate('/priority-queue')}
+            >
               View All
             </button>
           </div>
@@ -560,7 +565,10 @@ const Dashboard = () => {
           <p className="text-sm text-gray-500">Access frequently used operations and management tools</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <button className="dashboard-card-elevated p-6 text-left group hover:scale-[1.02] transition-all duration-200">
+          <button
+            className="dashboard-card-elevated p-6 text-left group hover:scale-[1.02] transition-all duration-200"
+            onClick={() => navigate('/alerts')}
+          >
             <div className="p-4 bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl w-16 h-16 mb-4 flex items-center justify-center group-hover:shadow-xl transition-shadow">
               <AlertTriangle className="w-8 h-8 text-white" />
             </div>
@@ -572,7 +580,10 @@ const Dashboard = () => {
             </p>
           </button>
 
-          <button className="dashboard-card-elevated p-6 text-left group hover:scale-[1.02] transition-all duration-200">
+          <button
+            className="dashboard-card-elevated p-6 text-left group hover:scale-[1.02] transition-all duration-200"
+            onClick={() => navigate('/complaints')}
+          >
             <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl w-16 h-16 mb-4 flex items-center justify-center group-hover:shadow-xl transition-shadow">
               <MessageSquare className="w-8 h-8 text-white" />
             </div>
@@ -584,7 +595,10 @@ const Dashboard = () => {
             </p>
           </button>
 
-          <button className="dashboard-card-elevated p-6 text-left group hover:scale-[1.02] transition-all duration-200">
+          <button
+            className="dashboard-card-elevated p-6 text-left group hover:scale-[1.02] transition-all duration-200"
+            onClick={() => navigate('/staff')}
+          >
             <div className="p-4 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl w-16 h-16 mb-4 flex items-center justify-center group-hover:shadow-xl transition-shadow">
               <Users className="w-8 h-8 text-white" />
             </div>

@@ -223,17 +223,26 @@ class CoordinatorAgent:
                             response["agent_used"] = "reschedule"
 
                         elif action_type == "execute_agent":
-                            # Execute confirmed agent action (e.g., complaint creation)
+                            # Execute confirmed agent action (e.g., complaint creation, booking creation)
                             intent = pending_action.get("intent")
                             collected_entities = pending_action.get("collected_entities", {})
                             agent_name = pending_action.get("agent", "unknown")
 
                             self.logger.info(f"[COORDINATOR] Executing confirmed {intent} action with agent {agent_name}")
 
-                            # Execute the appropriate agent
-                            response = await self._execute_agent(
+                            # Create IntentResult for routing
+                            from src.schemas.intent import IntentResult
+                            import json
+
+                            intent_result = IntentResult(
                                 intent=intent,
-                                entities=collected_entities,
+                                confidence=1.0,
+                                entities_json=json.dumps(collected_entities)
+                            )
+
+                            # Execute the appropriate agent
+                            response = await self._route_to_agent(
+                                intent_result=intent_result,
                                 user=user,
                                 session_id=session_id,
                                 message=message,
@@ -879,6 +888,28 @@ class CoordinatorAgent:
                     if "service_type" in collected_entities and action == "book":
                         service_type = collected_entities.get("service_type", "").lower()
                         self.logger.info(f"[COORDINATOR] Checking service_type='{service_type}' for subcategory validation")
+
+                        # First, map category IDs to service names
+                        category_id_to_service = {
+                            "1": "home_cleaning",
+                            "13": "ac",
+                            "2": "appliance_repair",
+                            "3": "plumbing",
+                            "4": "electrical",
+                            "5": "carpentry",
+                            "6": "painting",
+                            "7": "pest_control",
+                            "8": "water_purifier",
+                            "9": "car_care",
+                            "10": "salon_for_women",
+                            "11": "salon_for_men",
+                            "12": "packers_and_movers"
+                        }
+
+                        # If service_type is a category ID, convert to service name
+                        if service_type in category_id_to_service:
+                            service_type = category_id_to_service[service_type]
+                            self.logger.info(f"[COORDINATOR] Converted category ID to service name: '{service_type}'")
 
                         # Normalize service variations to match services_requiring_subcategory keys
                         service_normalizations = {

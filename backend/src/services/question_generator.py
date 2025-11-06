@@ -125,7 +125,7 @@ ENTITY_QUESTION_TEMPLATES = {
 
 CONFIRMATION_TEMPLATES = {
     "booking_management": {
-        "book": "Let me confirm: You want to book {service_type} servicing on {date} at {time} in {location}. Should I proceed with this booking?",
+        "book": "Let me confirm: You want to book {_service_name} service on {date} at {time} in {location}. Should I proceed with this booking?",
         "cancel": "You want to cancel Order {booking_id}. This action cannot be undone. Should I proceed with the cancellation?",
         "reschedule": "You want to reschedule Order {booking_id} to {date} at {time}. Should I proceed with this change?",
         "modify": "You want to modify Order {booking_id}. Should I proceed with this change?",
@@ -416,9 +416,16 @@ Generate the question:"""
             if intent_str == "booking_management":
                 action = collected_entities.get("action", "book")
                 template = template_config.get(action, template_config["book"])
+
+                # Ensure _service_name is available for booking confirmation
+                if action == "book" and "_service_name" not in collected_entities:
+                    # Fallback: use service_type if _service_name is missing
+                    if "service_type" in collected_entities:
+                        collected_entities["_service_name"] = collected_entities["service_type"]
+                        logger.warning(f"[QuestionGenerator] _service_name missing, using service_type as fallback")
             else:
                 template = template_config
-            
+
             # Format template with collected entities
             try:
                 confirmation = template.format(**collected_entities)

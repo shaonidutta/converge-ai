@@ -269,12 +269,17 @@ class IntentPatterns:
 
         # Extract service types (raw extraction)
         # NOTE: More specific patterns should come first (e.g., "tv repair" before "appliance")
+        # IMPORTANT: Check "salon for men" before "salon for women" to avoid mismatches
         service_keywords = {
             # Specific appliance repairs (check these first)
             "tv_repair": ["tv repair", "television repair", "tv service", "television service"],
             "ac_repair": ["ac repair", "air conditioning repair", "hvac repair", "air conditioner repair"],
             "microwave_repair": ["microwave repair", "microwave service"],
             "geyser_repair": ["geyser repair", "water heater repair", "geyser service"],
+
+            # Salon services (check specific ones first)
+            "salon_for_men": ["salon for men", "men salon", "barber", "gents salon", "male grooming", "men's salon"],
+            "salon_for_women": ["salon for women", "women salon", "ladies salon", "beauty parlor", "beauty salon", "women's salon"],
 
             # General services
             "ac": ["ac", "air conditioning", "hvac", "air conditioner"],
@@ -287,8 +292,6 @@ class IntentPatterns:
             "carpentry": ["carpentry", "carpenter", "furniture", "wood work", "cabinet", "door repair"],
             "water_purifier": ["water purifier", "ro", "water filter", "purifier", "water treatment"],
             "car_care": ["car care", "car wash", "car cleaning", "car service", "vehicle cleaning"],
-            "salon_for_women": ["salon", "beauty salon", "women salon", "ladies salon", "beauty parlor"],
-            "salon_for_men": ["men salon", "barber", "gents salon", "male grooming"],
             "packers_and_movers": ["packers", "movers", "packing", "moving", "relocation", "shifting"]
         }
 

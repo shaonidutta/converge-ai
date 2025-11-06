@@ -340,6 +340,30 @@ class EntityValidator:
         normalized_value = str(value).lower().strip()
         logger.info(f"[ENTITY_VALIDATOR] Normalized value: '{normalized_value}'")
 
+        # Map category IDs to service names
+        # Based on actual database IDs from service categories
+        category_id_to_service = {
+            "1": "home_cleaning",
+            "13": "ac",  # Test AC Services
+            "2": "appliance_repair",
+            "3": "plumbing",
+            "4": "electrical",
+            "5": "carpentry",
+            "6": "painting",
+            "7": "pest_control",
+            "8": "water_purifier",
+            "9": "car_care",
+            "10": "salon_for_women",
+            "11": "salon_for_men",
+            "12": "packers_and_movers"
+        }
+
+        # If value is a category ID, convert to service name
+        if normalized_value in category_id_to_service:
+            logger.info(f"[ENTITY_VALIDATOR] Converting category ID '{normalized_value}' to service name")
+            normalized_value = category_id_to_service[normalized_value]
+            logger.info(f"[ENTITY_VALIDATOR] Converted to: '{normalized_value}'")
+
         # Normalize common service variations to match services_with_subcategories keys
         service_normalizations = {
             # Home Cleaning variations

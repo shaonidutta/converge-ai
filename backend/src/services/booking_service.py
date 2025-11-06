@@ -158,7 +158,7 @@ class BookingService:
             remaining_amount=Decimal('0.00'),
             payment_method=PaymentMethod[request.payment_method.upper()],
             payment_status=PaymentStatus.PENDING,
-            status=BookingStatus.PENDING,
+            status=BookingStatus.CONFIRMED,  # Changed from PENDING to CONFIRMED since no payment module
             preferred_date=preferred_datetime.date(),
             preferred_time=preferred_datetime.time(),
             special_instructions=request.special_instructions
@@ -192,7 +192,7 @@ class BookingService:
                 scheduled_time_from=scheduled_time_from,
                 scheduled_time_to=scheduled_time_to,
                 payment_status="unpaid",
-                status="pending"
+                status="confirmed"  # Changed from "pending" to "confirmed" since no payment module
             )
             self.db.add(booking_item)
             booking_items.append((booking_item, rate_card, subcategory))

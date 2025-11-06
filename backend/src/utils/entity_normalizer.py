@@ -155,14 +155,16 @@ def normalize_date(raw_value: str) -> Optional[str]:
         "%d %b %Y",  # "30 Oct 2025"
         "%B %d %Y",  # "October 30 2025"
         "%b %d %Y",  # "Oct 30 2025"
-        "%B %d, %Y",  # "December 15, 2025"
+        "%B %d, %Y",  # "December 15, 2025" or "November 13, 2025"
         "%b %d, %Y",  # "Dec 15, 2025"
         "%d%s %B",  # "30th October" (with ordinal suffix)
         "%d%s %b",  # "30th Oct"
         "%d%s %B %Y",  # "30th October 2025"
         "%d%s %b %Y",  # "30th Oct 2025"
-        "%d%s %B, %Y",  # "15th December, 2025"
+        "%d%s %B, %Y",  # "15th December, 2025" or "13th November, 2025"
         "%d%s %b, %Y",  # "15th Dec, 2025"
+        "%B %d%s, %Y",  # "November 13th, 2025" or "December 15th, 2025"
+        "%b %d%s, %Y",  # "Nov 13th, 2025" or "Dec 15th, 2025"
     ]
 
     # Remove ordinal suffixes (st, nd, rd, th) and extra spaces
