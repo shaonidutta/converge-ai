@@ -196,7 +196,37 @@ class QuestionGenerator:
             return question
         except Exception as e:
             logger.warning(f"[QuestionGenerator] LLM generation failed: {e}, falling back to template")
-            # Fallback to template
+
+            # Special fallback for subcategory questions - show options even in template mode
+            if entity_type == EntityType.SERVICE_SUBCATEGORY and context:
+                available_subcategories = context.get('available_subcategories', [])
+                service_type = context.get('service_type', 'service')
+
+                if available_subcategories:
+                    # Format subcategories with prices
+                    options_list = []
+                    for subcategory in available_subcategories:
+                        name = subcategory.get('name', 'Unknown')
+                        rate_cards = subcategory.get('rate_cards', [])
+                        if rate_cards:
+                            cheapest = min(rate_cards, key=lambda x: x.get('price', 0))
+                            price = cheapest.get('price', 0)
+                            options_list.append(f"{name} - Starting from ₹{price:.0f}")
+                        else:
+                            options_list.append(name)
+
+                    # Get service name for display
+                    service_name = service_type
+                    if collected_entities and "_service_name" in collected_entities:
+                        service_name = collected_entities["_service_name"]
+
+                    # Format options
+                    formatted_options = "\n".join(f"{i}. {option}" for i, option in enumerate(options_list, 1))
+                    question = f"Great! Here are the {service_name} services we offer:\n\n{formatted_options}\n\nWhich one would you like to book?"
+                    logger.info(f"[QuestionGenerator] Template with subcategories: {question[:100]}...")
+                    return question
+
+            # Fallback to template for other cases
             question = self._get_template_question(entity_type, intent, attempt_number)
 
             # Add context if available
@@ -358,6 +388,18 @@ Generate the question:"""
         - If date="2025-10-10" collected, asking for time:
           "What time works best for you on October 10th?"
         """
+        # Replace {service_type} placeholder in templates (for subcategory questions)
+        if "{service_type}" in question:
+            if "_service_name" in collected_entities:
+                service_name = collected_entities["_service_name"]
+                question = question.replace("{service_type}", service_name)
+            elif "service_type" in collected_entities:
+                service = collected_entities["service_type"]
+                question = question.replace("{service_type}", service)
+            else:
+                # Fallback: remove placeholder
+                question = question.replace("{service_type} ", "")
+
         # Add service name to question if available (from ServiceNameResolver)
         # This ensures we use the actual service name (e.g., "Texture Painting") instead of just the ID
         if "_service_name" in collected_entities and entity_type != EntityType.SERVICE_TYPE:
