@@ -1054,6 +1054,27 @@ async def determine_needed_entities_node(
                     needed.insert(0, 'service_subcategory')
                     logger.info(f"[determine_needed_entities_node] ✅ Service '{normalized_service}' requires subcategory selection, added to needed entities")
                     logger.info(f"[determine_needed_entities_node] Updated needed entities: {needed}")
+
+                    # Fetch available subcategories from database
+                    try:
+                        from src.services.service_category_validator import ServiceCategoryValidator
+                        service_validator = ServiceCategoryValidator(db)
+                        validation_result = await service_validator.validate_service_type(service_type)
+
+                        if not validation_result.is_valid and validation_result.metadata:
+                            available_subcategories = validation_result.metadata.get('available_subcategories', [])
+                            if available_subcategories:
+                                # Add to state metadata for question generation
+                                metadata = state.get('metadata', {})
+                                metadata['available_subcategories'] = available_subcategories
+                                metadata['service_type'] = normalized_service
+                                logger.info(f"[determine_needed_entities_node] ✅ Fetched {len(available_subcategories)} subcategories from database")
+                            else:
+                                logger.warning(f"[determine_needed_entities_node] No subcategories found in validation result")
+                        else:
+                            logger.warning(f"[determine_needed_entities_node] Validation result did not contain subcategories")
+                    except Exception as e:
+                        logger.error(f"[determine_needed_entities_node] Error fetching subcategories: {e}")
             else:
                 logger.info(f"[determine_needed_entities_node] Service '{normalized_service}' does NOT require subcategory selection")
 
