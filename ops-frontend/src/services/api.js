@@ -305,6 +305,58 @@ const api = {
     check: () => apiClient.get('/health'),
   },
 
+  // ============================================
+  // Alerts APIs
+  // ============================================
+  alerts: {
+    /**
+     * Get list of alerts
+     * @param {Object} params - Query parameters (unread_only, alert_types, severities, page, page_size)
+     * @returns {Promise} API response with alerts list
+     */
+    getList: (params = {}) => apiClient.get('/alerts', { params }),
+
+    /**
+     * Get specific alert by ID
+     * @param {number} alertId - Alert ID
+     * @returns {Promise} API response with alert details
+     */
+    getAlert: (alertId) => apiClient.get(`/alerts/${alertId}`),
+
+    /**
+     * Mark alert as read
+     * @param {number} alertId - Alert ID
+     * @returns {Promise} API response
+     */
+    markAsRead: (alertId) => apiClient.put(`/alerts/${alertId}/read`),
+
+    /**
+     * Dismiss alert
+     * @param {number} alertId - Alert ID
+     * @returns {Promise} API response
+     */
+    dismiss: (alertId) => apiClient.put(`/alerts/${alertId}/dismiss`),
+
+    /**
+     * Get unread alert count
+     * @returns {Promise} API response with unread count
+     */
+    getUnreadCount: () => apiClient.get('/alerts/unread/count'),
+
+    /**
+     * Get alert rules (admin only)
+     * @param {Object} params - Query parameters (rule_type, enabled_only)
+     * @returns {Promise} API response with alert rules
+     */
+    getRules: (params = {}) => apiClient.get('/alerts/rules', { params }),
+
+    /**
+     * Get alert subscriptions
+     * @returns {Promise} API response with subscriptions
+     */
+    getSubscriptions: () => apiClient.get('/alerts/subscriptions'),
+  },
+
   // Reports API
   reports: {
     /**

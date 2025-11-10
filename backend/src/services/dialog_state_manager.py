@@ -387,7 +387,14 @@ class DialogStateManager:
         if state.state == DialogStateType.COLLECTING_INFO:
             if word_count <= 10:
                 # Check if message might be an entity value
-                expected_entity = state.needed_entities[0] if state.needed_entities else None
+                # IMPORTANT: Use expected_entity from context if available (updated during slot-filling)
+                # Otherwise fall back to needed_entities[0] (original list)
+                expected_entity = None
+                if state.context and isinstance(state.context, dict):
+                    expected_entity = state.context.get('expected_entity')
+
+                if not expected_entity:
+                    expected_entity = state.needed_entities[0] if state.needed_entities else None
 
                 # Very short messages (1-3 words) are likely entity values
                 if word_count <= 3:
@@ -416,11 +423,19 @@ class DialogStateManager:
             )
 
         # Default: active state exists but unclear
+        # Use expected_entity from context if available, otherwise fall back to needed_entities[0]
+        expected_entity = None
+        if state.context and isinstance(state.context, dict):
+            expected_entity = state.context.get('expected_entity')
+
+        if not expected_entity:
+            expected_entity = state.needed_entities[0] if state.needed_entities else None
+
         return FollowUpDetectionResult(
             is_follow_up=True,
             confidence=0.6,
             reason="Active dialog state exists, treating as potential follow-up",
-            expected_entity=state.needed_entities[0] if state.needed_entities else None
+            expected_entity=expected_entity
         )
 
     async def cleanup_expired_states(self) -> int:

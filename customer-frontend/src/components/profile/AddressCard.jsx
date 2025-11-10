@@ -5,21 +5,11 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Home, Briefcase, MapPin, Edit, Trash2, Star } from 'lucide-react';
+import { MapPin, Edit, Trash2, Star } from 'lucide-react';
 
 const AddressCard = ({ address, onEdit, onDelete, onSetDefault }) => {
-  const getAddressIcon = (type) => {
-    switch (type?.toLowerCase()) {
-      case 'home':
-        return Home;
-      case 'work':
-        return Briefcase;
-      default:
-        return MapPin;
-    }
-  };
-
-  const Icon = getAddressIcon(address.address_type);
+  // Use MapPin icon for all addresses since backend doesn't have address_type
+  const Icon = MapPin;
 
   return (
     <motion.div
@@ -35,7 +25,7 @@ const AddressCard = ({ address, onEdit, onDelete, onSetDefault }) => {
             <Icon className="h-5 w-5 text-primary-500" />
           </div>
           <div>
-            <h3 className="font-semibold text-slate-900">{address.address_type}</h3>
+            <h3 className="font-semibold text-slate-900">Address</h3>
             {address.is_default && (
               <span className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full mt-1">
                 <Star className="h-3 w-3 fill-current" />
@@ -71,10 +61,10 @@ const AddressCard = ({ address, onEdit, onDelete, onSetDefault }) => {
 
       {/* Address Details */}
       <div className="text-sm text-slate-600 space-y-1">
-        <p>{address.street_address}</p>
-        {address.apartment_number && <p>{address.apartment_number}</p>}
+        <p>{address.address_line1}</p>
+        {address.address_line2 && <p>{address.address_line2}</p>}
         <p>
-          {address.city}, {address.state} {address.postal_code}
+          {address.city}, {address.state} {address.pincode}
         </p>
       </div>
 

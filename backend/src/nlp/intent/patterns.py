@@ -357,6 +357,7 @@ class IntentPatterns:
                     r'\b(list|show|view|display)\s+(my|all|them)?\s*(bookings?|appointments?)?',  # "list my bookings", "show bookings"
                     r'\b(check|see|get)\s+my\s+(bookings?|appointments?)',  # "check my bookings"
                     r'(bookings?|appointments?).*\b(list|show|view|display)',  # "bookings and list them"
+                    r'\bfilter\s+by\s+\w+',  # "filter by pending", "filter by status"
                 ]
 
                 for pattern in list_patterns:
@@ -365,16 +366,30 @@ class IntentPatterns:
                         break
 
         # Extract STATUS_FILTER (for list action)
-        # Check for status keywords in queries like "show my pending bookings"
-        if raw_entities.get(EntityType.ACTION.value) == "list":
-            status_keywords = {
-                "pending": ["pending", "upcoming", "scheduled", "active"],
-                "confirmed": ["confirmed", "approved"],
-                "completed": ["completed", "finished", "done", "past"],
-                "cancelled": ["cancelled", "canceled", "deleted", "removed"]
-            }
+        # Check for status keywords in queries like "show my pending bookings" or "filter by pending"
+        status_keywords = {
+            "pending": ["pending", "upcoming", "scheduled", "active"],
+            "confirmed": ["confirmed", "approved"],
+            "completed": ["completed", "finished", "done", "past"],
+            "cancelled": ["cancelled", "canceled", "deleted", "removed"]
+        }
 
-            # Check for status keywords appearing before "bookings" or "appointments"
+        # Check for "filter by [status]" patterns first (highest priority)
+        filter_by_pattern = r'\bfilter\s+by\s+(\w+)'
+        filter_match = re.search(filter_by_pattern, message_lower)
+        if filter_match:
+            status_word = filter_match.group(1)
+            # Find which status this keyword belongs to
+            for status, keywords in status_keywords.items():
+                if status_word in keywords or status_word == status:
+                    raw_entities[EntityType.STATUS_FILTER.value] = status
+                    # Also set action to "list" if not already set
+                    if EntityType.ACTION.value not in raw_entities:
+                        raw_entities[EntityType.ACTION.value] = "list"
+                    break
+
+        # Check for status keywords appearing before "bookings" or "appointments" (if list action detected)
+        elif raw_entities.get(EntityType.ACTION.value) == "list":
             # Pattern: "show my [status] bookings"
             status_pattern = r'\b(' + '|'.join([kw for keywords in status_keywords.values() for kw in keywords]) + r')\s+(bookings?|appointments?)'
             status_match = re.search(status_pattern, message_lower)

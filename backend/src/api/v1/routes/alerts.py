@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated, Optional, List
 
 from src.core.database.connection import get_db
-from src.core.security.dependencies import require_permissions
+from src.core.security.dependencies import get_current_staff
 from src.core.models.staff import Staff
 from src.services.alert_service import AlertService
 from src.schemas.alert import (
@@ -36,7 +36,7 @@ router = APIRouter(prefix="/alerts", tags=["Alerts"])
     summary="Get staff alerts"
 )
 async def get_alerts(
-    current_staff: Annotated[Staff, Depends(require_permissions(["alerts.read"]))],
+    current_staff: Annotated[Staff, Depends(get_current_staff)],
     db: Annotated[AsyncSession, Depends(get_db)],
     unread_only: bool = Query(False, description="Show only unread alerts"),
     alert_types: Optional[str] = Query(None, description="Comma-separated alert types"),
@@ -103,42 +103,137 @@ async def get_alerts(
 
 
 @router.get(
+    "/unread/count",
+    response_model=UnreadCountResponse,
+    summary="Get unread alert count"
+)
+async def get_unread_count(
+    current_staff: Annotated[Staff, Depends(get_current_staff)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Get count of unread alerts for current staff
+
+    **Permissions Required:** alerts.read
+
+    **Returns:**
+    - Count of unread alerts
+    """
+    try:
+        alert_service = AlertService(db)
+        count = await alert_service.get_unread_count(current_staff.id)
+
+        return UnreadCountResponse(unread_count=count)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get unread count: {str(e)}"
+        )
+
+
+# ============================================================================
+# Alert Rule Endpoints (Admin Only)
+# ============================================================================
+
+@router.get(
+    "/rules",
+    response_model=List[AlertRuleResponse],
+    summary="Get alert rules"
+)
+async def get_alert_rules(
+    current_staff: Annotated[Staff, Depends(get_current_staff)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    rule_type: Optional[str] = Query(None, description="Filter by rule type"),
+    enabled_only: bool = Query(True, description="Show only enabled rules")
+):
+    """
+    Get all alert rules (admin only)
+
+    **Permissions Required:** alerts.manage
+    """
+    try:
+        alert_service = AlertService(db)
+        rules = await alert_service.alert_repo.get_alert_rules(
+            rule_type=rule_type,
+            enabled_only=enabled_only
+        )
+
+        return [AlertRuleResponse.model_validate(rule) for rule in rules]
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve alert rules: {str(e)}"
+        )
+
+
+@router.get(
+    "/subscriptions",
+    response_model=AlertSubscriptionListResponse,
+    summary="Get alert subscriptions"
+)
+async def get_subscriptions(
+    current_staff: Annotated[Staff, Depends(get_current_staff)],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    Get alert subscriptions for current staff
+
+    **Permissions Required:** alerts.read
+    """
+    try:
+        alert_service = AlertService(db)
+        subscriptions = await alert_service.alert_repo.get_subscriptions_for_staff(current_staff.id)
+
+        return AlertSubscriptionListResponse(
+            subscriptions=[AlertSubscriptionResponse.model_validate(sub) for sub in subscriptions]
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve subscriptions: {str(e)}"
+        )
+
+
+@router.get(
     "/{alert_id}",
     response_model=AlertResponse,
     summary="Get single alert"
 )
 async def get_alert(
     alert_id: int,
-    current_staff: Annotated[Staff, Depends(require_permissions(["alerts.read"]))],
+    current_staff: Annotated[Staff, Depends(get_current_staff)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
     Get a single alert by ID
-    
+
     **Permissions Required:** alerts.read
-    
+
     **Returns:**
     - Alert details
     """
     try:
         alert_service = AlertService(db)
         alert = await alert_service.alert_repo.get_alert_by_id(alert_id)
-        
+
         if not alert:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Alert {alert_id} not found"
             )
-        
+
         # Verify ownership
         if alert.assigned_to_staff_id != current_staff.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You don't have permission to view this alert"
             )
-        
+
         return AlertResponse.model_validate(alert)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -155,7 +250,7 @@ async def get_alert(
 )
 async def mark_alert_read(
     alert_id: int,
-    current_staff: Annotated[Staff, Depends(require_permissions(["alerts.read"]))],
+    current_staff: Annotated[Staff, Depends(get_current_staff)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
@@ -189,7 +284,7 @@ async def mark_alert_read(
 )
 async def dismiss_alert(
     alert_id: int,
-    current_staff: Annotated[Staff, Depends(require_permissions(["alerts.read"]))],
+    current_staff: Annotated[Staff, Depends(get_current_staff)],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
@@ -214,99 +309,3 @@ async def dismiss_alert(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to dismiss alert: {str(e)}"
         )
-
-
-@router.get(
-    "/unread/count",
-    response_model=UnreadCountResponse,
-    summary="Get unread alert count"
-)
-async def get_unread_count(
-    current_staff: Annotated[Staff, Depends(require_permissions(["alerts.read"]))],
-    db: Annotated[AsyncSession, Depends(get_db)]
-):
-    """
-    Get count of unread alerts for current staff
-    
-    **Permissions Required:** alerts.read
-    
-    **Returns:**
-    - Count of unread alerts
-    """
-    try:
-        alert_service = AlertService(db)
-        count = await alert_service.get_unread_count(current_staff.id)
-        
-        return UnreadCountResponse(unread_count=count)
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get unread count: {str(e)}"
-        )
-
-
-# ============================================================================
-# Alert Rule Endpoints (Admin Only)
-# ============================================================================
-
-@router.get(
-    "/rules",
-    response_model=List[AlertRuleResponse],
-    summary="Get alert rules"
-)
-async def get_alert_rules(
-    current_staff: Annotated[Staff, Depends(require_permissions(["alerts.manage"]))],
-    db: Annotated[AsyncSession, Depends(get_db)],
-    rule_type: Optional[str] = Query(None, description="Filter by rule type"),
-    enabled_only: bool = Query(True, description="Show only enabled rules")
-):
-    """
-    Get all alert rules (admin only)
-    
-    **Permissions Required:** alerts.manage
-    """
-    try:
-        alert_service = AlertService(db)
-        rules = await alert_service.alert_repo.get_alert_rules(
-            rule_type=rule_type,
-            enabled_only=enabled_only
-        )
-        
-        return [AlertRuleResponse.model_validate(rule) for rule in rules]
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve alert rules: {str(e)}"
-        )
-
-
-@router.get(
-    "/subscriptions",
-    response_model=AlertSubscriptionListResponse,
-    summary="Get alert subscriptions"
-)
-async def get_subscriptions(
-    current_staff: Annotated[Staff, Depends(require_permissions(["alerts.read"]))],
-    db: Annotated[AsyncSession, Depends(get_db)]
-):
-    """
-    Get alert subscriptions for current staff
-    
-    **Permissions Required:** alerts.read
-    """
-    try:
-        alert_service = AlertService(db)
-        subscriptions = await alert_service.alert_repo.get_subscriptions_for_staff(current_staff.id)
-        
-        return AlertSubscriptionListResponse(
-            subscriptions=[AlertSubscriptionResponse.model_validate(sub) for sub in subscriptions]
-        )
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve subscriptions: {str(e)}"
-        )
-

@@ -15,8 +15,6 @@ import Footer from '../components/common/Footer';
 import HeroSection from '../components/home/HeroSection';
 import ServicesSection from '../components/home/ServicesSection';
 import RecentBookingsSection from '../components/home/RecentBookingsSection';
-import LisaChatBubble from '../components/chat/LisaChatBubble';
-import LisaChatWindow from '../components/chat/LisaChatWindow';
 
 /**
  * Home Component
@@ -126,12 +124,6 @@ const Home = () => {
 
       {/* Footer */}
       <Footer />
-
-      {/* Lisa AI Chat Bubble */}
-      <LisaChatBubble />
-
-      {/* Lisa Chat Window */}
-      <LisaChatWindow />
     </div>
   );
 };

@@ -385,6 +385,26 @@ async def extract_initial_entities_node(
             else:
                 logger.info(f"[extract_initial_entities_node] No service extracted or low confidence")
 
+        # Also try to extract action from the initial message (e.g., "book", "schedule", "cancel")
+        if intent == "booking_management" and 'action' not in collected_entities:
+            logger.info(f"[extract_initial_entities_node] Attempting to extract action from: '{message}'")
+
+            action_extraction = await entity_extractor.extract_from_follow_up(
+                message=message,
+                expected_entity=EntityType.ACTION,
+                context={
+                    'intent': intent,
+                    'session_id': state.get('session_id'),
+                    'user_id': state.get('user_id')
+                }
+            )
+
+            if action_extraction and action_extraction.confidence >= 0.7:
+                collected_entities['action'] = action_extraction.entity_value
+                logger.info(f"[extract_initial_entities_node] ✅ Extracted action: {action_extraction.entity_value}")
+            else:
+                logger.info(f"[extract_initial_entities_node] No action extracted or low confidence")
+
         return {
             "collected_entities": collected_entities,
             "metadata": {
@@ -519,14 +539,26 @@ async def extract_entity_node(
         if multiple_needed or is_complaint_with_details:
             # Try to extract multiple entities from the message
             logger.info(f"[extract_entity_node] Trying to extract multiple entities: {needed_entities}")
+
+            # Build context for multiple entity extraction
+            multiple_extraction_context = {
+                "collected_entities": collected_entities,
+                "last_question": state.get('last_question_asked'),
+                "user_id": state['user_id']
+            }
+
+            # Add available_subcategories if service_subcategory is one of the needed entities
+            if 'service_subcategory' in needed_entities:
+                metadata = state.get('metadata', {})
+                available_subcategories = metadata.get('available_subcategories', [])
+                if available_subcategories:
+                    multiple_extraction_context['available_subcategories'] = available_subcategories
+                    logger.info(f"[extract_entity_node] Added {len(available_subcategories)} available subcategories to multiple extraction context")
+
             multiple_results = await entity_extractor.extract_multiple_entities(
                 message=state['current_message'],
                 expected_entities=[EntityType(e) for e in needed_entities],
-                context={
-                    "collected_entities": collected_entities,
-                    "last_question": state.get('last_question_asked'),
-                    "user_id": state['user_id']
-                }
+                context=multiple_extraction_context
             )
 
             # If we found multiple entities, return the expected one but store all
@@ -626,6 +658,13 @@ async def validate_entity_node(
 
         extracted = state.get('extracted_entity', {})
         collected_entities = state.get('collected_entities', {})
+
+        # If service_type is in metadata but not in collected_entities, add it
+        # This happens when validating subcategory in follow-up messages
+        metadata = state.get('metadata', {})
+        if 'service_type' in metadata and 'service_type' not in collected_entities:
+            collected_entities['service_type'] = metadata['service_type']
+            logger.info(f"[validate_entity_node] Added service_type from metadata to collected_entities: {metadata['service_type']}")
 
         # Check if we have an extracted entity (normal flow)
         if extracted and 'entity_type' in extracted:
@@ -1181,8 +1220,7 @@ async def generate_question_node(
         needed = state.get('needed_entities', [])
 
         if not needed:
-            logger.info(f"[generate_question_node] No entities needed, generating confirmation")
-            # All entities collected, generate confirmation
+            # All entities collected
             primary_intent = state.get('primary_intent')
             if not primary_intent:
                 logger.error("[generate_question_node] No primary_intent found in state")
@@ -1193,10 +1231,31 @@ async def generate_question_node(
                 }
 
             intent_enum = IntentType(primary_intent) if isinstance(primary_intent, str) else primary_intent
+            collected_entities = state.get('collected_entities', {})
+            action = collected_entities.get('action', '')
 
+            # Define read-only actions that don't need confirmation
+            READ_ONLY_ACTIONS = ['list', 'view', 'show', 'check_status', 'track']
+
+            # Skip confirmation for read-only actions
+            if action in READ_ONLY_ACTIONS:
+                logger.info(f"[generate_question_node] Action '{action}' is read-only, skipping confirmation and executing agent directly")
+                return {
+                    "next_graph": "agent_execution",
+                    "response_type": "ready_for_agent",
+                    "metadata": {
+                        **state.get("metadata", {}),
+                        "nodes_executed": state.get("metadata", {}).get("nodes_executed", []) + ["generate_question_node"],
+                        "confirmation_skipped": True,
+                        "reason": "read_only_action"
+                    }
+                }
+
+            logger.info(f"[generate_question_node] No entities needed, generating confirmation for action '{action}'")
+            # Generate confirmation for high-impact actions
             confirmation = question_generator.generate_confirmation(
                 intent=intent_enum,
-                collected_entities=state.get('collected_entities', {})
+                collected_entities=collected_entities
             )
 
             # Save dialog state with awaiting_confirmation status
@@ -1322,6 +1381,16 @@ async def generate_question_node(
                 "expected_entity": next_entity,
                 "needed_entities": needed  # Save needed_entities to persist across messages
             }
+
+            # Also save available_subcategories if present in metadata
+            metadata = state.get('metadata', {})
+            if 'available_subcategories' in metadata:
+                context_update['available_subcategories'] = metadata['available_subcategories']
+                logger.info(f"[generate_question_node] Saving {len(metadata['available_subcategories'])} available_subcategories to dialog state context")
+
+            # Also save service_type if present in metadata
+            if 'service_type' in metadata:
+                context_update['service_type'] = metadata['service_type']
 
             await dialog_manager.update_state(
                 session_id=state['session_id'],

@@ -70,17 +70,12 @@ const StaffPage = () => {
 
   const fetchRoles = async () => {
     try {
-      // TODO: Backend /api/v1/ops/roles endpoint not yet implemented
-      // For now, using hardcoded roles based on database schema
-      setRoles([
-        { id: 1, name: 'system_admin', display_name: 'System Admin' },
-        { id: 2, name: 'ops_manager', display_name: 'Operations Manager' },
-        { id: 3, name: 'ops_agent', display_name: 'Operations Agent' },
-        { id: 4, name: 'support_agent', display_name: 'Support Agent' },
-        { id: 5, name: 'viewer', display_name: 'Viewer' }
-      ]);
+      const response = await api.staff.getRoles();
+      setRoles(response.data);
     } catch (error) {
       console.error('Error fetching roles:', error);
+      // Fallback to empty array on error
+      setRoles([]);
     }
   };
 

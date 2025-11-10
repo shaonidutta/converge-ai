@@ -193,6 +193,11 @@ class SlotFillingService:
                         state['needed_entities'] = context_data['needed_entities']
                         logger.info(f"[SlotFillingService] Loaded needed_entities from dialog state context: {context_data['needed_entities']}")
 
+                    # Load expected_entity from context (for follow-up entity extraction)
+                    if 'expected_entity' in context_data:
+                        state['expected_entity'] = context_data['expected_entity']
+                        logger.info(f"[SlotFillingService] Loaded expected_entity from dialog state context: {context_data['expected_entity']}")
+
                 except Exception as e:
                     logger.warning(f"[SlotFillingService] Could not load dialog state context: {e}")
                     # Continue without metadata

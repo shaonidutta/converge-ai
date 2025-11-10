@@ -18,6 +18,7 @@ from sqlalchemy import select
 from src.core.models import User, Complaint, ComplaintUpdate, Booking
 from src.core.models.complaint import ComplaintType, ComplaintPriority, ComplaintStatus
 from src.services.response_generator import ResponseGenerator
+from src.monitoring.metrics import complaints_created_total
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +194,13 @@ class ComplaintAgent:
         self.db.add(complaint)
         await self.db.commit()
         await self.db.refresh(complaint)
-        
+
+        # Track complaint creation metrics
+        complaints_created_total.labels(
+            priority=priority.value,
+            status=ComplaintStatus.OPEN.value
+        ).inc()
+
         self.logger.info(
             f"Complaint created: id={complaint.id}, user_id={user.id}, "
             f"type={complaint_type.value}, priority={priority.value}"

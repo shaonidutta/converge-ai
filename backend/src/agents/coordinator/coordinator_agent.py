@@ -12,6 +12,7 @@ This agent serves as the central orchestrator that:
 
 import logging
 import re
+import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +29,13 @@ from src.agents.cancellation.cancellation_agent import CancellationAgent
 from src.agents.reschedule.reschedule_agent import RescheduleAgent
 from src.agents.complaint.complaint_agent import ComplaintAgent
 from src.agents.sql.sql_agent import SQLAgent
+from src.monitoring.metrics import (
+    agent_executions_total,
+    agent_execution_duration_seconds,
+    agent_errors_total,
+    agent_concurrent_executions,
+    chat_sessions_total
+)
 
 
 class CoordinatorAgent:
@@ -170,6 +178,11 @@ class CoordinatorAgent:
         Returns:
             Dictionary with response, intent, agent_used, and metadata
         """
+        # Track metrics
+        start_time = time.time()
+        agent_concurrent_executions.labels(agent_name="coordinator").inc()
+        chat_sessions_total.labels(user_type="customer").inc()
+
         try:
             # Extract user_id early to avoid lazy loading issues in async context
             user_id = user.id
@@ -1194,6 +1207,11 @@ class CoordinatorAgent:
             }
 
         except Exception as e:
+            # Track error metrics
+            execution_time = time.time() - start_time
+            agent_errors_total.labels(agent_name="coordinator", error_type="execution_error").inc()
+            agent_execution_duration_seconds.labels(agent_name="coordinator", intent="error").observe(execution_time)
+
             self.logger.error(f"Error in CoordinatorAgent execution: {e}", exc_info=True)
             return {
                 "response": "I apologize, but I encountered an error processing your request. Please try again or contact support if the issue persists.",
@@ -1203,6 +1221,12 @@ class CoordinatorAgent:
                 "classification_method": "error",
                 "metadata": {"error": str(e)}
             }
+        finally:
+            # Track completion metrics
+            execution_time = time.time() - start_time
+            agent_concurrent_executions.labels(agent_name="coordinator").dec()
+            agent_execution_duration_seconds.labels(agent_name="coordinator", intent="all").observe(execution_time)
+            agent_executions_total.labels(agent_name="coordinator", intent="all", status="completed").inc()
     
     async def _route_to_agent(
         self,

@@ -344,6 +344,31 @@ class EntityExtractor:
             "cancelled": ["cancelled", "canceled", "deleted", "removed"]
         }
 
+        # Check for filter patterns like "filter by pending", "show pending", etc.
+        filter_patterns = [
+            r'\bfilter\s+by\s+(\w+)',
+            r'\bshow\s+(\w+)\s+(?:bookings?|orders?)',
+            r'\blist\s+(\w+)\s+(?:bookings?|orders?)',
+            r'\b(\w+)\s+(?:bookings?|orders?)\s+only\b',
+            r'\bonly\s+(\w+)\s+(?:bookings?|orders?)',
+        ]
+
+        import re
+        for pattern in filter_patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                potential_status = match.group(1).lower()
+                for status, keywords in status_keywords.items():
+                    if potential_status in keywords or potential_status == status:
+                        return EntityExtractionResult(
+                            entity_type=EntityType.STATUS_FILTER.value,
+                            entity_value=status,
+                            confidence=0.95,
+                            normalized_value=status,
+                            extraction_method="pattern_filter"
+                        )
+
+        # Fallback to simple keyword matching
         for status, keywords in status_keywords.items():
             for keyword in keywords:
                 if keyword in message_lower:
@@ -968,13 +993,48 @@ class EntityExtractor:
         logger.info(f"[EntityExtractor] Available subcategories: {[sub.get('name', '') for sub in available_subcategories]}")
 
         # Check if user input is a numeric selection (e.g., "3" to select option 3)
+        # Also handle patterns like "4. Wiring" or "3) Deep Cleaning"
+        import re
+        numeric_patterns = [
+            r'^(\d+)\.?\s*(.*)$',  # "4. Wiring" or "4 Wiring"
+            r'^(\d+)\)\s*(.*)$',   # "4) Wiring"
+            r'^(\d+)\s*-\s*(.*)$', # "4 - Wiring"
+        ]
+
+        for pattern in numeric_patterns:
+            match = re.match(pattern, message_lower.strip())
+            if match:
+                selection_num = int(match.group(1))
+                selection_text = match.group(2).strip()
+                selection_index = selection_num - 1  # Convert to 0-based index
+
+                if 0 <= selection_index < len(available_subcategories):
+                    selected_subcategory = available_subcategories[selection_index]
+                    subcategory_name = selected_subcategory.get('name', '')
+                    subcategory_id = selected_subcategory.get('id')
+
+                    # Verify the text matches the subcategory name (optional validation)
+                    if selection_text and selection_text.lower() not in subcategory_name.lower():
+                        logger.warning(f"[EntityExtractor] Numeric selection text mismatch: '{selection_text}' vs '{subcategory_name}'")
+
+                    logger.info(f"[EntityExtractor] Numeric selection: {message_lower} -> {subcategory_name} (ID: {subcategory_id})")
+                    return EntityExtractionResult(
+                        entity_type=EntityType.SERVICE_SUBCATEGORY.value,
+                        entity_value=subcategory_name.lower(),
+                        confidence=0.95,
+                        normalized_value=subcategory_name.lower(),
+                        extraction_method="numeric_selection",
+                        metadata={"subcategory_id": subcategory_id, "subcategory_name": subcategory_name}
+                    )
+
+        # Simple numeric selection (just the number)
         if message_lower.strip().isdigit():
             selection_index = int(message_lower.strip()) - 1  # Convert to 0-based index
             if 0 <= selection_index < len(available_subcategories):
                 selected_subcategory = available_subcategories[selection_index]
                 subcategory_name = selected_subcategory.get('name', '')
                 subcategory_id = selected_subcategory.get('id')
-                logger.info(f"[EntityExtractor] Numeric selection: {message_lower} -> {subcategory_name} (ID: {subcategory_id})")
+                logger.info(f"[EntityExtractor] Simple numeric selection: {message_lower} -> {subcategory_name} (ID: {subcategory_id})")
                 return EntityExtractionResult(
                     entity_type=EntityType.SERVICE_SUBCATEGORY.value,
                     entity_value=subcategory_name.lower(),
@@ -1004,6 +1064,18 @@ class EntityExtractor:
                     confidence=0.95,
                     normalized_value=subcategory_name,
                     extraction_method="pattern",
+                    metadata={"subcategory_id": subcategory_id, "subcategory_name": subcategory.get('name')}
+                )
+
+            # Partial match - check if message contains the subcategory name
+            if subcategory_name in message_lower or message_lower in subcategory_name:
+                logger.info(f"[EntityExtractor] Partial match found: '{message_lower}' matches '{subcategory_name}'")
+                return EntityExtractionResult(
+                    entity_type=EntityType.SERVICE_SUBCATEGORY.value,
+                    entity_value=message_lower,
+                    confidence=0.85,
+                    normalized_value=subcategory_name,
+                    extraction_method="pattern_partial",
                     metadata={"subcategory_id": subcategory_id, "subcategory_name": subcategory.get('name')}
                 )
 

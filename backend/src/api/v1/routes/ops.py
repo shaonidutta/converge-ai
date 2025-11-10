@@ -11,12 +11,14 @@ from datetime import datetime
 from src.core.database.connection import get_db
 from src.core.security.dependencies import get_current_staff, require_permissions
 from src.core.models import Staff
+from src.core.models.role import Role
 from src.schemas.ops import (
     OpsRegisterRequest,
     OpsLoginRequest,
     OpsAuthResponse,
     OpsUserResponse,
     OpsUpdateRequest,
+    RoleResponse,
 )
 from src.schemas.ops_dashboard import PriorityQueueResponse
 from src.schemas.metrics import DashboardMetricsResponse
@@ -29,6 +31,8 @@ from src.services.audit_service import AuditService
 from src.api.v1.routes.ops_complaints import router as complaints_router
 # Import analytics router
 from src.api.v1.routes.ops_analytics import router as analytics_router
+# Import alerts router
+from src.api.v1.routes.alerts import router as alerts_router
 
 router = APIRouter(prefix="/ops", tags=["Ops Management"])
 
@@ -36,6 +40,8 @@ router = APIRouter(prefix="/ops", tags=["Ops Management"])
 router.include_router(complaints_router)
 # Include analytics sub-router
 router.include_router(analytics_router)
+# Include alerts sub-router
+router.include_router(alerts_router)
 
 
 @router.post(
@@ -87,6 +93,48 @@ async def login_ops_user(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to login"
+        )
+
+
+@router.get(
+    "/roles",
+    response_model=List[RoleResponse],
+    summary="Get all roles"
+)
+async def get_roles(
+    current_staff: Annotated[Staff, Depends(get_current_staff)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    is_active: Optional[bool] = Query(None, description="Filter by active status")
+):
+    """
+    Get all roles in the system
+
+    **Returns:**
+    - List of all roles with id, name, display_name, description, level, is_active
+    """
+    try:
+        from sqlalchemy import select
+
+        # Build query
+        query = select(Role)
+
+        # Apply filters
+        if is_active is not None:
+            query = query.where(Role.is_active == is_active)
+
+        # Order by level (hierarchy)
+        query = query.order_by(Role.level.asc(), Role.name.asc())
+
+        # Execute query
+        result = await db.execute(query)
+        roles = result.scalars().all()
+
+        return [RoleResponse.model_validate(role) for role in roles]
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch roles: {str(e)}"
         )
 
 

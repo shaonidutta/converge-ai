@@ -20,7 +20,23 @@ from src.schemas.chat import (
     SessionResponse,
 )
 
+# Import guardrails
+from src.guardrails.core.guardrail_factory import create_guardrail_manager
+from src.guardrails.core.guardrail_result import Action
+
 logger = logging.getLogger(__name__)
+
+# Global guardrail manager (singleton)
+_guardrail_manager = None
+
+
+def get_guardrail_manager():
+    """Get or create the global guardrail manager."""
+    global _guardrail_manager
+    if _guardrail_manager is None:
+        _guardrail_manager = create_guardrail_manager()
+        logger.info("[ChatService] Guardrail manager initialized")
+    return _guardrail_manager
 
 
 class ChatService:
@@ -37,14 +53,16 @@ class ChatService:
         """
         Send a chat message and get AI response
 
-        Now powered by intelligent slot-filling system!
+        Now powered by intelligent slot-filling system with guardrails!
 
         The system will:
-        1. Classify your intent (booking, pricing, policy, etc.)
-        2. Extract entities from your message
-        3. Ask follow-up questions to collect missing information
-        4. Validate all inputs
-        5. Generate confirmation before executing actions
+        1. Validate input with guardrails (PII, toxic content, rate limiting)
+        2. Classify your intent (booking, pricing, policy, etc.)
+        3. Extract entities from your message
+        4. Ask follow-up questions to collect missing information
+        5. Validate all inputs
+        6. Generate confirmation before executing actions
+        7. Validate output with guardrails (PII leakage, toxic content)
 
         Args:
             user: Current user
@@ -58,27 +76,86 @@ class ChatService:
         # 1. Get or create session
         session_id = request.session_id or self._generate_session_id()
 
-        # 2. Store user message
+        # 2. Run input guardrails
+        guardrail_manager = get_guardrail_manager()
+        input_report = await guardrail_manager.check_input(
+            text=request.message,
+            user_id=user.id,
+            context={"session_id": session_id, "channel": request.channel}
+        )
+
+        # 3. Handle input guardrail violations
+        if input_report.is_blocked:
+            # Store user message (original)
+            user_message = await self._store_message(
+                user_id=user.id,
+                session_id=session_id,
+                role=MessageRole.USER,
+                message=request.message,
+                channel=Channel(request.channel)
+            )
+
+            # Store blocked response
+            ai_message = await self._store_message(
+                user_id=user.id,
+                session_id=session_id,
+                role=MessageRole.ASSISTANT,
+                message=input_report.final_text or "I'm sorry, but I can't process that message.",
+                channel=Channel(request.channel),
+                response_time_ms=int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000),
+                agent_calls={"guardrail_blocked": True, "violations": [r.message for r in input_report.results if not r.passed]}
+            )
+
+            return ChatMessageResponse(
+                session_id=session_id,
+                user_message=self._to_message_response(user_message),
+                assistant_message=self._to_message_response(ai_message),
+                response_time_ms=int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000),
+                metadata={"guardrail_blocked": True, "input_violations": [r.message for r in input_report.results if not r.passed]}
+            )
+
+        # 4. Use sanitized text if available
+        processed_message = input_report.final_text or request.message
+
+        # 5. Store user message (sanitized if needed)
         user_message = await self._store_message(
             user_id=user.id,
             session_id=session_id,
             role=MessageRole.USER,
-            message=request.message,
+            message=processed_message,
             channel=Channel(request.channel)
         )
 
-        # 3. Get AI response with metadata from slot-filling system
+        # 6. Get AI response with metadata from slot-filling system
         ai_response_text, metadata = await self._get_ai_response(
-            user_message=request.message,
+            user_message=processed_message,
             session_id=session_id,
             user=user,
             channel=request.channel
         )
 
-        # Calculate response time
+        # 7. Run output guardrails
+        output_report = await guardrail_manager.check_output(
+            text=ai_response_text,
+            user_id=user.id,
+            context={"session_id": session_id, "channel": request.channel}
+        )
+
+        # 8. Handle output guardrail violations
+        if output_report.is_blocked:
+            # Use fallback response
+            ai_response_text = output_report.final_text or "I apologize, but I need to rephrase my response. How else can I help you?"
+            metadata["guardrail_blocked_output"] = True
+            metadata["output_violations"] = [r.message for r in output_report.results if not r.passed]
+        elif output_report.final_text:
+            # Use sanitized text
+            ai_response_text = output_report.final_text
+            metadata["guardrail_sanitized_output"] = True
+
+        # 9. Calculate response time
         response_time_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
 
-        # 4. Store AI response with metadata
+        # 10. Store AI response with metadata
         ai_message = await self._store_message(
             user_id=user.id,
             session_id=session_id,
@@ -91,8 +168,11 @@ class ChatService:
             agent_calls=metadata  # Store full metadata in JSON field
         )
 
-        # 5. Return response with metadata
+        # 11. Return response with metadata
         logger.info(f"[ChatService] Message processed successfully: session={session_id}, response_time={response_time_ms}ms")
+        logger.info(f"[ChatService] Input guardrails latency: {input_report.total_latency_ms:.2f}ms")
+        logger.info(f"[ChatService] Output guardrails latency: {output_report.total_latency_ms:.2f}ms")
+
         return ChatMessageResponse(
             session_id=session_id,
             user_message=self._to_message_response(user_message),

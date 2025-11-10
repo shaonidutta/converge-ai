@@ -7,11 +7,19 @@ This uses the stable v1 API instead of the deprecated v1beta API.
 
 import os
 import json
+import time
 from typing import Optional, Dict, Any, List
 import logging
 
 import google.generativeai as genai
 from pydantic import BaseModel
+
+from src.monitoring.metrics import (
+    llm_requests_total,
+    llm_tokens_used_total,
+    llm_request_duration_seconds,
+    llm_errors_total
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,13 +87,35 @@ class LLMClient:
         Returns:
             Generated text response
         """
+        start_time = time.time()
+
         try:
+            # Track request
+            llm_requests_total.labels(model=self.model_name, operation="invoke").inc()
+
             response = self.client.generate_content(
                 contents=prompt,
                 generation_config=self.generation_config
             )
+
+            # Track success metrics
+            duration = time.time() - start_time
+            llm_request_duration_seconds.labels(model=self.model_name, operation="invoke").observe(duration)
+
+            # Track token usage if available
+            if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                if hasattr(response.usage_metadata, 'prompt_token_count'):
+                    llm_tokens_used_total.labels(model=self.model_name, token_type="input").inc(response.usage_metadata.prompt_token_count)
+                if hasattr(response.usage_metadata, 'candidates_token_count'):
+                    llm_tokens_used_total.labels(model=self.model_name, token_type="output").inc(response.usage_metadata.candidates_token_count)
+
             return response.text
         except Exception as e:
+            # Track error metrics
+            duration = time.time() - start_time
+            llm_errors_total.labels(model=self.model_name, error_type="api_error").inc()
+            llm_request_duration_seconds.labels(model=self.model_name, operation="invoke_error").observe(duration)
+
             logger.error(f"Error invoking Gemini: {e}")
             raise
 
@@ -100,7 +130,12 @@ class LLMClient:
         Returns:
             Generated text response
         """
+        start_time = time.time()
+
         try:
+            # Track request
+            llm_requests_total.labels(model=self.model_name, operation="invoke_with_messages").inc()
+
             # Extract system instruction if present
             system_instruction = None
             contents = []
@@ -135,8 +170,24 @@ class LLMClient:
                 generation_config=config
             )
 
+            # Track success metrics
+            duration = time.time() - start_time
+            llm_request_duration_seconds.labels(model=self.model_name, operation="invoke_with_messages").observe(duration)
+
+            # Track token usage if available
+            if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                if hasattr(response.usage_metadata, 'prompt_token_count'):
+                    llm_tokens_used_total.labels(model=self.model_name, token_type="input").inc(response.usage_metadata.prompt_token_count)
+                if hasattr(response.usage_metadata, 'candidates_token_count'):
+                    llm_tokens_used_total.labels(model=self.model_name, token_type="output").inc(response.usage_metadata.candidates_token_count)
+
             return response.text
         except Exception as e:
+            # Track error metrics
+            duration = time.time() - start_time
+            llm_errors_total.labels(model=self.model_name, error_type="api_error").inc()
+            llm_request_duration_seconds.labels(model=self.model_name, operation="invoke_with_messages_error").observe(duration)
+
             logger.error(f"Error invoking Gemini with messages: {e}")
             raise
 

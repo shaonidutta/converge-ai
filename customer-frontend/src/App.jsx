@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
@@ -13,9 +13,40 @@ import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
 import MyReviewsPage from "./pages/MyReviewsPage";
 import SearchResultsPage from "./pages/SearchResultsPage";
+import AddressesPage from "./pages/AddressesPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LisaChatBubble from "./components/chat/LisaChatBubble";
 import LisaChatWindow from "./components/chat/LisaChatWindow";
+import { useAuth } from "./context/AuthContext";
+
+/**
+ * Chat Components Wrapper
+ * Conditionally renders chat components based on authentication and current route
+ */
+function ChatComponents() {
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
+
+  // List of routes where chat should not be shown
+  const excludedRoutes = ['/', '/login', '/signup'];
+
+  // Don't show chat on authentication pages or landing page
+  if (excludedRoutes.includes(location.pathname)) {
+    return null;
+  }
+
+  // Only show chat for authenticated users
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return (
+    <>
+      <LisaChatBubble />
+      <LisaChatWindow />
+    </>
+  );
+}
 
 /**
  * Main App Component
@@ -98,11 +129,18 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/addresses"
+          element={
+            <ProtectedRoute>
+              <AddressesPage />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
 
-      {/* Global Chat Components */}
-      <LisaChatBubble />
-      <LisaChatWindow />
+      {/* Conditional Chat Components */}
+      <ChatComponents />
     </Router>
   );
 }

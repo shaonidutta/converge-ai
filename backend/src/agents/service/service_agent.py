@@ -347,6 +347,17 @@ class ServiceAgent:
                 entities = await self._infer_action_and_query(message, entities)
                 logger.info(f"[ServiceAgent] Inferred entities: {entities}")
 
+            # If query exists but looks like a full sentence, try to extract just the service keyword
+            if "query" in entities and message:
+                query = entities["query"]
+                # Check if query looks like a full sentence (contains common conversational words)
+                if any(word in query.lower() for word in ["i need", "i want", "tell me", "what do you", "recommend for"]):
+                    logger.info(f"[ServiceAgent] Query looks like full sentence: '{query}', extracting keyword from message")
+                    cleaned_entities = await self._infer_action_and_query(message, {})
+                    if "query" in cleaned_entities and cleaned_entities["query"] != query:
+                        entities["query"] = cleaned_entities["query"]
+                        logger.info(f"[ServiceAgent] Cleaned query: '{query}' -> '{entities['query']}'")
+
             # Get action from entities
             action = entities.get("action", "browse_categories")
             
@@ -978,10 +989,53 @@ class ServiceAgent:
                 logger.info(f"[_infer_action_and_query] Matched category pattern: {pattern}")
                 return updated_entities
 
-        # Priority 3: Service search patterns (including conversational prefixes)
+        # Priority 3: "I need X help" patterns - route to subcategory browsing
+        need_help_patterns = [
+            # "I need X help" - extract X and show subcategories
+            r'\bi\s+need\s+(?P<service>[\w\s]+?)\s+help',
+            # "I need help with X"
+            r'\bi\s+need\s+help\s+with\s+(?P<service>[\w\s]+?)(?:\s*$|[.!?])',
+        ]
+
+        for pattern in need_help_patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                service_keyword = match.group('service').strip()
+                # Clean up common words
+                service_keyword = re.sub(r'\b(the|a|an|some|any)\b', '', service_keyword).strip()
+                if service_keyword:
+                    updated_entities["action"] = "browse_subcategories_by_category"
+                    updated_entities["service_keyword"] = service_keyword
+                    logger.info(f"[_infer_action_and_query] Matched 'need help' pattern: service='{service_keyword}'")
+                    return updated_entities
+
+        # Priority 4: Recommendation patterns - route to search (not subcategory browsing)
+        # Recommendations are usually for specific problems, not categories
+        recommendation_patterns = [
+            # "What do you recommend for X"
+            r'\bwhat\s+do\s+you\s+recommend\s+for\s+(?:a\s+)?(?P<query>[\w\s]+?)(?:\s*$|[.!?])',
+            # "recommend for X", "suggestions for X"
+            r'\b(recommend|suggest|suggestions?)\s+for\s+(?:a\s+)?(?P<query>[\w\s]+?)(?:\s*$|[.!?])',
+        ]
+
+        for pattern in recommendation_patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                query = match.group('query').strip()
+                # Clean up common words
+                query = re.sub(r'\b(the|a|an|some|any)\b', '', query).strip()
+                if query:
+                    updated_entities["action"] = "search"
+                    updated_entities["query"] = query
+                    logger.info(f"[_infer_action_and_query] Matched recommendation pattern: query='{query}'")
+                    return updated_entities
+
+        # Priority 5: Service search patterns (for specific service details)
         search_patterns = [
             # "ok details on X", "details on X", "tell me about X"
             r'(?:ok\s+)?(?:details?|info|information)\s+(?:on|about|for)\s+(?P<query>[\w\s]+?)(?:\s*$|[.!?])',
+            # "tell me about X", "tell me more about X"
+            r'\btell\s+me\s+(?:more\s+)?about\s+(?P<query>[\w\s]+?)(?:\s*$|[.!?])',
             # "show/tell/give me about X services"
             r'\b(show|tell|give)\s+(me\s+)?(about\s+)?(?P<query>[\w\s]+?)\s+(services?|repair|maintenance)',
             # "search/find/look for X"

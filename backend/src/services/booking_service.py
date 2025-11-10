@@ -27,6 +27,7 @@ from src.schemas.customer import (
     SubcategoryResponse,
     CategoryResponse,
 )
+from src.monitoring.metrics import bookings_created_total
 
 logger = logging.getLogger(__name__)
 
@@ -210,10 +211,23 @@ class BookingService:
         
         await self.db.commit()
         await self.db.refresh(booking)
-        
+
+        # Track booking creation metrics
+        # Get the primary service category from the first booking item
+        if booking_items:
+            _, rate_card, subcategory = booking_items[0]
+            service_category = subcategory.category.name if subcategory and subcategory.category else "unknown"
+        else:
+            service_category = "unknown"
+
+        bookings_created_total.labels(
+            service_category=service_category,
+            status=booking.status.value
+        ).inc()
+
         logger.info(
             f"Booking created: id={booking.id}, order_id={booking.order_id}, "
-            f"user_id={user.id}"
+            f"user_id={user.id}, category={service_category}"
         )
         
         # Prepare response

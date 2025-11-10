@@ -9,12 +9,11 @@ import { Save, X } from 'lucide-react';
 
 const AddressForm = ({ address, onSave, onCancel, loading }) => {
   const [formData, setFormData] = useState({
-    address_type: 'Home',
-    street_address: '',
-    apartment_number: '',
+    address_line1: '',
+    address_line2: '',
     city: '',
     state: '',
-    postal_code: '',
+    pincode: '',
     is_default: false,
   });
 
@@ -23,12 +22,11 @@ const AddressForm = ({ address, onSave, onCancel, loading }) => {
   useEffect(() => {
     if (address) {
       setFormData({
-        address_type: address.address_type || 'Home',
-        street_address: address.street_address || '',
-        apartment_number: address.apartment_number || '',
+        address_line1: address.address_line1 || '',
+        address_line2: address.address_line2 || '',
         city: address.city || '',
         state: address.state || '',
-        postal_code: address.postal_code || '',
+        pincode: address.pincode || '',
         is_default: address.is_default || false,
       });
     }
@@ -37,8 +35,8 @@ const AddressForm = ({ address, onSave, onCancel, loading }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.street_address.trim()) {
-      newErrors.street_address = 'Street address is required';
+    if (!formData.address_line1.trim()) {
+      newErrors.address_line1 = 'Address is required';
     }
 
     if (!formData.city.trim()) {
@@ -49,10 +47,10 @@ const AddressForm = ({ address, onSave, onCancel, loading }) => {
       newErrors.state = 'State is required';
     }
 
-    if (!formData.postal_code.trim()) {
-      newErrors.postal_code = 'Postal code is required';
-    } else if (!/^\d{6}$/.test(formData.postal_code)) {
-      newErrors.postal_code = 'Invalid postal code (6 digits required)';
+    if (!formData.pincode.trim()) {
+      newErrors.pincode = 'Pincode is required';
+    } else if (!/^\d{6}$/.test(formData.pincode)) {
+      newErrors.pincode = 'Invalid pincode (6 digits required)';
     }
 
     setErrors(newErrors);
@@ -90,55 +88,38 @@ const AddressForm = ({ address, onSave, onCancel, loading }) => {
       </h2>
 
       <div className="space-y-4">
-        {/* Address Type */}
+        {/* Address Line 1 */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
-            Address Type *
-          </label>
-          <select
-            name="address_type"
-            value={formData.address_type}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-          >
-            <option value="Home">Home</option>
-            <option value="Work">Work</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-
-        {/* Street Address */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
-            Street Address *
+            Address Line 1 *
           </label>
           <input
             type="text"
-            name="street_address"
-            value={formData.street_address}
+            name="address_line1"
+            value={formData.address_line1}
             onChange={handleChange}
             className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
-              errors.street_address ? 'border-red-500' : 'border-slate-300'
+              errors.address_line1 ? 'border-red-500' : 'border-slate-300'
             }`}
-            placeholder="Enter street address"
+            placeholder="House/Flat No., Building Name, Street"
           />
-          {errors.street_address && (
-            <p className="text-sm text-red-600 mt-1">{errors.street_address}</p>
+          {errors.address_line1 && (
+            <p className="text-sm text-red-600 mt-1">{errors.address_line1}</p>
           )}
         </div>
 
-        {/* Apartment/Suite Number */}
+        {/* Address Line 2 */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
-            Apartment/Suite Number
+            Address Line 2 (Optional)
           </label>
           <input
             type="text"
-            name="apartment_number"
-            value={formData.apartment_number}
+            name="address_line2"
+            value={formData.address_line2}
             onChange={handleChange}
             className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-            placeholder="Apt, Suite, Unit, etc. (optional)"
+            placeholder="Landmark, Area, etc."
           />
         </div>
 
@@ -185,21 +166,21 @@ const AddressForm = ({ address, onSave, onCancel, loading }) => {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Postal Code *
+              Pincode *
             </label>
             <input
               type="text"
-              name="postal_code"
-              value={formData.postal_code}
+              name="pincode"
+              value={formData.pincode}
               onChange={handleChange}
               maxLength={6}
               className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 ${
-                errors.postal_code ? 'border-red-500' : 'border-slate-300'
+                errors.pincode ? 'border-red-500' : 'border-slate-300'
               }`}
               placeholder="000000"
             />
-            {errors.postal_code && (
-              <p className="text-sm text-red-600 mt-1">{errors.postal_code}</p>
+            {errors.pincode && (
+              <p className="text-sm text-red-600 mt-1">{errors.pincode}</p>
             )}
           </div>
         </div>
